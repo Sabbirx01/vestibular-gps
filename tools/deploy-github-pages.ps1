@@ -124,6 +124,10 @@ if (-not (Test-Path (Join-Path $root '.git'))) {
     & git init -b main 2>&1 | Out-Null
     Write-Host "  initialised repository"
 }
+# Regenerate the language page from index.html before staging, so the Bengali
+# URL can never be deployed out of step with the English one.
+& powershell -ExecutionPolicy Bypass -File (Join-Path $root 'tools\sync-lang-pages.ps1') 2>&1 | ForEach-Object { Write-Host ("  " + $_) }
+
 & git add -A 2>&1 | Out-Null
 $msg = 'VESTIBULAR GPS - interactive 3D vestibular navigation experience'
 & git commit -m $msg 2>&1 | Select-Object -First 2 | ForEach-Object { Write-Host ("  " + $_) }

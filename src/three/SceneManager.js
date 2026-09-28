@@ -35,12 +35,21 @@ const FRAMING = {
   'sec-final':      { focus: 'astronaut',dist: 7.4,  height: 1.8, look: 1.5,  env: 0.5 },
 };
 
-  /* Earth reference sits below the astronaut in the hero composition. The
-     active planet is a gravity reference, not a floating bubble beside the
-     helmet. */
-/* Distant background reference: the planet should sit behind the astronaut,
-   never become a foreground globe competing with the hero subject. */
-const SOLAR_POS = [1.55, -1.35, -8.8];
+/* The Earth reference in the hero composition.
+   It used to sit at [1.55, -1.35, -8.8] — roughly behind the astronaut, which
+   is how the previous author wanted it ("never become a foreground globe
+   competing with the hero subject"). That intent produced the opposite
+   complaint: at 1920x1080 the planet landed on the astronaut's torso, and in a
+   narrower window it sat squarely on the suit, so it read as a decal stuck to
+   the figure rather than as a planet.
+   It now sits clear to the RIGHT of the figure and below the spec-card grid:
+     world x 5.0  -> screen x ~1258   (astronaut body ends near x 1140)
+     world y -3.5 -> screen y ~815    (card grid bottom is y ~745)
+   The body's own drift and the camera orbit are both small compared with that
+   clearance. On phones it would fall off-screen, but the camera focus switches
+   to 'planet' there (see the mobilePlanet branch in updateCamera), so the
+   planet is tracked instead of being left behind. */
+const SOLAR_POS = [5.0, -3.5, -8.8];
 
 /* Which 3D layers are drawn in which section. Solar bodies are hidden on text-heavy
    sections so a planet can never end up sitting on top of a paragraph. */

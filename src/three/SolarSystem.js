@@ -49,11 +49,18 @@ export class SolarSystem {
     if (maps.emissiveMap) {
       mat.emissiveMap = maps.emissiveMap;
       mat.emissive = new THREE.Color(0xffffff);
-      mat.emissiveIntensity = 0.42;
+      /* Raised from 0.42: with the stronger terminator above, the night side is
+         darker, and the city lights are what make it read as a living planet
+         rather than an unlit half. */
+      mat.emissiveIntensity = 0.55;
     }
-    /* Background reference body: keep the procedural texture and atmosphere,
-       but do not let the planet dominate the astronaut composition. */
-    const showcaseRadius = spec.radius * 0.82;
+    /* Size of the showcase body. It used to be 1.16x smaller, to keep the
+       planet from competing with the astronaut — but the fix for "it looks
+       like a decal on the suit" is POSITION (it now sits clear of the figure,
+       see SOLAR_POS in SceneManager.js), not being small. At 0.95 it reads as
+       a sphere with a readable terminator instead of a blue smudge: about
+       120 px across at the hero framing distance. */
+    const showcaseRadius = spec.radius * 0.95;
     const surface = new THREE.Mesh(new THREE.SphereGeometry(showcaseRadius, seg, seg / 2), mat);
     surface.rotation.z = spec.tilt;
     grp.add(surface);
@@ -107,18 +114,22 @@ export class SolarSystem {
     grp.add(label);
     this.labels.push(label);
 
-    /* Key light from the direction of the sun */
-    const key = new THREE.DirectionalLight(0xfff6e8, 3.6);
+    /* Key light from the direction of the sun.
+       Raised from 3.6 and the fill dropped from 1.15 so the sphere carries a
+       real day/night terminator. At the old ratio the fill flattened the
+       planet into an evenly lit disc, which is one of the things that made it
+       read as a sticker instead of a lit world. */
+    const key = new THREE.DirectionalLight(0xfff6e8, 4.4);
     key.position.set(spec.radius * 4.2, spec.radius * 1.8, spec.radius * 4.2);
     grp.add(key);
 
     /* Cool fill from the opposite side so the dark limb is not pure black */
-    const fill = new THREE.DirectionalLight(0x6f9fe0, 1.15);
+    const fill = new THREE.DirectionalLight(0x6f9fe0, 0.85);
     fill.position.set(-spec.radius * 4, -spec.radius, -spec.radius * 2);
     grp.add(fill);
 
     /* Touch of bounce from below — keeps the terminator readable */
-    const bounce = new THREE.DirectionalLight(0x3f6d9c, 0.5);
+    const bounce = new THREE.DirectionalLight(0x3f6d9c, 0.38);
     bounce.position.set(0, -spec.radius * 4, spec.radius * 1.5);
     grp.add(bounce);
 

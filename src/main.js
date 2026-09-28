@@ -9,6 +9,7 @@ import {
   state, set, bus, subscribe, toast, showError,
   initEnvironment, startLinkWatchdog, startClock,
 } from './core/store.js';
+import { installTranslator, t } from './i18n/index.js';
 import { SensorHub } from './sensors/providers.js';
 import { SceneManager } from './three/SceneManager.js';
 import {
@@ -123,6 +124,15 @@ async function main() {
 
   installErrorBoundary();
   armBootFailsafe();
+
+  /* Language layer, installed before anything renders. The intro overlay is
+     static markup, so it has to be translated here rather than after the
+     sections mount; the MutationObserver inside picks up everything the panels
+     render afterwards. On an English page this is a no-op and costs a path
+     test. See src/i18n/index.js for why the copy is translated in the DOM
+     instead of at every call site. */
+  const i18n = installTranslator();
+  if (i18n.installed) console.info('[i18n] Bengali page: %d strings translated on first pass', i18n.hits);
 
   const boot = bootUI();
   const ctx = {};
@@ -291,8 +301,8 @@ main().catch((e) => {
     b.innerHTML = '';
     b.append(el('div', { class: 'boot-inner' },
       el('p', { class: 'boot-title', text: 'VESTIBULAR GPS' }),
-      el('p', { style: 'color:var(--red);font-family:var(--font-mono);font-size:var(--fs-xs);', text: 'STARTUP FAILED' }),
-      el('p', { class: 'caption', text: 'The application could not initialise in this browser. The written science remains available in docs/.' }),
+      el('p', { style: 'color:var(--red);font-family:var(--font-mono);font-size:var(--fs-xs);', text: t('STARTUP FAILED') }),
+      el('p', { class: 'caption', text: t('The application could not initialise in this browser. The written science remains available in docs/.') }),
     ));
   }
   document.body.classList.remove('vg-boot');

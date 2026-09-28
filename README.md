@@ -65,6 +65,14 @@ Do not describe the product as a validated clinical monitor. Describe it as a **
 - Camera motion values are an estimator output, not clinically calibrated head displacement.
 - Face-scan head pose is an estimator output from a skin-tone region, not a goniometer reading; it has not been compared against any real head-tracking instrument, and it has only been verified against a synthetic video stream, never against a real camera and a real person.
 - No eye landmarks, gaze tracking, or true VOR gain in the current camera provider.
+
+### Language layer (`/bn/`)
+
+- The Bengali page is served at `/bn/` from `bn/index.html`, which is **generated** from `index.html` by `tools/sync-lang-pages.ps1` (it only adds `<base href="../">`, so relative module paths resolve from the repository root). Edit `index.html`; never edit `bn/index.html`. The deploy script runs the sync before staging, so the two cannot drift.
+- `src/i18n/index.js` decides the language from the URL path alone (`/bn` → Bengali, `?lang=bn` overrides) and rewrites matching text nodes in the live DOM, with a MutationObserver so panels that render later are translated too. Renderers never call a translation function — that is what keeps a language from touching every call site.
+- Matching is **exact** on the collapsed text of a node, so a partial key silently does nothing. That is the main failure mode: an incomplete key is invisible.
+- **Coverage is partial and measured, not assumed.** Runtime reports the number of strings translated on first pass in the console (`[i18n] Bengali page: N strings translated on first pass`). `node tools/extract-strings.mjs` writes `tests/_strings.json` listing every candidate string the site contains, grouped by source file, and which ones the dictionary is missing. Its total includes code-like false positives and excludes one-word labels, so treat its percentage as an approximation in both directions.
+- Style rule: technical terms stay in English inside Bengali sentences (motion, balance, baseline, domain, VOR). Values the code also uses as identifiers are translated only in their on-screen phrasing.
 - No physical force plate, chest/head IMU, vHIT goggles, Web Bluetooth bridge, or lab instrument has been tested.
 - No clinical or physiological validation of OSI exists.
 - Chrome is the primary browser verification target; Firefox/Safari are not fully verified.

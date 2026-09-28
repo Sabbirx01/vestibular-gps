@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <base href="../">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>VESTIBULAR GPS — Explore Balance, Motion, the Brain &amp; Space</title>
+<meta name="description" content="VESTIBULAR GPS is an interactive 3D laboratory for the human balance system: semicircular canals, otolith organs, vestibular pathways, the vestibulo-ocular reflex, and how microgravity alters spatial orientation. Built on publicly documented NASA and NIH research." />
+<meta name="theme-color" content="#04060f" />
+<meta name="color-scheme" content="dark" />
+<link rel="canonical" href="./" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="VESTIBULAR GPS — Explore Balance, Motion, the Brain &amp; Space" />
+<meta property="og:description" content="An interactive 3D experience of the vestibular system, from inner ear to brainstem to microgravity adaptation." />
+<meta property="og:site_name" content="VESTIBULAR GPS" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="VESTIBULAR GPS — Explore Balance, Motion, the Brain &amp; Space" />
+<meta name="twitter:description" content="An interactive 3D experience of the vestibular system, from inner ear to brainstem to microgravity adaptation." />
+<meta name="robots" content="index,follow" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%235fe3ff' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%235fe3ff'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="./src/styles/tokens.css" />
+<link rel="stylesheet" href="./src/styles/base.css" />
+<link rel="stylesheet" href="./src/styles/components.css" />
+<link rel="stylesheet" href="./src/styles/sections.css" />
+<link rel="stylesheet" href="./src/styles/console.css" />
+</head>
+<body class="vg-boot">
+
+<a class="skip-link" href="#sec-space">Skip to content</a>
+
+<!-- ═══════════ CINEMATIC INTRO ═══════════ -->
+<div id="intro" class="intro" role="dialog" aria-modal="true" aria-label="Introduction">
+  <div class="intro-stars" aria-hidden="true"></div>
+  <div class="intro-veil" aria-hidden="true"></div>
+  <div class="intro-core">
+    <p class="intro-kicker" data-intro="0">A NEURO-VESTIBULAR SPACE NAVIGATION LABORATORY</p>
+    <h1 class="intro-title">
+      <span class="intro-line" data-intro="1">WELCOME TO</span>
+      <span class="intro-brand">
+        <span class="ch" data-intro="2">V</span><span class="ch" data-intro="2">E</span><span class="ch" data-intro="2">S</span><span class="ch" data-intro="2">T</span><span class="ch" data-intro="2">I</span><span class="ch" data-intro="2">B</span><span class="ch" data-intro="2">U</span><span class="ch" data-intro="2">L</span><span class="ch" data-intro="2">A</span><span class="ch" data-intro="2">R</span>
+        <span class="ch sp" data-intro="2">&nbsp;</span>
+        <span class="ch" data-intro="2">G</span><span class="ch" data-intro="2">P</span><span class="ch" data-intro="2">S</span>
+      </span>
+    </h1>
+    <p class="intro-sub" data-intro="3">Navigate the space between motion, balance and the brain.</p>
+    <div class="intro-bar" data-intro="4"><i></i></div>
+    <button type="button" class="intro-enter" data-intro="5" id="introEnter">
+      <span>ENTER THE EXPERIENCE</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button type="button" class="intro-skip" id="introSkip">Skip intro</button>
+  </div>
+  <div class="intro-hint" aria-hidden="true">uses your device motion &amp; orientation sensors — permission is optional</div>
+</div>
+
+<!-- ═══════════ BOOT / LOADING ═══════════ -->
+<div id="boot" class="boot" aria-live="polite">
+  <div class="boot-inner">
+    <div class="boot-mark" aria-hidden="true">
+      <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" class="boot-ring"/><circle cx="50" cy="50" r="26" class="boot-ring boot-ring-b"/><circle cx="50" cy="50" r="6" class="boot-dot"/></svg>
+    </div>
+    <p class="boot-title">VESTIBULAR GPS</p>
+    <ul class="boot-steps" id="bootSteps"></ul>
+    <div class="boot-bar"><i id="bootBar"></i></div>
+    <p class="boot-note">Real loading progress — no simulated percentage.</p>
+  </div>
+</div>
+
+<!-- ═══════════ 3D CANVAS ═══════════ -->
+<canvas id="gl" class="gl-canvas" aria-hidden="true"></canvas>
+<div class="gl-vignette" aria-hidden="true"></div>
+
+<!-- ═══════════ CUSTOM CURSOR ═══════════ -->
+<div id="cursor" class="cursor" aria-hidden="true">
+  <div class="cursor-lock"></div>
+  <svg class="cursor-ship" viewBox="0 0 40 40">
+    <g class="ship-body">
+      <path d="M20 3 L26 22 L20 18 L14 22 Z" fill="currentColor" opacity=".95"/>
+      <path d="M20 18 L25 27 L20 25 L15 27 Z" fill="currentColor" opacity=".45"/>
+      <circle cx="20" cy="20" r="2.2" fill="#0b1220"/>
+    </g>
+    <path class="ship-flame" d="M18.4 25.5 L20 33 L21.6 25.5 Z" fill="#5fe3ff" opacity=".75"/>
+  </svg>
+  <span class="cursor-label" id="cursorLabel"></span>
+</div>
+
+<!-- ═══════════ HEADER / NAV ═══════════ -->
+<header class="topbar" id="topbar">
+  <base href="../">
+  <a class="brand" href="#sec-hero" aria-label="VESTIBULAR GPS home">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".55"/><ellipse cx="16" cy="16" rx="12.5" ry="5" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".4"/><circle cx="16" cy="16" r="3.4" fill="currentColor"/></svg>
+    </span>
+    <span class="brand-text"><b>VESTIBULAR GPS</b><small>NEURO-VESTIBULAR LAB</small></span>
+  </a>
+
+  <nav class="nav" id="nav" aria-label="Sections">
+    <a href="#sec-hero">Explore</a>
+    <a href="#sec-body">Body</a>
+    <a href="#sec-ear">Ear</a>
+    <a href="#sec-brain">Brain</a>
+    <a href="#sec-vor">VOR</a>
+    <a href="#sec-sensors">Sensors</a>
+    <a href="#sec-space">Space</a>
+    <a href="#sec-lab">Lab</a>
+    <a href="#sec-console">Console</a>
+    <a href="#sec-integration">Integration</a>
+    <a href="#sec-research">Research</a>
+  </nav>
+
+  <div class="topbar-tools">
+    <button type="button" class="chip" id="modeToggle" data-mode="EARTH" aria-live="polite">
+      <span class="chip-dot"></span><span id="modeLabel">EARTH</span>
+    </button>
+    <button type="button" class="chip chip-ghost" id="sourceChip" title="Data source">
+      <span class="chip-dot" id="sourceDot"></span><span id="sourceLabel">SIMULATION</span>
+    </button>
+    <button type="button" class="chip chip-ghost" id="soundToggle" aria-pressed="false">SOUND OFF</button>
+    <button type="button" class="chip chip-ghost" id="menuToggle" aria-expanded="false" aria-controls="nav">MENU</button>
+  </div>
+</header>
+
+<!-- ═══════════ JOURNEY RAIL ═══════════ -->
+<aside class="journey" id="journey" aria-label="Vestibular journey">
+  <div class="journey-track"><i id="journeyFill"></i></div>
+  <ol id="journeyList"></ol>
+</aside>
+
+<!-- ═══════════ LIVE HUD ═══════════ -->
+<div class="hud" id="hud" aria-live="off">
+  <div class="hud-row"><span>SYSTEM</span><b>VESTIBULAR GPS</b></div>
+  <div class="hud-row"><span>MODE</span><b id="hudMode">EARTH</b></div>
+  <div class="hud-row"><span>SOURCE</span><b id="hudSource">SIMULATION</b></div>
+  <div class="hud-row"><span>ORIENTATION</span><b id="hudOrient">IDLE</b></div>
+  <div class="hud-row"><span>JERK</span><b id="hudJerk">0.0 deg/s</b></div>
+  <div class="hud-row"><span>RATE</span><b id="hudRate">0 Hz</b></div>
+  <div class="hud-row"><span>3D ENGINE</span><b id="hudEngine">—</b></div>
+  <div class="hud-fps"><i id="hudFpsFill"></i></div>
+</div>
+
+<main id="main">
+
+  <!-- ═══════════ HERO ═══════════ -->
+  <section class="section sec-hero" id="sec-hero" data-journey="01 SPACE">
+    <div class="hero-copy float-field">
+      <p class="eyebrow float" data-float="0.9">NEURO-VESTIBULAR SPACE NAVIGATION LABORATORY</p>
+      <h1 class="hero-title float" data-float="0.6">Navigate the space between <em>motion</em>, <em>balance</em> and the <em>brain</em>.</h1>
+      <p class="lede float" data-float="0.4">Your inner ear is a biological navigation instrument. It senses rotation, detects gravity, and reports to your brainstem and cerebellum in milliseconds — a system you never notice until it disagrees with what your eyes see. This is an interactive laboratory for that system, and for what happens to it when gravity changes.</p>
+      <div class="cta-row float" data-float="0.3">
+        <a class="btn btn-primary" href="#sec-ear"><span>ENTER THE EXPERIENCE</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        <a class="btn" href="#sec-research">EXPLORE THE SCIENCE</a>
+      </div>
+      <p class="disclaimer float" data-float="0.2">Educational visualization. Not a medical device, not a diagnostic tool, and not affiliated with or endorsed by NASA.</p>
+    </div>
+
+    <div class="hero-specs float-field">
+      <article class="spec glass float" data-float="0.5">
+        <p class="spec-k">SEMICIRCULAR CANALS</p>
+        <p class="spec-v">3</p>
+        <p class="spec-d">Angular acceleration — one plane each: anterior, posterior, lateral.</p>
+      </article>
+      <article class="spec glass float" data-float="0.7">
+        <p class="spec-k">OTOLITH ORGANS</p>
+        <p class="spec-v">2</p>
+        <p class="spec-d">Utricle and saccule sense linear acceleration and head tilt.</p>
+      </article>
+      <article class="spec glass float" data-float="0.35">
+        <p class="spec-k">CANAL ARRANGEMENT</p>
+        <p class="spec-v">~90<small>°</small></p>
+        <p class="spec-d">The three canals sit at roughly right angles to one another, one plane each.</p>
+      </article>
+      <article class="spec glass float" data-float="0.6">
+        <p class="spec-k">OTOCONIA</p>
+        <p class="spec-v">CaCO<small>3</small></p>
+        <p class="spec-d">Dense calcium-carbonate grains that gravity pulls on to signal head position.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════ BODY ═══════════ -->
+  <section class="section" id="sec-body" data-journey="02 BODY">
+    <header class="section-head">
+  <base href="../">
+      <p class="eyebrow">02 / SENSORIMOTOR SYSTEM</p>
+      <h2>Your body knows where you are.</h2>
+      <p class="lede">Balance is not one sense. It is a continuous arbitration between three inputs that your brain must reconcile — and when they disagree, you feel it.</p>
+    </header>
+
+    <div class="grid grid-3">
+      <article class="glass card reveal">
+        <h3>Vision</h3>
+        <p>Your eyes report the position and movement of the world relative to you. Vision is the dominant input when the other two conflict — which is exactly what causes motion sickness.</p>
+        <p class="tag">SOURCE: NIH / NIDCD</p>
+      </article>
+      <article class="glass card reveal">
+        <h3>Vestibular</h3>
+        <p>The inner ear reports head rotation and linear acceleration. Unlike vision it has no off switch — you cannot close your ears.</p>
+        <p class="tag">SOURCE: NCBI NEUROSCIENCE</p>
+      </article>
+      <article class="glass card reveal">
+        <h3>Proprioception</h3>
+        <p>Muscle spindles, joint receptors and pressure sensors in your feet report how your body is loaded and oriented against a surface.</p>
+        <p class="tag">SOURCE: NIH / NIDCD</p>
+      </article>
+    </div>
+
+    <div class="grid grid-aside">
+      <div class="glass stage reveal">
+        <canvas id="subjectCanvas" class="stage-canvas" aria-label="Standing figure being measured, showing body axis, head axis, centre of gravity and vestibular signal lines"></canvas>
+        <div class="stage-tools">
+          <button type="button" class="btn btn-sm" id="subjectReset">RESET VIEW</button>
+          <button type="button" class="btn btn-sm" id="subjectToggleAxes">VECTORS</button>
+          <span class="badge" id="subjectPose">ARMS EXTENDED &middot; NEUTRAL</span>
+        </div>
+      </div>
+
+      <div class="aside">
+        <div class="glass panel reveal">
+          <div class="panel-head">
+            <h3>The measurement frame</h3>
+            <p>This is the instrument view: a standing subject, arms extended, turning slowly while the reference frame stays fixed. The number you read anywhere else on this page comes from the same idea — comparing a person against their own reference, not against a crowd.</p>
+          </div>
+          <dl class="kv">
+            <div><dt>BODY AXIS</dt><dd>Cyan — the vertical reference</dd></div>
+            <div><dt>HEAD AXIS</dt><dd>Violet — tracked independently of the body</dd></div>
+            <div><dt>CENTRE OF GRAVITY</dt><dd>Amber marker</dd></div>
+            <div><dt>ORIENTATION VECTORS</dt><dd>Forward, lateral and up from the head</dd></div>
+            <div><dt>SIGNAL LINES</dt><dd>Violet: inner ear toward the brainstem</dd></div>
+          </dl>
+          <p class="caption">Illustration only. This is not a biomechanical model, not a clinical assessment, and not a measurement of any real person.</p>
+        </div>
+
+        <div class="glass panel flow-panel reveal">
+          <div class="flow" role="img" aria-label="Sensory convergence diagram: vision, vestibular and proprioception converge on the brain, which outputs posture and gaze control.">
+            <span class="flow-in">VISION</span>
+            <span class="flow-in">VESTIBULAR</span>
+            <span class="flow-in">PROPRIOCEPTION</span>
+            <span class="flow-arrow">&rarr;</span>
+            <span class="flow-core">BRAINSTEM &middot; CEREBELLUM</span>
+            <span class="flow-arrow">&rarr;</span>
+            <span class="flow-out">POSTURE</span>
+            <span class="flow-out">GAZE STABILIZATION</span>
+            <span class="flow-out">ORIENTATION</span>
+          </div>
+          <p class="caption">Conceptual schematic. Real convergence is parallel and heavily bidirectional — this diagram is a simplification, not a wiring diagram.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass panel reveal">
+      <div class="panel-head">
+        <h3>Adjust the sensory inputs</h3>
+        <p>Move the three weights and watch the model lean. This is a demonstration of arbitration behaviour, not a biomechanical simulation.</p>
+      </div>
+      <div class="sliders" id="bodyWeights"></div>
+      <div id="bodyReadout" class="readout"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ INNER EAR ═══════════ -->
+  <section class="section" id="sec-ear" data-journey="03 EAR">
+    <header class="section-head">
+  <base href="../">
+      <p class="eyebrow">03 / PERIPHERAL VESTIBULAR SYSTEM</p>
+      <h2>Three canals. Two otolith organs. One nerve.</h2>
+      <p class="lede">Drag to orbit the model. Select a structure to read what it senses and how. Rotate the head controller and watch which canal responds.</p>
+    </header>
+
+    <div class="grid grid-aside">
+      <div class="glass stage reveal">
+        <canvas id="earCanvas" class="stage-canvas" aria-label="Interactive 3D model of the vestibular apparatus"></canvas>
+        <div class="stage-tools">
+          <button type="button" class="btn btn-sm" id="earReset">RESET VIEW</button>
+          <button type="button" class="btn btn-sm" id="earToggleLabels">LABELS</button>
+          <span class="badge" id="earActive">—</span>
+        </div>
+      </div>
+
+      <div class="aside">
+        <div class="glass panel reveal">
+          <div class="panel-head">
+            <h3 id="earTitle">Select a structure</h3>
+            <p id="earBlurb">Drag the model, or pick a structure from the list.</p>
+          </div>
+          <div class="pill-list" id="earList"></div>
+        </div>
+
+        <div class="glass panel reveal">
+          <div class="panel-head"><h3>Head rotation input</h3><p>Simulated angular velocity drives canal fluid motion.</p></div>
+          <label class="range"><span>YAW <b id="earYawV">0&deg;</b></span><input type="range" id="earYaw" min="-180" max="180" value="0" step="1" /></label>
+          <label class="range"><span>PITCH <b id="earPitchV">0&deg;</b></span><input type="range" id="earPitch" min="-90" max="90" value="0" step="1" /></label>
+          <label class="range"><span>ROLL <b id="earRollV">0&deg;</b></span><input type="range" id="earRoll" min="-90" max="90" value="0" step="1" /></label>
+          <div class="canal-meters" id="earCanals"></div>
+        </div>
+
+        <div class="glass panel reveal" id="earDetail">
+          <div class="panel-head"><h3>Structure</h3></div>
+          <dl class="kv" id="earKv"></dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ BRAIN ═══════════ -->
+  <section class="section" id="sec-brain" data-journey="04 BRAIN">
+    <header class="section-head">
+  <base href="../">
+      <p class="eyebrow">04 / CENTRAL VESTIBULAR PROCESSING</p>
+      <h2>The brain turns motion into orientation.</h2>
+      <p class="lede">Vestibular signals travel the eighth cranial nerve to the brainstem, are calibrated by the cerebellum, and reach cortex — where they are combined with vision and proprioception into a single sense of where you are.</p>
+    </header>
+
+    <div class="grid grid-aside">
+      <div class="glass stage reveal">
+        <canvas id="brainCanvas" class="stage-canvas" aria-label="Interactive 3D model of central vestibular pathways"></canvas>
+        <div class="stage-tools">
+          <button type="button" class="btn btn-sm" id="brainReset">RESET VIEW</button>
+          <button type="button" class="btn btn-sm" id="brainPulse">PULSE SIGNAL</button>
+          <span class="badge" id="brainActive">IDLE</span>
+        </div>
+      </div>
+
+      <div class="aside">
+        <div class="glass panel reveal">
+          <div class="panel-head"><h3>Pathway stage</h3><p>Step through the route from end organ to cortex.</p></div>
+          <div class="pill-list" id="brainList"></div>
+        </div>
+        <div class="glass panel reveal">
+          <div class="panel-head"><h3>Stage detail</h3></div>
+          <dl class="kv" id="brainKv"></dl>
+          <p class="caption" id="brainConfidence"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ VOR ═══════════ -->
+  <section class="section" id="sec-vor" data-journey="05 VOR">
+    <header class="section-head">
+  <base href="../">
+      <p class="eyebrow">05 / VESTIBULO-OCULAR REFLEX</p>
+      <h2>Why the world stays still when your head does not.</h2>
+      <p class="lede">Shake your head from side to side. The world does not blur. The vestibulo-ocular reflex drives your eyes in the opposite direction at almost exactly equal speed, stabilising the image on the retina with a latency of a few milliseconds.</p>
+    </header>
+
+    <div class="grid grid-aside">
+      <div class="glass stage stage-vor reveal">
+        <canvas id="vorCanvas" class="stage-canvas" aria-label="Vestibulo-ocular reflex simulation: a head rotates while the eyes counter-rotate to hold the target steady"></canvas>
+        <div class="stage-tools">
+          <button type="button" class="btn btn-sm" id="vorPlay">PAUSE</button>
+          <span class="badge" id="vorGainBadge">GAIN 0.82</span>
+        </div>
+      </div>
+
+      <div class="aside">
+        <div class="glass panel reveal">
+          <div class="panel-head"><h3>Stimulus</h3><p>Head rotation is sinusoidal; eye velocity is modelled as a counter-rotation.</p></div>
+          <label class="range"><span>FREQUENCY <b id="vorFreqV">0.50 Hz</b></span><input type="range" id="vorFreq" min="0.1" max="4" step="0.05" value="0.5" /></label>
+          <label class="range"><span>AMPLITUDE <b id="vorAmpV">20&deg;</b></span><input type="range" id="vorAmp" min="2" max="60" step="1" value="20" /></label>
+          <label class="range"><span>REFLEX GAIN <b id="vorGainV">0.82</b></span><input type="range" id="vorGain" min="0" max="1.4" step="0.02" value="0.82" /></label>
+          <p class="caption">Gain 1.0 means eye velocity matches head velocity. Below ~0.7, retinal slip becomes visible — the world would smear.</p>
+        </div>
+        <div class="glass panel reveal">
+          <div class="panel-head"><h3>Live trace</h3></div>
+          <canvas id="vorChart" class="chart" aria-label="Line chart of head velocity and eye velocity over time"></canvas>
+          <dl class="kv" id="vorKv"></dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ SENSORS ═══════════ -->
+  <section class="section" id="sec-sensors" data-journey="06 SENSOR">
+    <header class="section-head">
+  <base href="../">
+      <p class="eyebrow">06 / REALTIME SENSOR LINK</p>
+      <h2>Move. The system feels it.</h2>
+      <p class="lede">The same signals your vestibular system uses — rotation and linear acceleration — are available in your browser. With your permission, this page can read them and drive the 3D scene live. Nothing is uploaded. Everything is processed on this device.</p>
+    </header>
+
+    <div class="grid grid-3">
+      <article class="glass card reveal">
+        <h3>Consent first</h3>
+        <p>Each sensor is requested separately, with a plain-language reason. Refusing any of them leaves the rest of the experience fully usable.</p>
+        <div class="perm-row">
+          <button type="button" class="btn btn-sm" id="permOrientation">ALLOW ORIENTATION</button>
+          <span class="badge" id="permOrientationState">NOT REQUESTED</span>
+        </div>
+        <div class="perm-row">
+          <button type="button" class="btn btn-sm" id="permMotion">ALLOW MOTION</button>
+          <span class="badge" id="permMotionState">NOT REQUESTED</span>
+        </div>
+        <div class="perm-row">
+          <button type="button" class="btn btn-sm" id="permGeo">ALLOW LOCATION</button>
+          <span class="badge" id="permGeoState">NOT REQUESTED</span>
+        </div>
+        <p class="tag" id="secureNote"></p>
+      </article>
+
+      <article class="glass card reveal">
+        <h3>Source</h3>
+        <p>Switch between a live device sensor and a generated signal. The interface always states which one is driving the scene.</p>
+        <div class="btn-row">
+          <button type="button" class="btn btn-sm is-on" data-source="SIMULATION">SIMULATION</button>
+          <button type="button" class="btn btn-sm" data-source="LIVE_SENSOR">LIVE SENSOR</button>
+          <button type="button" class="btn btn-sm" data-source="REPLAY">REPLAY</button>
+        </div>
+        <p class="caption" id="sourceExplain">No sensor connected. Values are mathematically generated and labelled as simulation everywhere they appear.</p>
+      </article>
+
+      <article class="glass card reveal">
+        <h3>Sensor simulator</h3>
+        <p>No hardware needed. Drive the entire pipeline by hand to reproduce any state.</p>
+        <label class="range"><span>YAW <b id="simYawV">0&deg;</b></span><input type="range" id="simYaw" min="-180" max="180" value="0" step="1" /></label>
+        <label class="range"><span>PITCH <b id="simPitchV">0&deg;</b></span><input type="range" id="simPitch" min="-90" max="90" value="0" step="1" /></label>
+        <label class="range"><span>ROLL <b id="simRollV">0&deg;</b></span><input type="range" id="simRoll" min="-90" max="90" value="0" step="1" /></label>
+        <label class="range"><span>LINEAR ACCEL <b id="simAccV">0.00 g</b></span><input type="range" id="simAcc" min="-2" max="2" value="0" step="0.01" /></label>
+        <button type="button" class="btn btn-sm" id="simAuto">REPLAY MOTION SEQUENCE</button>
+      </article>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="glass panel reveal">
+        <div class="panel-head"><h3>Orientation stream</h3><p>Rolling window of angular rate, in degrees per second.</p></div>
+        <canvas id="sensorChart" class="chart chart-tall" aria-label="Rolling chart of angular velocity"></canvas>
+        <div class="legend">
+          <span><i style="background:var(--cyan)"></i>YAW</span>
+          <span><i style="background:var(--violet)"></i>PITCH</span>
+          <span><i style="background:var(--amber)"></i>ROLL</span>
+        </div>
+      </div>
+      <div class="glass panel reveal">
+        <div class="panel-head"><h3>Attitude indicators</h3><p>Derived from the same state that drives the 3D scene.</p></div>
+        <div class="attitude" id="attitude"></div>
+        <dl class="kv" id="sensorKv"></dl>
+      </div>
+    </div>
+
+    <div class="glass panel reveal">
+      <div class="panel-head"><h3>Session recorder</h3><p>Capture the stream, then play it back. Stored in memory on this device only — never uploaded.</p></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-sm" id="recStart">START RECORDING</button>
+        <button type="button" class="btn btn-sm" id="recStop" disabled>STOP</button>
+        <button type="button" class="btn btn-sm" id="recPlay" disabled>PLAY BACK</button>
+        <button type="button" class="btn btn-sm" id="recExportJson" disabled>EXPORT JSON</button>
+        <button type="button" class="btn btn-sm" id="recExportCsv" disabled>EXPORT CSV</button>
+      </div>
+      <p class="caption" id="recStatus">Idle. No samples captured.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════ SPACE ═══════════ -->
+  <section class="section" id="sec-space" data-journey="07 MICROGRAVITY">
+    <header class="section-head">
+  <base href="../">
+      <p class="eyebrow">07 / GRAVITY TRANSITION</p>
+      <h2>What happens when gravity changes?</h2>
+      <p class="lede">On Earth your otolith organs are loaded by 1&nbsp;g continuously, giving your brain a stable reference for "down". In microgravity that reference disappears. The canals still report rotation perfectly — but the constant signal that told your brain which way is down goes quiet.</p>
+    </header>
+
+    <div class="glass panel reveal">
+      <div class="btn-row btn-row-center" id="gravityRow"></div>
+      <div class="gravity-readout" id="gravityReadout"></div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="glass panel reveal">
+        <div class="panel-head"><h3>Otolith load</h3><p>Conceptual model of otoconia displacement under different gravitational accelerations.</p></div>
+        <div class="otolith-viz" id="otolithViz"></div>
+        <p class="caption" id="otolithCaption"></p>
+      </div>
+      <div class="glass panel reveal">
+        <div class="panel-head"><h3>Adaptation timeline</h3><p>Select a phase. Documented findings and modelled behaviour are labelled separately.</p></div>
+        <div class="timeline" id="timeline"></div>
+        <div class="timeline-detail" id="timelineDetail"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ LAB ═══════════ -->
+  <section class="section" id="sec-lab" data-journey="08 LAB">
+    <header class="section-head">
+  <base href="../">
+      <p class="eyebrow">08 / INTERACTIVE TEST LAB</p>
+      <h2>Vestibular Lab</h2>
+      <p class="lede">Six demonstrations. Each one shows what is being measured, what the mathematics does, and where the science comes from — with a clear line between what is documented and what is simulated here.</p>
+    </header>
+
+    <div class="lab-grid" id="labGrid"></div>
+
+    <div class="glass panel lab-runner reveal" id="labRunner">
+      <div class="panel-head">
+        <h3 id="labTitle">Select a test</h3>
+        <p id="labSub">Pick one of the six demonstrations above.</p>
+      </div>
+      <div class="lab-body">
+        <div class="lab-stage"><canvas id="labCanvas" class="chart chart-tall" aria-label="Test output"></canvas></div>
+        <div class="lab-side">
+          <div class="btn-row"><button type="button" class="btn btn-sm btn-primary" id="labRun">RUN</button><button type="button" class="btn btn-sm" id="labClear">CLEAR</button></div>
+          <div class="lab-metrics" id="labMetrics"></div>
+          <div class="lab-explain">
+            <details><summary><b>WHAT</b> is being shown</summary><p id="labWhat"></p></details>
+            <details><summary><b>WHY</b> it behaves this way</summary><p id="labWhy"></p></details>
+            <details><summary><b>HOW</b> the biology does it</summary><p id="labHow"></p></details>
+            <details class="src"><summary><b>SOURCE</b></summary><ul id="labSource"></ul></details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ MISSION CONSOLE ═══════════ -->
+  <section class="section" id="sec-console" data-journey="09 CONSOLE">
+    <header class="section-head">
+  <base href="../">
+      <p class="eyebrow">09 / MISSION CONSOLE</p>
+      <h2>The instrument, not just the explanation.</h2>
+      <p class="lede">Everything above this line explains the vestibular system. From here down it behaves like the product that would actually fly: a reference the crew maintains for themselves, an index that carries its own uncertainty, an advisory that respects who really holds the authority, and countermeasures that are only credited when the change clears the measurement noise floor.</p>
+    </header>
+
+    <div class="glass panel reveal">
+      <div class="panel-head">
+        <h3>Session controls</h3>
+        <p>The index cannot report until a personal reference exists. Capture at least three baseline sessions &mdash; from the live channels, from the simulator in section 06, or by ingesting a payload in section 10. Until then the console says so rather than inventing a number.</p>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" id="consoleCapture">CAPTURE BASELINE SESSION</button>
+        <span class="tag tag-info">SELF-REFERENCED &middot; NOT A POPULATION NORM</span>
+      </div>
+      <div class="ctl-row">
+        <label for="consoleSymptoms">MOTION SYMPTOMS (SELF-REPORT)</label>
+        <input type="range" id="consoleSymptoms" min="0" max="10" step="1" value="1" />
+        <output id="consoleSymptomsOut">1/10</output>
+      </div>
+      <div class="ctl-row">
+        <label for="consoleTask">UPCOMING TASK</label>
+        <select id="consoleTask" class="ingest-box" style="margin:0;padding:9px 12px;max-width:340px">
+          <option value="Mars surface EVA">Mars surface EVA</option>
+          <option value="Post-landing egress">Post-landing egress</option>
+          <option value="Manual docking">Manual docking</option>
+          <option value="Rover traverse">Rover traverse</option>
+          <option value="Routine monitoring">Routine monitoring</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="consoleBody"></div>
+  </section>
+
+  <!-- ═══════════ INTEGRATION ═══════════ -->
+  <section class="section" id="sec-integration" data-journey="10 INTEGRATION">
+    <header class="section-head">
+  <base href="../">
+      <p class="eyebrow">10 / INTEGRATION</p>
+      <h2>How this connects to real instruments.</h2>
+      <p class="lede">A monitor is only as good as what feeds it. This section is the honest answer to &ldquo;how would you hook this up to the astronaut&rsquo;s actual equipment&rdquo;: a documented ingestion contract, three transport paths, a mapping from every domain to the instrument NASA or its analogs really use, and a live path you can test right here by pasting a payload.</p>
+    </header>
+
+    <div id="integrationBody"></div>
+  </section>
+
+  <!-- ═══════════ RESEARCH ═══════════ -->
+  <section class="section" id="sec-research" data-journey="11 RESEARCH">
+    <header class="section-head">
+  <base href="../">
+      <p class="eyebrow">11 / RESEARCH</p>
+      <h2>Where the science comes from.</h2>
+      <p class="lede">Every scientific statement on this site is traceable to a source below. Where something is a model or a simplification, it says so on the page. Where it is documented practice or published research, the reference is listed here.</p>
+    </header>
+
+    <div class="glass panel reveal">
+      <div class="panel-head"><h3>Filter</h3></div>
+      <div class="btn-row" id="researchFilters"></div>
+      <p class="caption" id="researchCount"></p>
+    </div>
+
+    <div class="src-grid" id="researchGrid"></div>
+
+    <div class="glass panel reveal">
+      <div class="panel-head"><h3>Integrity statement</h3></div>
+      <ul class="plain">
+        <li>No clinical claim is made anywhere on this site. Nothing here diagnoses, screens for, or treats any condition.</li>
+        <li>All generated data is labelled <b>SIMULATION</b> wherever it appears. Recorded data is labelled <b>REPLAY</b>. Only a live device sensor is labelled <b>LIVE SENSOR</b>.</li>
+        <li>This project is inspired by publicly documented spaceflight and vestibular research. It is not affiliated with, approved by, or endorsed by NASA or any agency.</li>
+        <li>Anatomical models are interactive illustrations built from procedural geometry. They are anatomically informed but not patient-derived imaging.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═══════════ FINAL ═══════════ -->
+  <section class="section sec-final" id="sec-final" data-journey="12 FINAL">
+    <div class="final-inner float-field">
+      <h2 class="final-title float" data-float="0.5">You are always navigating.</h2>
+      <p class="final-sub float" data-float="0.3">The question is how your brain knows where you are.</p>
+      <div class="cta-row float" data-float="0.2">
+        <a class="btn btn-primary" href="#sec-hero">EXPLORE AGAIN</a>
+        <a class="btn" href="#sec-lab">ENTER VESTIBULAR LAB</a>
+        <a class="btn" href="#sec-research">EXPLORE RESEARCH</a>
+      </div>
+      <p class="disclaimer">Educational visualization built on publicly documented research. Not a medical device. No agency affiliation.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-left">
+    <b>VESTIBULAR GPS</b>
+    <span>Neuro-vestibular space navigation laboratory</span>
+  </div>
+  <div class="footer-sources">
+    <span>SOURCES</span>
+    <button type="button" class="linkish" data-goto="#sec-research">NASA &middot; NIH / NIDCD &middot; NCBI &middot; PubMed</button>
+  </div>
+  <div class="footer-right">
+    <span id="footerEngine">3D: —</span>
+    <span id="footerQuality">QUALITY: —</span>
+    <button type="button" class="linkish" id="debugToggle">DEBUG</button>
+  </div>
+</footer>
+
+<!-- ═══════════ DEBUG OVERLAY ═══════════ -->
+<div class="debug" id="debug" hidden>
+  <p><span>FPS</span><b id="dbgFps">—</b></p>
+  <p><span>DRAW CALLS</span><b id="dbgCalls">—</b></p>
+  <p><span>TRIANGLES</span><b id="dbgTris">—</b></p>
+  <p><span>GPU</span><b id="dbgGpu">—</b></p>
+  <p><span>ACTIVE OBJS</span><b id="dbgObjs">—</b></p>
+  <p><span>SENSOR</span><b id="dbgSensor">—</b></p>
+  <p><span>ASSETS</span><b id="dbgAssets">—</b></p>
+</div>
+
+<!-- ═══════════ TOASTS ═══════════ -->
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<noscript>
+  <div class="noscript">
+    <h2>JavaScript required</h2>
+    <p>VESTIBULAR GPS is an interactive 3D laboratory — the visualization, sensor pipeline and lab demonstrations are computed in your browser. The written science on this page is also available in <a href="./docs/SOURCES.md">docs/SOURCES.md</a>.</p>
+  </div>
+</noscript>
+
+<script type="module" src="./src/main.js"></script>
+
+<!-- ─────────────────────────────────────────────────────────────
+     BOOT GUARD — deliberately a CLASSIC script, not a module.
+     If the ES module graph fails to load (stale cached module, missing
+     export, blocked fetch) nothing inside main.js can ever run, so the
+     failsafe that lives there is unreachable and the loading curtain
+     would stay up forever. This guard runs regardless.
+     ───────────────────────────────────────────────────────────── -->
+<script>
+(function () {
+  var TIMEOUT_MS = 15000;
+
+  function curtainDown() {
+    var b = document.getElementById('boot');
+    if (b) { b.classList.add('is-done'); b.style.display = 'none'; }
+    document.body.classList.remove('vg-boot');
+    document.body.classList.remove('vg-intro');
+    var i = document.getElementById('intro');
+    if (i) i.style.display = 'none';
+    var t = document.getElementById('toasts');
+    if (t) {
+      var d = document.createElement('div');
+      d.className = 'toast err';
+      d.innerHTML = '<b>MODULE LOAD FAILED</b>' +
+        'The application scripts did not run. This is almost always a stale cached module. ' +
+        '<b>Hard-reload with Ctrl+Shift+R</b> (or Cmd+Shift+R). To avoid it entirely, serve the folder with the bundled ' +
+        '<code>serve.py</code>, which sends <code>Cache-Control: no-store</code>.';
+      t.appendChild(d);
+    }
+  }
+
+  var guard = setTimeout(function () {
+    if (window.__VG_STARTED__) return;
+    curtainDown();
+  }, TIMEOUT_MS);
+
+  window.addEventListener('error', function (e) {
+    var msg = e && e.message ? String(e.message) : '';
+    if (/does not provide an export|Importing a module script failed|Failed to fetch dynamically imported module|Cannot use import statement/i.test(msg)) {
+      clearTimeout(guard);
+      if (window.__VG_STARTED__) return;
+      curtainDown();
+    }
+  }, true);
+
+  /* main.js sets this the moment it begins executing */
+  window.__VG_BOOT_GUARD_CLEAR__ = function () { clearTimeout(guard); };
+})();
+</script>
+</body>
+</html>
