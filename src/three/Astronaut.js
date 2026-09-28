@@ -197,13 +197,15 @@ export class FloatingAstronaut {
       /* Name-aware dressing: it keeps the suit's authored albedo and its
          transmission/ior glass for the helmet, and tunes only surface
          response. Lighting comes from the scene environment map. */
+      /* The GLB node is authored with a +90° X export rotation. Cancel that
+         source rotation once at the scene clone, before measuring bounds. If it
+         is left in place, the astronaut's feet/head axis is rotated into the
+         wrong plane and a later 360° yaw looks like an upside-down roll. */
+      model.rotation.set(-Math.PI / 2, 0, 0);
       dressMaterials(model);
 
       const carrier = normalizeModel(model, { targetSize: 1.86, dropToFloor: false });
-      /* The downloaded GLB node carries a +90° X correction from its Blender
-         export. It is already baked into the cloned model; applying it again
-         at the carrier level is what made the suit appear upside-down. Keep
-         the model's vertical axis and only correct its measured front yaw. */
+      /* The carrier is now upright; only Y is allowed to turn the suit. */
       carrier.rotation.set(0, 0, 0);
       carrier.position.y = 0.02;
 
@@ -288,7 +290,10 @@ export class FloatingAstronaut {
          second time: that double transform was the source of the sideways
          entrance pose. Keep the first frame perfectly level; later movement
          is only a very small pointer/gravity response. */
-      this.realBody.rotation.y = 0;
+      /* Preserve the measured front yaw from loadReal(). Only the root handles
+         pointer steering; resetting this to zero every frame could turn a
+         re-exported asset back-facing after its correction was applied. */
+      this.realBody.rotation.y = this.assetFront < 0 ? Math.PI : 0;
       this.realBody.rotation.z = interactive ? Math.sin(t * 0.33) * 0.008 * floatAmt : 0;
       this.realBody.rotation.x = interactive ? Math.cos(t * 0.27) * 0.010 * floatAmt : 0;
       this.realBody.position.y = 0.02 + (interactive ? Math.sin(t * 0.4) * 0.008 * floatAmt : 0);
@@ -542,11 +547,13 @@ export class MeasurementSubject {
       /* Lower emissive floor than the floating figure: inside the instrument
          frame the subject was washing out to near-white with no readable
          surface detail. More metalness and less self-glow restores contrast. */
+      /* Same GLB correction as the hero: cancel the source +90° X node
+         rotation before normalization, so the measurement figure is upright.
+         Its 360° interaction is then a clean Y-axis turn. */
+      model.rotation.set(-Math.PI / 2, 0, 0);
       dressMaterials(model);
 
       const carrier = normalizeModel(model, { targetSize: 2.0, dropToFloor: true });
-      /* Preserve the asset's authored upright axis; apply only the measured
-         front correction below. Never rotate the suit around X/Z here. */
       carrier.rotation.set(0, 0, 0);
 
       this.body.visible = false;
@@ -595,7 +602,9 @@ export class MeasurementSubject {
        whole. The hidden procedural body below keeps running, which costs
        nothing and means the overlays always update on the same code path. */
     if (this.usingRealModel && this.realBody) {
-      this.realBody.rotation.y = interactive ? this.pointer.x * 0.5 : 0;
+      /* Keep the asset front correction and let the parent/root provide any
+         interactive yaw. X/Z remain small visual drift only—never a roll. */
+      this.realBody.rotation.y = this.assetFront < 0 ? Math.PI : 0;
       this.realBody.rotation.x = interactive ? Math.sin(t * 0.4) * 0.006 * q : 0;
     }
 
