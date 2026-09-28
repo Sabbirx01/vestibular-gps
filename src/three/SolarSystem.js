@@ -196,6 +196,16 @@ export class SolarSystem {
 
       b.userData.surface.rotation.y += dt * spec.spin * q;
       if (b.userData.clouds) b.userData.clouds.rotation.y += dt * (spec.spin * 1.35) * q;
+
+      /* Slow orbital drift, so the bodies visibly travel rather than only
+         spinning in place. The amplitude is deliberately small: this section's
+         framing aims at the fixed SOLAR_POS, not at the body, so a wide
+         revolution would walk the planet straight out of frame. At 0.46 units
+         on a 5.8-unit framing distance it is unmistakable motion that never
+         leaves the composition. */
+      const phase = k.length * 0.7;
+      b.position.x = Math.sin(t * 0.055 + phase) * 0.46 * q;
+      b.position.z = Math.cos(t * 0.055 + phase) * 0.24 * q;
       b.position.y = Math.sin(t * 0.24 + k.length) * 0.13 * q;
 
       /* Scale in with the same fast crossfade so the new planet feels like a

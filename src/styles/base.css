@@ -77,6 +77,48 @@ em { font-style: normal; color: var(--cyan); }
   letter-spacing: var(--ls-wide); text-transform: uppercase;
   color: var(--faint);
 }
+/* Status chips.
+   Every .tag-* modifier below was referenced from the UI (14 call sites:
+   MEASURED / SIMULATED / REPORTED / DERIVED / CONFIDENCE / PROTOCOL /
+   advisory level / provider state) but none was ever defined, so every
+   status rendered in the same grey and the honesty labels carried no visual
+   signal at all. Each state now gets a tinted ground and ring, so a
+   simulated channel cannot be mistaken for a measured one on a projector or
+   in a screen recording. */
+.tag-ok, .tag-green, .tag-normal, .tag-measured {
+  color: var(--green); background: var(--green-dim);
+  border-color: rgba(74, 222, 128, 0.30);
+}
+.tag-warn, .tag-amber, .tag-reduced, .tag-reported {
+  color: var(--amber); background: var(--amber-dim);
+  border-color: rgba(255, 181, 71, 0.32);
+}
+.tag-simulated, .tag-model {
+  color: var(--violet); background: var(--violet-dim);
+  border-color: rgba(168, 119, 255, 0.32);
+}
+.tag-bad, .tag-red, .tag-low {
+  color: var(--red); background: var(--red-dim);
+  border-color: rgba(255, 95, 109, 0.32);
+}
+.tag-info, .tag-derived {
+  color: var(--cyan); background: var(--cyan-dim);
+  border-color: rgba(95, 227, 255, 0.28);
+}
+.tag-unavailable {
+  color: var(--faint); background: rgba(139, 163, 196, 0.10);
+  border-color: rgba(139, 163, 196, 0.26);
+}
+.tag-ok, .tag-green, .tag-normal, .tag-measured,
+.tag-warn, .tag-amber, .tag-reduced, .tag-reported,
+.tag-simulated, .tag-model,
+.tag-bad, .tag-red, .tag-low,
+.tag-info, .tag-derived,
+.tag-unavailable {
+  display: inline-block; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid transparent; line-height: 1.55;
+  white-space: nowrap;
+}
 .disclaimer {
   font-size: var(--fs-xs); color: var(--faint);
   max-width: 62ch; line-height: 1.6;

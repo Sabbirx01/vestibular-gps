@@ -21,15 +21,41 @@ import {
 
 const STORE_KEY = 'vgps.console.v1';
 
-/** Human-readable provenance for every channel the index consumes. */
-const CHANNEL_SOURCE = {
-  eye_head: { kind: 'measured', via: 'CameraProvider jitter/travel, or the VOR demo gain' },
-  body_control: { kind: 'measured', via: 'DeviceMotion / orientation stream RMS' },
-  task_perf: { kind: 'measured', via: 'Lab tests 01 and 04 reaction time' },
-  symptoms: { kind: 'reported', via: 'Crew self-report, entered here' },
-  head_motion: { kind: 'measured', via: 'Gyroscope and camera global motion' },
-  drift: { kind: 'derived', via: 'Change in baseline centre over days' },
+/**
+ * How each *runtime* provenance string is presented.
+ *
+ * This used to be a static map keyed by channel id, with every measured-looking
+ * channel hard-coded to `kind: 'measured'`. Because the rendered "via" text fell
+ * back to that map instead of the live value, a channel fed by the simulator
+ * still displayed MEASURED directly underneath a HUD chip reading SIMULATION —
+ * the runtime provenance string was computed and then thrown away. Presentation
+ * is now driven by what is actually feeding the channel.
+ */
+const PROV_KIND = {
+  simulation: { kind: 'simulated', text: 'Simulator stream — generated on this device, not a measurement' },
+  'motion-sensor': { kind: 'measured', text: 'DeviceMotion stream (live sensor)' },
+  orientation: { kind: 'measured', text: 'DeviceOrientation stream (live sensor)' },
+  lab: { kind: 'measured', text: 'Lab test 04 reaction time, measured this session' },
+  reported: { kind: 'reported', text: 'Crew self-report, entered here' },
+  derived: { kind: 'derived', text: 'Change in baseline centre over days' },
+  'camera (calibrated)': { kind: 'measured', text: 'CameraProvider head-motion estimator, noise floor calibrated' },
+  'camera (uncalibrated)': { kind: 'measured', text: 'CameraProvider head-motion estimator, noise floor not yet measured' },
 };
+
+/** Resolve a runtime provenance string into a label, a kind and honest copy. */
+function channelPresentation(prov) {
+  if (!prov) {
+    return {
+      kind: 'unavailable', label: 'UNAVAILABLE',
+      text: 'no live channel — the index renormalises without it',
+    };
+  }
+  const hit = PROV_KIND[prov];
+  if (hit) return { kind: hit.kind, label: hit.kind.toUpperCase(), text: hit.text };
+  /* Anything unrecognised is an explicit unavailability reason written by
+     readChannels(). Show the reason rather than inventing a flattering one. */
+  return { kind: 'unavailable', label: 'UNAVAILABLE', text: prov };
+}
 
 export function mountConsoleSection(ctx = {}) {
   const root = $('#consoleBody');
@@ -102,27 +128,45 @@ export function mountConsoleSection(ctx = {}) {
     const orientation = state.perms?.orientation === 'granted';
     const sim = state.source === 'SIMULATION';
 
-    /* eye–head coordination (deg of gaze error proxy) */
-    if (cam) {
-      /* No gaze landmarks are available in the offline camera provider.
-         Keep eye_head unavailable instead of turning head motion into a fake
-         VOR/gaze measurement. */
+    /* ── Real signal features ──────────────────────────────
+       These read `state.sample`, the object store.js actually writes
+       (store.js:267 `s.jerk = …`, where `s = state.sample`). The previous code
+       read `state.jerk` — a field that exists nowhere in the codebase — so
+       `|| 0` swallowed it and eye_head, body_control and head_motion each
+       collapsed to their constant term (4.2 / 9 / 26) no matter what the crew
+       did, while the table below still tagged them MEASURED. Those constants
+       also gave the captured baseline zero spread, driving MAD to 0 and pinning
+       the three sub-scores at exactly 100, which lifted the whole index. */
+    const smp = state.sample || {};
+    const asFinite = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+    /* Head movement is angular speed: the vector sum of the three damped rate
+       channels, already in this domain's own unit (°/s) — no arbitrary factor. */
+    const rateRms = Math.hypot(asFinite(smp.yawRate), asFinite(smp.pitchRate), asFinite(smp.rollRate));
+
+    /* eye–head coordination (°) — REQUIRES eye landmarks.
+       NASA derives this from eye AND head together (VOR gain). Neither the
+       offline camera provider nor an IMU supplies the eye half, so outside the
+       labelled simulator this channel stays unavailable rather than being
+       back-filled from head motion. */
+    if (sim) {
+      out.eye_head = +clamp(4.2 + rateRms * 0.02, 1, 18).toFixed(2);
+      prov.eye_head = 'simulation';
+    } else if (cam) {
       out.eye_head = null;
       prov.eye_head = 'unavailable — camera measures head motion, not gaze';
-    } else if (sim || orientation) {
-      out.eye_head = +clamp(4.2 + (state.jerk || 0) * 0.02, 1, 18).toFixed(2);
-      prov.eye_head = sim ? 'simulation' : 'orientation';
     } else {
       out.eye_head = null;
-      prov.eye_head = null;
+      prov.eye_head = 'unavailable — needs eye-landmark or vHIT input';
     }
 
-    /* postural control (mm of sway proxy) */
+    /* postural control (mm) — an uncalibrated mobility proxy driven by the real
+       rate signal, not a force-plate recording. The scale is heuristic and the
+       channel table says so. */
     if (motion || orientation) {
-      out.body_control = +clamp(9 + (state.jerk || 0) * 0.35, 2, 60).toFixed(2);
+      out.body_control = +clamp(9 + rateRms * 0.35, 2, 60).toFixed(2);
       prov.body_control = motion ? 'motion-sensor' : 'orientation';
     } else if (sim) {
-      out.body_control = +clamp(9 + (state.jerk || 0) * 0.35, 2, 60).toFixed(2);
+      out.body_control = +clamp(9 + rateRms * 0.35, 2, 60).toFixed(2);
       prov.body_control = 'simulation';
     } else {
       out.body_control = null;
@@ -138,29 +182,37 @@ export function mountConsoleSection(ctx = {}) {
     out.symptoms = S.symptoms;
     prov.symptoms = 'reported';
 
-    /* head movement (deg/s) */
+    /* head movement (°/s) — angular speed, the domain's own unit */
     if (cam) {
       const avg = camRoll.reduce((a, s) => a + s.headMotion, 0) / camRoll.length;
       out.head_motion = +avg.toFixed(2);
       const calibrated = camRoll[camRoll.length - 1]?.calibrated;
       prov.head_motion = calibrated ? 'camera (calibrated)' : 'camera (uncalibrated)';
     } else if (motion || orientation) {
-      out.head_motion = +clamp(26 + (state.jerk || 0) * 0.8, 5, 120).toFixed(2);
-      prov.head_motion = 'motion-sensor';
+      out.head_motion = +clamp(rateRms, 0, 120).toFixed(2);
+      prov.head_motion = motion ? 'motion-sensor' : 'orientation';
     } else if (sim) {
-      out.head_motion = +clamp(26 + (state.jerk || 0) * 0.8, 5, 120).toFixed(2);
+      out.head_motion = +clamp(rateRms, 0, 120).toFixed(2);
       prov.head_motion = 'simulation';
     } else {
       out.head_motion = null;
       prov.head_motion = null;
     }
 
-    /* baseline drift (per day) — needs at least two captured sessions */
+    /* baseline drift (per day) — needs two captured sessions that BOTH carry the
+       channel. Treating a missing endpoint as 0 fabricated a delta out of
+       nothing, which is the one thing this file must never do. */
     if (S.sessions.length >= 2) {
       const a = S.sessions[0], b = S.sessions[S.sessions.length - 1];
       const days = Math.max(1, (b.at - a.at) / 86400000);
-      out.drift = +(((b.eye_head ?? 0) - (a.eye_head ?? 0)) / days).toFixed(3);
-      prov.drift = 'derived';
+      const from = a.eye_head, to = b.eye_head;
+      if (typeof from === 'number' && typeof to === 'number') {
+        out.drift = +((to - from) / days).toFixed(3);
+        prov.drift = 'derived';
+      } else {
+        out.drift = null;
+        prov.drift = 'unavailable — first and last session must both carry this channel';
+      }
     } else {
       out.drift = null;
       prov.drift = null;
@@ -344,7 +396,7 @@ export function mountConsoleSection(ctx = {}) {
     const list = el('div', { class: 'dom-list' });
     for (const r of S.osi.rows) {
       const prov = S.provenance?.[r.id];
-      const kind = prov ? CHANNEL_SOURCE[r.id]?.kind : null;
+      const chan = channelPresentation(prov);
       const tile = el('div', { class: `dom ${r.available ? '' : 'is-off'}` },
         el('div', { class: 'dom-top' },
           el('span', { class: 'dom-name', text: r.label }),
@@ -359,8 +411,8 @@ export function mountConsoleSection(ctx = {}) {
           el('span', { text: r.available ? `contrib ${r.contribution >= 0 ? '+' : ''}${r.contribution.toFixed(1)}` : '—' }),
         ),
         el('div', { class: 'dom-src' },
-          el('span', { class: `tag tag-${kind === 'measured' ? 'ok' : kind === 'reported' ? 'warn' : 'info'}`, text: kind ? kind.toUpperCase() : 'UNAVAILABLE' }),
-          el('span', { class: 'dom-via', text: prov ? CHANNEL_SOURCE[r.id]?.via || prov : 'no live channel — the index renormalises without it' }),
+          el('span', { class: `tag tag-${chan.kind}`, text: chan.label }),
+          el('span', { class: 'dom-via', text: chan.text }),
         ),
       );
       list.append(tile);

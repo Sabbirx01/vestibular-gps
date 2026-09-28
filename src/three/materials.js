@@ -141,7 +141,14 @@ export function starMaterial() {
         vec3 hot = mix(col, vec3(1.0), 0.28 * vBright);
         /* Spikes weighted heavily: they are thin, so they need a high
            amplitude to survive next to a saturated core. */
-        vec3 rgb = col * halo * 1.15 + hot * core * 0.80 + col * spikes * 2.4;
+        /* Bright cores used to hard-clip to white. Halo, core and spikes were
+           summed and then clamped by the framebuffer, so the brightest stars
+           flattened into white discs and lost their temperature colour — the
+           complaint that the core clips. A soft shoulder, 1 - e^-x, compresses
+           the top of the range instead of clipping it, so a hot O-type star
+           stays blue at full brightness rather than turning into a white dot. */
+        vec3 lit = col * halo * 1.15 + hot * core * 0.80 + col * spikes * 2.4;
+        vec3 rgb = vec3(1.0) - exp(-lit * 1.15);
 
         float a = (halo * 0.85 + core * 0.92 + spikes * 1.0) * vTwinkle * uOpacity;
         gl_FragColor = vec4(rgb, clamp(a, 0.0, 1.0));

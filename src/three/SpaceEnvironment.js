@@ -5,7 +5,12 @@
    ═══════════════════════════════════════════════════════════ */
 
 import * as THREE from '../../vendor/three.module.js';
-import { starMaterial, nebulaMaterial, fresnelMaterial, PAL } from './materials.js';
+/* fresnelMaterial is not imported: its only use here was the removed origin
+   glow shell. Do not add it back for a rim-lit sphere at short range — that is
+   what read as a second planet. */
+import { starMaterial, nebulaMaterial, PAL } from './materials.js';
+import { BlackHole } from './BlackHole.js';
+import { Comet } from './Comet.js';
 import { TAU } from '../core/util.js';
 
 export class SpaceEnvironment {
@@ -22,10 +27,20 @@ export class SpaceEnvironment {
   build() {
     const q = this.q;
 
-    /* ── Stars: two shells for parallax depth ── */
+    /* ── Stars: shells for parallax depth ── */
     this.starsFar = this._starShell(300, 240, q.stars);
     this.starsNear = this._starShell(120, 60, Math.floor(q.stars * 0.22));
     this.group.add(this.starsFar, this.starsNear);
+
+    /* A third shell filling 120–300 units on the higher tiers. With only the
+       two originals the sky is dense out past 240 and dense again under 120,
+       with a thin band between; that band is what reads as banding once the
+       camera pushes toward the subject. */
+    this.starsMid = null;
+    if (q.stars > 4000) {
+      this.starsMid = this._starShell(180, 120, Math.floor(q.stars * 0.35));
+      this.group.add(this.starsMid);
+    }
 
     /* ── Nebula: only on higher tiers (large additive fill cost) ── */
     if (q.nebula) {
@@ -77,21 +92,77 @@ export class SpaceEnvironment {
     }
     this.group.add(this.orbits);
 
-    /* ── Central atmospheric glow so the scene has a light source origin ── */
-    this.core = new THREE.Mesh(
-      new THREE.SphereGeometry(0.55, 32, 24),
-      fresnelMaterial(PAL.cyan, { power: 2.0, intensity: 1.4, side: THREE.BackSide }),
-    );
-    this.group.add(this.core);
+    /* REMOVED — a 0.55-radius fresnel sphere parked at the world origin, added
+       as "a light source origin" for the scene.
+       Why it had to go: at the hero framing distance that sphere projects to
+       roughly 112 px across, while the Earth behind it projects to 98 px, and
+       the two sit about 90 px apart. A rim-lit sphere cannot read as ambient
+       light at that scale — it reads as a second, slightly larger planet
+       hanging beside the real one, which is exactly how it was reported: a pale
+       bubble floating loose next to the Earth in the hero. The scene's actual
+       light comes from the DirectionalLights plus the nebula and starfield
+       layers, none of which needed this shell. */
+
+    /* ── Black hole ──────────────────────────────────────────
+       Parked 246 units out — about twenty times the hero framing distance — so
+       it sits deep in the backdrop rather than competing with the astronaut.
+       It is wrapped in a pivot because applyPointer() overwrites the position
+       of every layer it parallaxes; the far offset has to live one level down
+       or the black hole would snap to the origin on the first mouse move. */
+    this.blackHole = new BlackHole({ quality: q, radius: q.stars > 4000 ? 26 : 20 });
+    this.blackHole.group.position.set(58, 22, -246);
+    this.blackHolePivot = new THREE.Group();
+    this.blackHolePivot.name = 'black-hole-pivot';
+    this.blackHolePivot.add(this.blackHole.group);
+    this.group.add(this.blackHolePivot);
+
+    /* ── Comet ───────────────────────────────────────────────
+       Two Points clouds plus its own draw calls is real budget for pure
+       backdrop, so it is skipped on the lowest tiers. Same pivot treatment:
+       its group's position is driven by its own orbit, not by pointer parallax.
+        */
+    this.comet = null;
+    this.cometPivot = null;
+    if (q.nebula) {
+      this.comet = new Comet({ quality: q, reducedMotion: this.reduced });
+      this.cometPivot = new THREE.Group();
+      this.cometPivot.name = 'comet-pivot';
+      this.cometPivot.add(this.comet.group);
+      this.group.add(this.cometPivot);
+    }
 
     this.layers = [
       { obj: this.galaxyBand, depth: 0.003 },
+      { obj: this.blackHolePivot, depth: 0.002 },
       { obj: this.starsFar, depth: 0.006 },
       { obj: this.starsNear, depth: 0.026 },
       { obj: this.dust, depth: 0.05 },
       { obj: this.orbits, depth: 0.014 },
     ];
+    if (this.starsMid) this.layers.push({ obj: this.starsMid, depth: 0.011 });
     if (this.nebulae) this.layers.push({ obj: this.nebulae, depth: 0.01 });
+    if (this.cometPivot) this.layers.push({ obj: this.cometPivot, depth: 0.004 });
+
+    /* Baseline opacities captured once, so setIntensity() restores an exact
+       value instead of compounding a multiplier every section change. */
+    this._dim = [
+      { mat: this.starsFar.material, key: 'uOpacity', base: this.starsFar.material.uniforms.uOpacity.value },
+      { mat: this.starsNear.material, key: 'uOpacity', base: this.starsNear.material.uniforms.uOpacity.value },
+      { mat: this.galaxyBand.material, key: 'uOpacity', base: this.galaxyBand.material.uniforms.uOpacity.value },
+      { mat: this.dust.material, key: 'uOpacity', base: this.dust.material.uniforms.uOpacity.value },
+    ];
+    if (this.starsMid) {
+      this._dim.push({ mat: this.starsMid.material, key: 'uOpacity', base: this.starsMid.material.uniforms.uOpacity.value });
+    }
+    if (this.nebulae) {
+      for (const m of this.nebulae.children) {
+        this._dim.push({ mat: m.material, key: 'uOpacity', base: m.material.uniforms.uOpacity?.value ?? 0.4 });
+      }
+    }
+    for (const r of this.orbits.children) {
+      this._dim.push({ mat: r.material, key: 'opacity', base: r.material.opacity, literal: true });
+    }
+    this.intensity = 1;
   }
 
   _starShell(inner, outer, count) {
@@ -224,6 +295,26 @@ export class SpaceEnvironment {
     return pts;
   }
 
+  /**
+   * Section-level backdrop dimming.
+   *
+   * FRAMING in SceneManager.js has carried an `env` value per section since the
+   * beginning — 1.0 on the hero, 0.2 on the console and integration panels —
+   * with a comment saying the background is dimmed so nothing drifts behind a
+   * readout. Nothing ever read it, so the backdrop stayed at full strength on
+   * the densest sections. Now it is wired, which also keeps the new black hole
+   * from shining through instrument panels.
+   */
+  setIntensity(v = 1) {
+    this.intensity = v;
+    for (const d of this._dim ?? []) {
+      if (d.literal) d.mat[d.key] = d.base * v;
+      else if (d.mat.uniforms?.[d.key]) d.mat.uniforms[d.key].value = d.base * v;
+    }
+    this.blackHole?.setIntensity(v);
+    this.comet?.setIntensity(v);
+  }
+
   /** Pointer parallax: each depth layer shifts by its own fraction. */
   applyPointer(nx, ny) {
     if (this.reduced) return;
@@ -241,11 +332,22 @@ export class SpaceEnvironment {
     sm.uTime.value = t;
     this.starsNear.material.uniforms.uTime.value = t * 1.24;
     this.dust.material.uniforms.uTime.value = t * 0.7;
+    if (this.starsMid) this.starsMid.material.uniforms.uTime.value = t * 1.1;
 
     if (this.nebulae) {
       this.nebulae.children.forEach((m, i) => { m.material.uniforms.uTime.value = t * (0.6 + i * 0.2); });
     }
-    this.core.material.uniforms.uTime.value = t;
+
+    /* These two calls were missing entirely — the black hole and comet were
+       built and added to the scene, but nothing ever advanced their clocks or
+       (for the comet) moved them off their construction-time default position.
+       A THREE.Group with no position set defaults to the scene origin, so the
+       comet sat permanently at (0,0,0) — 12.5 units from the hero camera,
+       directly behind the headline — instead of drifting through the far
+       background at z -132..-224 as its own update() computes. This is the
+       cause of the "giant pale sphere in the hero" regression. */
+    this.blackHole?.update(dt);
+    this.comet?.update(dt);
 
     if (!this.reduced) {
       this.orbits.rotation.y += dt * 0.014;
@@ -257,10 +359,15 @@ export class SpaceEnvironment {
 
   setQuality(q) {
     /* Full rebuild is the honest cheap path — these are all generated buffers. */
+    const keep = this.intensity ?? 1;
     this.q = q;
     this.dispose();
     this.group.clear();
     this.build();
+    /* build() resets the backdrop to full strength; restore the current
+       section's dimming so an adaptive quality step mid-scroll does not
+       brighten the backdrop behind the instrument panels. */
+    this.setIntensity(keep);
   }
 
   dispose() {

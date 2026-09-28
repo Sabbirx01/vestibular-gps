@@ -45,22 +45,22 @@ const SOLAR_POS = [1.55, -1.35, -8.8];
 /* Which 3D layers are drawn in which section. Solar bodies are hidden on text-heavy
    sections so a planet can never end up sitting on top of a paragraph. */
 const SECTION_LAYERS = {
-  'sec-hero':     { solar: true,  astronaut: true,  subject: false, core: true  },
-  'sec-body':     { solar: false, astronaut: false, subject: false, core: false },
+  'sec-hero':     { solar: true,  astronaut: true,  subject: false },
+  'sec-body':     { solar: false, astronaut: false, subject: false },
   /* ear and brain host their own dedicated 3D viewports, so the background
      subject and any planet are hidden to avoid ghosting through the panels */
-  'sec-ear':      { solar: false, astronaut: false, subject: false, core: false },
-  'sec-brain':    { solar: false, astronaut: false, subject: false, core: false },
-  'sec-vor':      { solar: false, astronaut: true,  subject: false, core: false },
-  'sec-sensors':  { solar: false, astronaut: true,  subject: false, core: false },
-  'sec-space':    { solar: true,  astronaut: true,  subject: false, core: true  },
-  'sec-lab':      { solar: false, astronaut: true,  subject: false, core: false },
+  'sec-ear':      { solar: false, astronaut: false, subject: false },
+  'sec-brain':    { solar: false, astronaut: false, subject: false },
+  'sec-vor':      { solar: false, astronaut: true,  subject: false },
+  'sec-sensors':  { solar: false, astronaut: true,  subject: false },
+  'sec-space':    { solar: true,  astronaut: true,  subject: false },
+  'sec-lab':      { solar: false, astronaut: true,  subject: false },
   /* The console and integration sections are dense instrument panels: no
      planets, no figures, nothing that could drift behind a readout. */
-  'sec-console':  { solar: false, astronaut: false, subject: false, core: false },
-  'sec-integration': { solar: false, astronaut: false, subject: false, core: false },
-  'sec-research': { solar: true,  astronaut: false, subject: false, core: true  },
-  'sec-final':    { solar: false, astronaut: true,  subject: false, core: false },
+  'sec-console':  { solar: false, astronaut: false, subject: false },
+  'sec-integration': { solar: false, astronaut: false, subject: false },
+  'sec-research': { solar: true,  astronaut: false, subject: false },
+  'sec-final':    { solar: false, astronaut: true,  subject: false },
 };
 
 export class SceneManager {
@@ -162,12 +162,32 @@ export class SceneManager {
       /* Measured: scale 2.75 puts the figure at 49.9% of viewport height with
          419 px clearance from the HUD, but it sat high with a ~157 px dead band
          under the boots, so it is dropped to balance the composition. */
-      /* Keep the astronaut prominent but inside the hero's open right column.
-         It floats above the Earth reference instead of overlapping the title
-         or cards. */
-      this.astronaut.root.position.set(2.05, -0.05, 1.85);
-      this.astronaut.scale = 2.45;
-      this.astronaut.root.scale.setScalar(2.45);
+       /* The figure now has its OWN column, between the copy and the card grid.
+          Set as the anchor (baseX/baseY/baseZ), not root.position directly:
+          update() offsets from that anchor every frame for the floating/tumble
+          motion, so setting position here would just be overwritten next frame.
+          The old anchor (baseX 2.05) put the projected figure at x=1086..1342
+          on a 1920x1080 viewport while the 2x2 spec grid ran x=1143..1672, so
+          the suit rendered through SEMICIRCULAR CANALS (200x145 px) and CANAL
+          ARRANGEMENT (199x163 px). Moving this anchor alone could never fix
+          that: the gap between the copy box (ends x=904) and the grid was only
+          239 px, narrower than the figure itself. The real fix is one line of
+          layout (sections.css: .hero-specs capped at 450 px and right-aligned,
+          which moves the grid's left edge from x=1143 to x=1222) plus this
+          anchor, which slides the figure into the column that opens up.
+          Mapping for sec-hero at 1920x1080 (fov 46, camera z 12.5, look y 1.0):
+            screen x = 960 + 119.45 * world x   (measured, verified twice)
+          The figure's projected width varies about 15% as the zero-g tumble
+          turns it, so it is placed by its CENTRE (world x 0.85 -> screen
+          x ~1062) with clearance on both sides, never tuned flush to a single
+          frame. Re-measure the projected box in a browser before changing
+          either baseX or scale. */
+       this.astronaut.baseX = 0.85;
+      this.astronaut.baseY = -0.05;
+      this.astronaut.baseZ = 1.85;
+       this.astronaut.root.position.set(0.85, -0.05, 1.85);
+       this.astronaut.scale = 2.10;
+       this.astronaut.root.scale.setScalar(2.10);
       /* Straight-on entrance pose. The astronaut may respond to pointer input
          after its own settle window, but it must not arrive tilted. */
       this.astronaut.root.rotation.set(0, 0, 0);
@@ -296,6 +316,17 @@ export class SceneManager {
     /* ── camera framing per section ── */
     const f = this.framing || FRAMING['sec-hero'];
     const mobile = innerWidth <= 720;
+
+    /* Backdrop dimming. Every FRAMING entry has declared an `env` strength
+       since the beginning — 1.0 on the hero, 0.2 on the console and
+       integration panels, with a comment saying the backdrop is dimmed so
+       nothing drifts behind a readout — but nothing ever read the field, so
+       the sky stayed at full strength on the densest sections. Applied on
+       change only; it touches a dozen material values. */
+    if (this.env && this._envApplied !== f.env) {
+      this._envApplied = f.env;
+      try { this.env.setIntensity(f.env ?? 1); } catch (e) { console.warn('[SceneManager] env intensity failed', e); }
+    }
     /* Mobile keeps the same subject-first composition; it must not retarget
        the camera to the distant planet and push the astronaut off-screen. */
     const mobilePlanet = false;
@@ -371,9 +402,9 @@ export class SceneManager {
     if (this.solar) this.solar.root.visible = want.solar;
     if (this.astronaut) this.astronaut.root.visible = want.astronaut;
     if (this.subject) this.subject.root.visible = want.subject;
-    /* the ambient glow shell at the world origin otherwise reads as a stray
-       blue sphere limb at the edge of text-heavy sections */
-    if (this.env?.core) this.env.core.visible = want.core !== false;
+    /* The ambient glow shell that used to be toggled here was removed from
+       SpaceEnvironment: it read as a second planet beside the Earth rather than
+       as light. See the removal note in SpaceEnvironment.js. */
   }
 
   _trackFps(dt) {

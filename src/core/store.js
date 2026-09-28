@@ -67,11 +67,16 @@ export const state = {
   /* link quality */
   link: { hz: 0, latencyMs: 0, strength: 0, samples: 0, lastAt: 0, stale: true },
 
-  /* camera pipeline telemetry — updated by CameraProvider at analysis rate */
+  /* camera pipeline telemetry — updated by CameraProvider at analysis rate.
+     `face` is the face-scan channel: region lock status plus a coarse head pose
+     in degrees, null until calibrate() stores a neutral. It is labelled an
+     estimate everywhere it is shown — see the FACE SCAN note in
+     src/sensors/webcam.js for what it can and cannot measure. */
   camera: {
     running: false, calibrated: false, samples: 0, rateHz: 0,
     headMotion: 0, eyeHead: 0, motionEnergy: 0, jitter: 0,
     dx: 0, dy: 0, quality: 0, lastAt: 0,
+    face: null,
   },
 
   geo: null,

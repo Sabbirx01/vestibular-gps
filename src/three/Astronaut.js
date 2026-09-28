@@ -199,7 +199,15 @@ export class FloatingAstronaut {
        short settle window, then pointer motion can steer the figure. */
     this.t = 0;
     this.poseAge = 0;
+    /* Anchor position, set once by the caller (SceneManager places the hero
+       figure in the right column at baseX=2.05). update() used to overwrite
+       root.position.x/z with a bare drift term every frame, which silently
+       discarded that anchor and pulled the astronaut back to the scene
+       origin — straight into the headline text and the card column. All
+       three axes are now offset from this anchor instead of replacing it. */
+    this.baseX = 0;
     this.baseY = 0;
+    this.baseZ = 0;
     this.baseRot = 0;
     this.pointer = { x: 0, y: 0 };
     this.scale = 1;
@@ -312,20 +320,29 @@ export class FloatingAstronaut {
     const entrance = clamp(this.poseAge / 1.6, 0, 1);
     const entranceEase = entrance * entrance * (3 - 2 * entrance);
     this.root.scale.setScalar(this.scale * (0.86 + entranceEase * 0.14));
+    /* Every axis below is an OFFSET added to the anchor SceneManager set
+       (baseX/baseY/baseZ) — never a replacement. Replacing it is what used to
+       pull the whole figure back to the scene origin every frame, straight
+       into the headline text and the card column. See the constructor note. */
     this.root.position.y = this.baseY + (interactive ? Math.sin(t * 0.31) * 0.04 * floatAmt : 0) + (1 - entranceEase) * 0.22;
     /* Life-like microgravity drift: a slow swimming/breathing motion in the
        open space, with no gravity drop. The amplitude stays restrained so the
        astronaut remains readable and never clips the hero copy. */
-    this.root.position.x = interactive ? Math.sin(t * 0.19) * 0.055 * floatAmt + sensorX * 0.025 : 0;
-    this.root.position.z = interactive ? Math.cos(t * 0.23) * 0.045 * floatAmt + sensorY * 0.018 : 0;
+    this.root.position.x = this.baseX + (interactive ? Math.sin(t * 0.19) * 0.055 * floatAmt + sensorX * 0.025 : 0);
+    this.root.position.z = this.baseZ + (interactive ? Math.cos(t * 0.23) * 0.045 * floatAmt + sensorY * 0.018 : 0);
 
-    /* Earth/Moon/Mars: keep the entrance facing the viewer. In microgravity,
-       introduce the slow autonomous 360° spin; mouse/sensor steering remains
-       available in every environment. */
-    const freeSpin = state.mode === 'MICROGRAVITY' && interactive ? t * 0.16 : 0;
-    this.root.rotation.y = this.baseRot + freeSpin + steer * 0.28;
-    this.root.rotation.x = damp(this.root.rotation.x, -tilt * 0.08, 4, dt);
-    this.root.rotation.z = damp(this.root.rotation.z, interactive ? 0 : 0, 5, dt);
+    /* Weightless free tumble. An astronaut adrift keeps slowly turning with no
+       thrusters to stop it — on every axis, in every environment, not only
+       MICROGRAVITY as before. It only starts once the entrance has settled
+       (interactive), so the hero never appears already spinning on first
+       paint; pointer/sensor steering rides on top of the tumble everywhere.
+       floatAmt already makes MICROGRAVITY more restless than Earth/Moon/Mars. */
+    const tumbleY = interactive ? t * 0.052 * floatAmt : 0;
+    const tumbleX = interactive ? Math.sin(t * 0.087) * 0.10 * floatAmt : 0;
+    const tumbleZ = interactive ? Math.cos(t * 0.071) * 0.07 * floatAmt : 0;
+    this.root.rotation.y = this.baseRot + tumbleY + steer * 0.28;
+    this.root.rotation.x = damp(this.root.rotation.x, tumbleX - tilt * 0.08, 4, dt);
+    this.root.rotation.z = damp(this.root.rotation.z, tumbleZ, 5, dt);
 
     /* The real suit is a single rigid mesh with no skeleton attached, so the
        microgravity drift is expressed by the whole figure instead of joints. */

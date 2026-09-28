@@ -93,6 +93,19 @@
 .hud-fps i { display: block; height: 100%; width: 100%; background: var(--green); transition: width 300ms linear, background 300ms; }
 
 /* ── Hero ───────────────────────────────────────────────── */
+/* The hero is a three-part composition: copy | astronaut | spec cards.
+   The WebGL astronaut is not a DOM element, so it cannot reserve layout space
+   for itself; the two DOM columns have to leave it a real column of air, or the
+   figure renders straight through the cards.
+   Measured at 1920x1080 before the fix: the copy box ended at x=904, the card
+   grid started at x=1143 and the astronaut's projected box was x=1086..1342 —
+   a 200x145 px overlap with SEMICIRCULAR CANALS and a 199x163 px overlap with
+   CANAL ARRANGEMENT. The copy measure is deliberately LEFT at 66ch: trimming it
+   does buy the figure more room, but it also re-breaks the hero headline from
+   three lines to four, and the headline is authored copy that layout work must
+   not silently rewrite. The air comes from the card grid instead.
+   Do not raise the .hero-specs cap below without re-measuring the projected
+   astronaut box in a browser (see SceneManager.js for the mapping). */
 .sec-hero { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(280px,.85fr); gap: clamp(30px, 5vw, 70px); align-items: center; min-height: 100svh; }
 .hero-copy { max-width: 66ch; }
 .hero-title {
@@ -100,7 +113,13 @@
   font-weight: 590; margin: var(--sp-4) 0 var(--sp-5);
 }
 .hero-title em { color: var(--cyan); }
-.hero-specs { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-3); }
+/* Capped and right-aligned: the 4-card 2x2 grid must stop short of the
+   astronaut's column, so it no longer fills its 0.85fr track. At 2x2 the grid
+   has to stay at or under ~450 px or its left edge slides back under the figure
+   (the uncapped 529 px grid put SEMICIRCULAR CANALS at x=1143 with the suit at
+   x=1086..1342). Cards are still 2-up and read as a spec sheet at 450 px
+   (~220 px each, one line of copy wider than a phone). */
+.hero-specs { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-3); max-width: 450px; justify-self: end; }
 .spec { padding: var(--sp-4); }
 .spec-k { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: .13em; color: var(--faint); }
 .spec-v { font-size: 2rem; font-weight: 620; line-height: 1.1; color: var(--cyan); margin: 6px 0; letter-spacing: -.02em; }
@@ -208,7 +227,10 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
   /* Preserve a visible 3D hero subject on tablets without promoting the
      distant planet into the foreground. */
   .sec-hero .hero-stage { min-height: 330px; }
-  .hero-specs { grid-template-columns: repeat(2, 1fr); }
+  /* Below this width the hero stacks, so the astronaut no longer sits beside
+     the grid and the desktop cap/right-align would just pin the cards to one
+     edge. Hand the full width back to the grid. */
+  .hero-specs { grid-template-columns: repeat(2, 1fr); max-width: none; justify-self: stretch; }
   .footer { padding-inline: var(--sp-4); }
   .debug { left: var(--sp-3); bottom: var(--sp-3); }
 }

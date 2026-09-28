@@ -287,13 +287,22 @@
 .hw-transport b { color: var(--cyan); }
 
 /* ── Camera panel ───────────────────────────────────────── */
+/* ONE camera view. The preview and the scan overlay are stacked, not placed
+   side by side: two boxes of video read as two camera feeds, which is how the
+   side-by-side layout was reported. The overlay sits exactly over the preview
+   and inherits its 4/3 geometry, so the lock box always lands on the face. */
 .cam-stage {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-top: var(--sp-3);
 }
-.cam-video, .cam-preview {
+.cam-stage-single {
+  display: block;
+  position: relative;
+  max-width: 560px;
+}
+.cam-video {
   width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: 11px;
@@ -301,11 +310,31 @@
   background: #03060e;
   object-fit: cover;
   display: block;
+  transform: scaleX(-1);
+  opacity: 0.96;
 }
-.cam-video { transform: scaleX(-1); opacity: 0.96; background: #050b18; }
-/* The preview must look like a normal camera, not a magnified processing
-   buffer. The analysis canvas remains a separate, softly upscaled diagnostic. */
-.cam-preview { image-rendering: auto; opacity: 0.82; }
+.cam-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 11px;
+  pointer-events: none;
+}
+
+/* Verification readout: the verdict, then the checks it is made of. */
+.cam-verify {
+  margin-top: var(--sp-3);
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  overflow: hidden;
+}
+.cam-verify-head { background: var(--panel-solid); }
+.cam-verify-head span:first-child { color: var(--white); letter-spacing: 0.08em; }
 
 .cam-rows { display: grid; gap: 1px; margin-top: var(--sp-3); background: var(--line); border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
 .cam-row { display: flex; justify-content: space-between; gap: 14px; padding: 10px 14px; background: var(--panel-solid); font-size: var(--fs-sm); }

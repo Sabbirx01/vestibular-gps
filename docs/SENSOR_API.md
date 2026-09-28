@@ -125,9 +125,10 @@ surfaces as a wrong health number instead of an error.
 
 ## The camera pipeline
 
-`src/sensors/webcam.js` measures **head motion** from the front camera.
+`src/sensors/webcam.js` measures **head motion** from the front camera, and runs
+a **face scan** on the same frames.
 
-**What it does:**
+**What it does (motion):**
 - draws the video into a 64×48 offscreen buffer at ~18 Hz
 - recovers the global motion vector by exhaustive block matching (±6 px) over
   the central band, where a head occupies the frame
@@ -136,9 +137,71 @@ surfaces as a wrong health number instead of an error.
   i.e. oscillation rather than travel
 - tracks a luminance-weighted centroid for slow lateral/vertical drift
 
+**What it does (face scan):**
+- white-balances the frame first (grey-world, one multiply per channel), because
+  a colour cast moves every skin bound at once
+- builds four per-pixel maps on the same 64×48 buffer: graded YCbCr skin
+  (0..255, how far inside the rule a pixel sits), luminance gradient (structure),
+  a dark-feature mask at 0.62 × the frame's median luminance, and frame-difference
+  motion
+- reduces each map to a summed-area table, then searches ~1500 face-shaped
+  windows (8 heights, width = 0.78 × height, 2 px step) scoring each as
+  `(skin + structure + dark + motion) × aspect × centre × brightness × size`
+- takes the winning window as a SEED and fits the published region to the
+  evidence inside it (skin OR structure) by image moments, giving centre and
+  spread that move when the head turns
+- publishes `status` (`searching` / `locked` / `lost`), the normalised box,
+  centre, spreads, coverage, `basis`, `score`, and a coarse head pose
+  `yaw` / `pitch` / `roll` in degrees
+
+**Why not skin-tone blob tracking (v1, removed):** on the first real camera this
+scanner met, the video's purple cast put the FACE outside every classic skin
+bound while the beige WALL sat inside them, so the largest-skin-blob rule locked
+the wall. Measured on that frame, structure and dark features separate face from
+wall by roughly 3× while colour separates nothing. `basis` now reports which
+channel is holding a lock, so a structure-held lock is never presented with the
+same confidence as a colour-held one.
+- verified against a still frame of that camera: lock `[0.31, 0.19, 0.73, 0.89]`
+  (face) against v1's `[0.00, 0.49, 0.37, 0.90]` (wall)
+
+**Pose contract:**
+- pose is `null` until `calibrate()` has stored a neutral region; a pose without
+  a subject-specific reference would be an invented number
+- the neutral is the **median of raw detections** in the hold-still window
+  (≥ 8 frames required), never of the smoothed box
+- the direction of a turn comes from the centroid displacement past a dead zone
+  of 0.06 face-widths; the magnitude also uses the change in the RATIO of the
+  region's two spreads, which is scale-invariant, so leaning towards or away
+  from the camera does not register as a turn
+- signs are mirrored to match the selfie preview on screen; `pitch` is positive
+  looking up
+- the pose is published ONLY when the current lock carries COLOUR evidence and
+  the stored baseline does too. A structure-only lock reports `poseNote` and a
+  blank pose instead of an angle. Reason, from a live camera: with structure
+  carrying the lock, the spread ratio swings with whichever features are
+  visible, and a face looking straight at the lens read yaw −60.0° (the clamp),
+  pitch +17.3°, roll +34.1°. A saturated angle is worse than no angle.
+- `neutral.basis` and `neutral.colourFraction` record how much of the hold-still
+  window had a colour lock, so a baseline that cannot support a pose is visible
+  rather than silent
+- `poseNote` carries the reason a pose is blank: "calibrate to set the neutral",
+  "no colour lock — this lighting has silenced the skin channel", "baseline
+  captured without a colour lock — re-calibrate", or "no face"
+- the published region BOX is the searched face-shaped window, not the moment
+  box: the moment box shrinks onto whichever features carry evidence and, with
+  the colour channel silent, was reported covering only one side of the face.
+  The moments still drive the pose and the neutral.
+- `confidence` describes the LOCK (from the detector's score) and is published
+  with or without a neutral; it is a relative score, not a probability
+- every value is an **estimate** (`estimated: true`, `eyeLandmarks: false`), not
+  a goniometer reading
+
 **What it does not do:**
 - it does not measure gaze
-- therefore it **cannot compute VOR gain**, which requires eye landmarks
+- therefore it **cannot compute VOR gain**, which requires eye landmarks; the
+  face scan provides none, so `eyeHead` remains `null` and the UI says so
+- it cannot separate a head **translation** from a head **rotation** — sliding
+  sideways moves the region exactly like a yaw
 
 **Why not MediaPipe Face Mesh:** roughly 3 MB of model plus WASM from a CDN,
 which would break the offline guarantee the project is built on and fail on a

@@ -42,16 +42,20 @@ Do not describe the product as a validated clinical monitor. Describe it as a **
 - NIH brain GLB is committed and loaded through the local GLTF/Draco path.
 - Camera permission path requests a high-resolution user-facing preview (ideal 1280×720, minimum 640×360, up to 30 fps), while analysis remains deliberately low-resolution (64×48 at about 18 Hz).
 - Camera stream is reattached after Integration panel rerenders.
-- Camera telemetry is stored in `state.camera`; Integration displays live head-motion, signal quality, motion energy and jitter.
-- Camera does **not** measure gaze and therefore does **not** produce VOR gain. The UI must say `UNAVAILABLE — CAMERA HAS NO EYE LANDMARKS`; do not invent eye/VOR values.
+- Camera telemetry is stored in `state.camera`; Integration displays live head-motion, signal quality, motion energy and jitter, plus the face-scan channel (`state.camera.face`).
+- The face scan searches face-shaped windows on the 64x48 buffer and scores each on four channels — skin colour after a grey-world white balance, local structure (gradient), dark features, and frame-difference motion — multiplied by shape, position, brightness and size priors. Statistics come from summed-area tables. The winning window seeds a fit by image moments, which supplies the region's centre and spread.
+- It is **not** a skin-colour blob finder, and that is the point: the first version was, and it locked a wall on the first real camera it met, because that video's purple cast put the face outside every classic skin bound while the beige wall sat inside them. Face vs wall on that frame: structure 4.95 vs 1.49, dark-fraction 0.28 vs 0.02, colour 0.00 vs 0.00.
+- The scan reports a **coarse head pose** (yaw/pitch/roll) from the fitted region: centroid displacement, the change in the ratio of the region's two spreads, and the tilt of its principal axis. Pose is zeroed against a neutral captured by CALIBRATE and stays `null` until that neutral exists. Every published value carries `estimated: true` and a `basis` field naming the channel that is holding the lock; `basis: "structure"` means the colour rule is silent and the lock is far less certain.
+- Camera does **not** measure gaze and therefore does **not** produce VOR gain. The UI must say `UNAVAILABLE — CAMERA HAS NO EYE LANDMARKS`; do not invent eye/VOR values. The face scan does not change this: it uses no landmarks, so `eyeHead` stays null.
+- The face-scan pose is a proxy, not a goniometer: a lateral head translation moves the region exactly like a yaw, and the direction term has a dead zone (0.06 of a face width) so that noise cannot decide which way the head turned.
 - The Mission Console can score the reaction-time `task_perf` domain after the lab API fix (`getReactionMs`).
 - `serve.py` blocks directory listings, dotfiles/underscore scratch paths, and `tests/` when exposed on a LAN; it adds `no-store` and `nosniff` headers.
 
 ### Current visual behavior
 
 - Hero astronaut uses the real NASA ACES suit asset, with procedural material detail and suit decoration.
-- Hero astronaut is intentionally larger and positioned in the right side of the hero.
-- The astronaut should initially face the viewer, ease into view, then float subtly. Autonomous spin is intended only for **MICROGRAVITY** mode; Earth/Moon/Mars should preserve a viewer-facing entrance pose. Mouse/pointer steering remains available.
+- Hero astronaut sits in its own column between the hero copy and the 2x2 spec-card grid (anchor `baseX 0.85`, `scale 2.10`, `scene z 1.85`). It must not render behind a card: the card grid is capped at `max-width: 450px` and right-aligned so that column exists at all. See the measured notes in `src/three/SceneManager.js` and `src/styles/sections.css` before changing any of those numbers.
+- The astronaut should initially face the viewer, ease into view, then float subtly with a slow zero-g tumble in every mode (explicitly requested), which only starts after the entrance settles. Mouse/pointer steering remains available.
 - Earth/Moon/Mars are **distant background reference bodies**, not foreground globes. Do not move them in front of or underneath the astronaut without explicit user instruction.
 - The site is a single-page experience by design. Navigation changes camera framing/layers without a visible page redirect, so animation continuity is preserved.
 - Brain/ear/VOR/planet visuals are explanatory illustrations/3D assets, not physiological measurements.
@@ -59,6 +63,7 @@ Do not describe the product as a validated clinical monitor. Describe it as a **
 ### Not fully verified / must not be overclaimed
 
 - Camera motion values are an estimator output, not clinically calibrated head displacement.
+- Face-scan head pose is an estimator output from a skin-tone region, not a goniometer reading; it has not been compared against any real head-tracking instrument, and it has only been verified against a synthetic video stream, never against a real camera and a real person.
 - No eye landmarks, gaze tracking, or true VOR gain in the current camera provider.
 - No physical force plate, chest/head IMU, vHIT goggles, Web Bluetooth bridge, or lab instrument has been tested.
 - No clinical or physiological validation of OSI exists.
@@ -176,9 +181,12 @@ state.lab        // active lab and results
 - User-facing video requests ideal 1280×720, minimum 640×360, max 30 fps.
 - Estimator uses a hidden 64×48 buffer, approximately 18 Hz.
 - It computes global frame displacement (`dx`, `dy`), motion energy, residual jitter, centroid drift, calibration noise floor, rate and quality.
-- It measures **head motion only**.
-- It cannot calculate eye-head coordination or VOR gain without eye landmarks.
-- Calibration holds still for about 2.2 seconds and subtracts the device's p95 noise floor.
+- It measures **head motion only** for the `head_motion` domain.
+- Face scan (same buffer, same frame): grey-world white balance → graded YCbCr skin, luminance gradient, dark-feature mask, frame-difference motion → summed-area tables → search over ~1500 face-shaped windows scored on those four channels plus shape/position/brightness/size priors → the winning window seeds a moment fit for the region box, centre and spread. Outputs status (`searching` / `locked` / `lost`), the box, centre, spreads, coverage, `basis`, `score`, and a coarse yaw/pitch/roll relative to the calibrated neutral. No model file, nothing fetched.
+- Verified against a still frame of the real camera that broke v1: the lock lands at `[0.31, 0.19, 0.73, 0.89]` (the face) instead of v1's `[0.00, 0.49, 0.37, 0.90]` (the wall). Not yet verified against live human motion on a real camera.
+- The neutral used for the pose is the **median of the raw (un-smoothed) detections** in the hold-still window; sampling the smoothed box would bake a not-yet-converged ratio into the baseline and produce a phantom turn for the whole session. At least 8 raw frames are required, otherwise no neutral is stored and the pose readouts stay blank with the reason shown.
+- It cannot calculate eye-head coordination or VOR gain without eye landmarks, and the face scan does not provide them: `eyeHead` stays `null`.
+- Calibration holds still for about 2.2 seconds, subtracts the device's p95 noise floor **and** captures the neutral head pose. Its sampler runs on a timer, not `requestAnimationFrame`, so a backgrounded tab cannot starve it.
 - If camera is stopped/denied/stale, the UI must show that state; it must not convert absence into a fake zero or fake healthy value.
 
 ---
