@@ -163,8 +163,9 @@ export class SceneManager {
       /* Keep the astronaut prominent but inside the hero's open right column.
          It floats above the Earth reference instead of overlapping the title
          or cards. */
-      this.astronaut.root.position.set(2.2, -0.05, 1.85);
-      this.astronaut.root.scale.setScalar(2.15);
+      this.astronaut.root.position.set(2.05, -0.05, 1.85);
+      this.astronaut.scale = 2.45;
+      this.astronaut.root.scale.setScalar(2.45);
       /* Straight-on entrance pose. The astronaut may respond to pointer input
          after its own settle window, but it must not arrive tilted. */
       this.astronaut.root.rotation.set(0, 0, 0);

@@ -43,53 +43,6 @@ function orientHumanoid(root) {
   return best;
 }
 
-/* The NASA ACES GLB is a single rigid mesh with no animation clips. These
-   lightweight pressure-suit motion parts sit on the real asset only to provide
-   readable human body language: a restrained greeting, finger spread and
-   breathing/swimming motion. They are not used as sensor output. */
-function makeGreetingRig() {
-  const rig = new THREE.Group();
-  rig.name = 'human-greeting-rig';
-  rig.position.set(0.37, 1.14, 0.10);
-
-  const suit = SUIT();
-  const glove = SUIT_DARK();
-  const accent = GOLD();
-  const capsule = (material, length, radius = 0.065) => new THREE.Mesh(
-    new THREE.CapsuleGeometry(radius, length, 8, 12), material,
-  );
-
-  const upper = new THREE.Group();
-  const upperMesh = capsule(suit, 0.26, 0.09);
-  upperMesh.position.y = -0.14;
-  upper.add(upperMesh);
-  const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.018, 8, 18), accent);
-  cuff.rotation.x = Math.PI / 2;
-  cuff.position.y = -0.28;
-  upper.add(cuff);
-
-  const fore = new THREE.Group();
-  fore.position.y = -0.29;
-  const foreMesh = capsule(suit, 0.22, 0.075);
-  foreMesh.position.y = -0.115;
-  fore.add(foreMesh);
-
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), glove);
-  palm.position.y = -0.27;
-  fore.add(palm);
-  for (let i = -1; i <= 1; i++) {
-    const finger = capsule(glove, 0.105, 0.022);
-    finger.position.set(i * 0.032, -0.36, 0.012);
-    finger.rotation.z = i * 0.15;
-    fore.add(finger);
-  }
-
-  upper.add(fore);
-  rig.add(upper);
-  rig.userData = { upper, fore, palm };
-  return rig;
-}
-
 /* ── Shared body builder ─────────────────────────────────
    Proportions are anthropometric ratios, scaled so that the
    standing figure measures 2.00 units (metres) head to foot.
@@ -251,7 +204,6 @@ export class FloatingAstronaut {
     this.pointer = { x: 0, y: 0 };
     this.scale = 1;
     this.assetFront = 1;
-    this.greetingRig = null;
   }
 
   /**
@@ -291,11 +243,6 @@ export class FloatingAstronaut {
       this.body.visible = false;
       this.realBody = carrier;
       this.root.add(carrier);
-      /* Real asset has no clips: add a small, blended greeting rig in front of
-         the rigid suit so the first view communicates a living crew member. */
-      this.greetingRig = makeGreetingRig();
-      this.root.add(this.greetingRig);
-
       /* Mirrored visor, helmet work lights, chest status cluster and a
          grounding rim, all placed by measuring the asset's own material
          groups. Without these the suit reads as a white domed mannequin. */
@@ -361,14 +308,22 @@ export class FloatingAstronaut {
     const steer = interactive ? clamp(this.pointer.x * 0.72 + sensorX * 0.28, -1, 1) : 0;
     const tilt = interactive ? clamp(this.pointer.y * 0.72 + sensorY * 0.28, -1, 1) : 0;
 
-    this.root.position.y = this.baseY + (interactive ? Math.sin(t * 0.31) * 0.04 * floatAmt : 0);
+    /* Ease into view instead of appearing as a statue on frame one. */
+    const entrance = clamp(this.poseAge / 1.6, 0, 1);
+    const entranceEase = entrance * entrance * (3 - 2 * entrance);
+    this.root.scale.setScalar(this.scale * (0.86 + entranceEase * 0.14));
+    this.root.position.y = this.baseY + (interactive ? Math.sin(t * 0.31) * 0.04 * floatAmt : 0) + (1 - entranceEase) * 0.22;
     /* Life-like microgravity drift: a slow swimming/breathing motion in the
        open space, with no gravity drop. The amplitude stays restrained so the
        astronaut remains readable and never clips the hero copy. */
     this.root.position.x = interactive ? Math.sin(t * 0.19) * 0.055 * floatAmt + sensorX * 0.025 : 0;
     this.root.position.z = interactive ? Math.cos(t * 0.23) * 0.045 * floatAmt + sensorY * 0.018 : 0;
 
-    this.root.rotation.y = this.baseRot + steer * 0.28;
+    /* Earth/Moon/Mars: keep the entrance facing the viewer. In microgravity,
+       introduce the slow autonomous 360° spin; mouse/sensor steering remains
+       available in every environment. */
+    const freeSpin = state.mode === 'MICROGRAVITY' && interactive ? t * 0.16 : 0;
+    this.root.rotation.y = this.baseRot + freeSpin + steer * 0.28;
     this.root.rotation.x = damp(this.root.rotation.x, -tilt * 0.08, 4, dt);
     this.root.rotation.z = damp(this.root.rotation.z, interactive ? 0 : 0, 5, dt);
 
@@ -385,20 +340,12 @@ export class FloatingAstronaut {
       this.realBody.rotation.y = this.assetFront < 0 ? Math.PI : 0;
       /* A subtle swimmer roll/yaw sells free-float without ever flipping the
          body; the parent stays upright and the X/Z values are deliberately tiny. */
-      this.realBody.rotation.z = interactive ? Math.sin(t * 0.33) * 0.035 * floatAmt : 0;
-      this.realBody.rotation.x = interactive ? Math.cos(t * 0.27) * 0.024 * floatAmt : 0;
+      this.realBody.rotation.z = interactive ? Math.sin(t * 0.33) * 0.014 * floatAmt : 0;
+      this.realBody.rotation.x = interactive ? Math.cos(t * 0.27) * 0.010 * floatAmt : 0;
       this.realBody.position.y = 0.02 + (interactive ? Math.sin(t * 0.4) * 0.008 * floatAmt : 0);
-      if (this.greetingRig) {
-        const r = this.greetingRig.userData;
-        /* One natural greeting at the entrance, then a slow relaxed swim. */
-        const wave = this.poseAge < 5.2 ? Math.sin(this.poseAge * 5.2) * 0.18 : Math.sin(t * 0.55) * 0.025;
-        r.upper.rotation.z = -0.38 + wave;
-        r.upper.rotation.y = Math.sin(t * 0.42) * 0.04;
-        r.fore.rotation.z = Math.sin(this.poseAge * 5.2 + 0.7) * 0.22;
-        r.fore.rotation.x = Math.sin(t * 0.8) * 0.08;
-        r.palm.rotation.z = Math.sin(this.poseAge * 5.2) * 0.16;
-        this.greetingRig.position.y = 1.14 + Math.sin(t * 1.1) * 0.012;
-      }
+      /* The real GLB is intentionally kept intact. It has no skeleton clips,
+         so we animate only the whole suit as a single physical body: entrance
+         ease, then restrained microgravity drift and upright Y rotation. */
       return;
     }
 
