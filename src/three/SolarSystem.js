@@ -49,10 +49,10 @@ export class SolarSystem {
     if (maps.emissiveMap) {
       mat.emissiveMap = maps.emissiveMap;
       mat.emissive = new THREE.Color(0xffffff);
-      /* Raised from 0.42: with the stronger terminator above, the night side is
-         darker, and the city lights are what make it read as a living planet
-         rather than an unlit half. */
-      mat.emissiveIntensity = 0.55;
+      /* Raised from 0.42, then to 0.7: with the stronger terminator above, the
+         night side is darker, and the city lights are what make it read as a
+         living planet rather than an unlit half. */
+      mat.emissiveIntensity = 0.7;
     }
     /* Size of the showcase body. It used to be 1.16x smaller, to keep the
        planet from competing with the astronaut — but the fix for "it looks
@@ -60,7 +60,11 @@ export class SolarSystem {
        see SOLAR_POS in SceneManager.js), not being small. At 0.95 it reads as
        a sphere with a readable terminator instead of a blue smudge: about
        120 px across at the hero framing distance. */
-    const showcaseRadius = spec.radius * 0.95;
+     /* 0.88 rather than 0.95. The reference body sits in the band below the
+        spec-card panel, and on a 1366x768 laptop that band is only about 120 px
+        tall — at 0.95 the globe measured 119 px and the bottom edge clipped it.
+        Five per cent smaller buys the margin without changing how it reads. */
+     const showcaseRadius = spec.radius * 0.88;
     const surface = new THREE.Mesh(new THREE.SphereGeometry(showcaseRadius, seg, seg / 2), mat);
     surface.rotation.z = spec.tilt;
     grp.add(surface);
@@ -71,7 +75,10 @@ export class SolarSystem {
       const cloudMat = new THREE.MeshStandardMaterial({
         map: maps.cloudMap,
         transparent: true,
-        opacity: 0.9,
+        /* 0.95 with the denser deck in planetTextures: the cloud layer is what
+           carries the planet's realism, and at 0.9 the swirls washed out to a
+           flat haze over the brighter ocean. */
+        opacity: 0.95,
         depthWrite: false,
         roughness: 1,
         metalness: 0,

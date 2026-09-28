@@ -177,12 +177,15 @@ export class SceneManager {
     };
 
     layer('environment', () => {
-      this.env = new SpaceEnvironment({ quality: q, reducedMotion: state.reducedMotion });
+      /* The aspect goes in because the black hole is parked far to the right of
+         the sky, and how far right survives depends on how wide the frame is —
+         see SpaceEnvironment.setAspect. The resize handlers re-apply it. */
+      this.env = new SpaceEnvironment({
+        quality: q,
+        reducedMotion: state.reducedMotion,
+        aspect: this.camera.aspect,
+      });
       this.scene.add(this.env.group);
-      /* The black hole is a backdrop, not a subject: it hangs off the camera so
-         it keeps its place in the frame at every aspect ratio and every camera
-         move. See SpaceEnvironment.attachBackdrop. */
-      this.env.attachBackdrop(this.camera);
     });
 
     layer('solarSystem', () => {
@@ -288,6 +291,10 @@ export class SceneManager {
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(innerWidth, innerHeight, false);
         this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, q.dpr));
+        /* A portrait window is a fraction of the width of a landscape one, and
+           the black hole is parked near the right edge of the sky: without this
+           it walks out of the frame when the window is resized. */
+        this.env?.setAspect?.(this.camera.aspect);
       });
     };
     window.addEventListener('resize', onResize);
@@ -410,11 +417,6 @@ export class SceneManager {
     /* subtle FOV breathing on interaction — never enough to be nauseating */
     this.camera.fov = damp(this.camera.fov, 46 + (this._pointerDown ? -1.4 : 0), 4, dt);
     this.camera.updateProjectionMatrix();
-
-    /* The frame-anchored backdrop tracks the live FOV and aspect, so it holds
-       its fractional position through a resize or a projection change instead
-       of sliding. Cheap: two multiplications. */
-    try { this.env?.fitBackdrop?.(); } catch { /* backdrop is optional */ }
 
     /* The Earth reference holds its column.
        It sits 8.8 units behind the hero focus, so in reality it would barely

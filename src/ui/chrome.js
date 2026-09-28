@@ -97,18 +97,56 @@ export function mountCursor() {
   /* Recent path as a ring buffer of numbers, so the trail costs no
      allocations. The ghosts are simply earlier positions: the ship itself
      never lags, because the trail is what makes it fly. */
-  /* The oldest ghost sits 6 frames back and the rest step 4 frames apart, so
-     the nearest echo is clearly BEHIND the hull. At a 3-frame step the first
-     ghost still overlapped the ship, because the ship barely lags — which is
-     the point of the change, but it left the brightest echo looking like part
-     of the hull (caught in verification). */
+  /* The oldest ghost sits 6 frames back and the rest step 2 frames apart.
+     A 2-frame step rather than 4 is what turns the plume from a row of beads
+     into a streak: with 20 segments the gap between them is 2 frames of travel
+     instead of 4, so at any ordinary mouse speed the segments overlap and the
+     eye reads one tapered line. Measured in a browser by cropping the plume
+     region at 3x: at a 4-frame step the segments sat ~50 px apart with 10 px
+     bodies — visibly dots, not thrust. */
   const TRAIL_FIRST = 6;
-  const TRAIL_STEP = 4;
+  const TRAIL_STEP = 2;
   const N = TRAIL_FIRST + TRAIL_STEP * Math.max(1, ghosts.length) + 4;
   const hx = new Float32Array(N);
   const hy = new Float32Array(N);
   let head = 0;
   let angle = -90;        // screen degrees; -90 is nose-up
+  let lastTx = pos.tx;    // pointer position at the previous frame
+  let lastTy = pos.ty;
+  let runLevel = 0;       // 0 = parked, 1 = full thrust
+
+  /* ── Exhaust plume ──────────────────────────────────────────
+     Same idea as the old four dots — each segment is a linked earlier position
+     of the ship — with three changes that make it read as thrust rather than as
+     a row of beads:
+
+       1. fourteen segments, reaching about a second of travel behind the hull,
+          so a fast flick leaves a long plume rather than a stub;
+       2. every segment is STRETCHED along its own local direction of travel, so
+          the plume bends through a turn instead of staying a straight line;
+       3. the colour ramps nozzle -> tail: hot white, cyan, amber, ember, which
+          is what exhaust looks like against a dark sky and what ties the plume
+          to the site's amber/cyan palette.
+
+     All three are set ONCE, here. The frame loop below only ever writes
+     transform, opacity and scale, so the plume stays compositor work. */
+  const TRAIL_N = ghosts.length;
+  const trailDir = new Float32Array(TRAIL_N);
+  ghosts.forEach((g, i) => {
+    const k = TRAIL_N > 1 ? i / (TRAIL_N - 1) : 0;
+    const w = 10 - k * 6.2;                 // long axis, aligned to travel
+    const h = 6.4 - k * 4.0;
+    g.style.width = `${w.toFixed(1)}px`;
+    g.style.height = `${h.toFixed(1)}px`;
+    g.style.margin = `${(-h / 2).toFixed(1)}px 0 0 ${(-w / 2).toFixed(1)}px`;
+    /* Colour goes through custom properties rather than inline background and
+       box-shadow. Inline would win over the stylesheet, and the stylesheet is
+       what turns the whole trail amber while the ship is over a target — that
+       state has to keep working. */
+    g.style.setProperty('--trail-fill', k < 0.14 ? '#ffffff' : k < 0.45 ? '#7fe9ff' : k < 0.75 ? '#ffc46a' : '#ff7a2f');
+    g.style.setProperty('--trail-glow', k < 0.45 ? 'rgba(120,235,255,.9)' : 'rgba(255,150,60,.85)');
+    g.style.setProperty('--trail-glow-size', `${(9 - k * 5).toFixed(0)}px`);
+  });
 
   on(window, 'pointermove', (e) => {
     pos.tx = e.clientX;
@@ -143,6 +181,21 @@ export function mountCursor() {
     requestAnimationFrame(tick);
     /* A touch device owns the native cursor; nothing to draw or track then. */
     if (document.documentElement.dataset.cursorMode !== 'custom') return;
+    /* How far the POINTER moved this frame — not how far the ship is behind it.
+       The two are not the same, and the difference was a real bug: the ship
+       tracks within a pixel or two and snaps outright once it is more than 48 px
+       behind (below), so the ship-to-pointer gap is LARGEST at a slow drift and
+       collapses to zero exactly when the ship is flying fastest. Both the plume
+       and the nose were driven by that gap, so the harder you moved, the less
+       exhaust there was, and a fast flick turned the ship not at all. Measuring
+       the pointer itself gives the plume a length that grows with real speed and
+       turns the nose on a flick. */
+    const pdx = pos.tx - lastTx;
+    const pdy = pos.ty - lastTy;
+    const travel = Math.hypot(pdx, pdy);
+    lastTx = pos.tx;
+    lastTy = pos.ty;
+
     /* 45, not 15. At the old rate the ship sat tens of pixels behind the
        pointer, which is exactly why the native cursor had to stay visible and
        two cursors showed on screen at once. This tracks within a pixel or two
@@ -160,15 +213,12 @@ export function mountCursor() {
     }
     cursor.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`;
 
-    const dx = pos.tx - pos.x;
-    const dy = pos.ty - pos.y;
-    const speed = Math.hypot(dx, dy);
-    cursor.classList.toggle('is-fast', speed > 9);
+    cursor.classList.toggle('is-fast', travel > 7);
 
     if (ship) {
-      if (speed > 0.6) {
+      if (travel > 0.6) {
         /* the nose leads the way */
-        const want = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+        const want = Math.atan2(pdy, pdx) * 180 / Math.PI + 90;
         const d = ((want - angle + 180) % 360 + 360) % 360 - 180;   // shortest way round
         angle += d * 0.25;
       }
@@ -178,16 +228,46 @@ export function mountCursor() {
       ship.style.rotate = `${angle.toFixed(2)}deg`;
     }
 
-    hx[head] = pos.x;
-    hy[head] = pos.y;
+    /* The buffer holds the POINTER's path, not the ship's damped one. The ship
+       is what has to stay exactly on the cursor; the trail should be the path
+       the hand actually drew, and reading the pointer means a fast flick leaves
+       the full sweep behind it instead of a snapped, empty gap. */
+    hx[head] = pos.tx;
+    hy[head] = pos.ty;
     head = (head + 1) % N;
-    for (let i = 0; i < ghosts.length; i++) {
+
+    /* Thrust: parked, there is no exhaust at all; flying, it trails many times
+       the length of the hull. Fast attack, slower release — a plume does not
+       blink out the instant a hand pauses mid-flick. */
+    const thrust = Math.min(1, travel / 18);
+    runLevel = damp(runLevel, thrust, thrust > runLevel ? 26 : 7, 1 / 60);
+    const run = runLevel;
+    const now = performance.now();
+    for (let i = 0; i < TRAIL_N; i++) {
       const at = (head - 1 - TRAIL_FIRST - i * TRAIL_STEP + N * 2) % N;
       const g = ghosts[i];
-      const k = 1 - i / ghosts.length;
-      g.style.transform = `translate3d(${(hx[at] - pos.x).toFixed(1)}px, ${(hy[at] - pos.y).toFixed(1)}px, 0)`;
-      g.style.opacity = (0.5 * k * k).toFixed(3);
-      g.style.scale = (0.4 + 0.6 * k).toFixed(3);
+      const k = TRAIL_N > 1 ? i / (TRAIL_N - 1) : 0;
+
+      /* local heading, from the sample one frame newer than this one, so the
+         plume curves through a turn instead of pointing at the last direction */
+      const newer = (at + 1) % N;
+      const ddx = hx[at] - hx[newer];
+      const ddy = hy[at] - hy[newer];
+      if (ddx || ddy) trailDir[i] = Math.atan2(ddy, ddx) * 180 / Math.PI;
+
+      /* The taper scale belongs INSIDE the transform list, after the translate.
+         Written as the `scale` CSS property it is applied BEFORE `transform` in
+         the individual-transform order, which multiplied the translate by the
+         same factor — so the tail segments were pulled up to 62 per cent closer
+         to the ship than their recorded positions, and the plume was far shorter
+         than its own numbers said. Leftmost first: move, turn, then shrink. */
+      g.style.transform =
+        `translate3d(${(hx[at] - pos.x).toFixed(1)}px, ${(hy[at] - pos.y).toFixed(1)}px, 0)` +
+        ` rotate(${trailDir[i].toFixed(1)}deg) scale(${(1 - k * 0.62).toFixed(3)})`;
+      /* A slow flicker down the plume: fire that holds perfectly still reads as
+         a drawn line, and this costs one sine per segment. */
+      const flick = 0.86 + 0.14 * Math.sin(now * 0.018 + i * 1.9);
+      g.style.opacity = (0.95 * (1 - k * 0.88) * run * flick).toFixed(3);
     }
   };
   tick();

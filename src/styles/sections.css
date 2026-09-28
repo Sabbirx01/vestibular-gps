@@ -225,9 +225,12 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
 .cursor.is-click .cursor-ship { scale: .92; }
 .cursor.is-target .cursor-ship { color: var(--amber); }
 
-/* exhaust — brighter and longer the faster the ship is travelling */
+/* exhaust — brighter and longer the faster the ship is travelling. 1.9 rather
+   than 1.4: the plume behind the hull now runs to about a second of travel, and
+   the nozzle flame has to be long enough to read as the start of that trail
+   rather than as a separate detail. */
 .ship-flame { transform-box: fill-box; transform-origin: 50% 0%; opacity: .5; transition: opacity 150ms linear, scale 150ms linear; }
-.cursor.is-fast .ship-flame { opacity: 1; scale: 1.4; }
+.cursor.is-fast .ship-flame { opacity: 1; scale: 1.9; }
 
 /* the outer scan ring: an instrument, not a decoration */
 .cursor-lock {
@@ -249,13 +252,19 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
 @keyframes lockPulse { 0%,100% { scale: 1; opacity: .85; } 50% { scale: 1.16; opacity: .4; } }
 .cursor.is-click .cursor-lock { animation: none; scale: 1.55; opacity: 1; border-color: #ffffff; }
 
-/* trail — echoes along the path already travelled, so precision is untouched */
+/* trail — the exhaust plume. Each segment is a linked earlier position of the
+   ship, so the pointer's own precision is untouched; size, colour and length
+   are set by chrome.js (it walks a ring buffer), and only the fallback lives
+   here. Colour arrives as a custom property rather than an inline background
+   because an inline value would outrank the target-state rule below, and that
+   rule is what turns the whole plume amber over a link. */
 .cursor-trail { position: absolute; inset: 0; }
 .cursor-trail i {
   position: absolute; left: 50%; top: 50%;
-  width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
-  border-radius: 50%; background: var(--cyan); opacity: 0;
-  box-shadow: 0 0 9px rgba(95,227,255,.85);
+  width: 10px; height: 6px; margin: -3px 0 0 -5px;
+  border-radius: 50%; opacity: 0;
+  background: var(--trail-fill, var(--cyan));
+  box-shadow: 0 0 var(--trail-glow-size, 9px) var(--trail-glow, rgba(95,227,255,.85));
   will-change: transform, opacity, scale;
 }
 .cursor.is-target .cursor-trail i { background: var(--amber); box-shadow: 0 0 9px rgba(255,181,71,.85); }

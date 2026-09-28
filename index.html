@@ -72,7 +72,17 @@
 <!-- ═══════════ CUSTOM CURSOR ═══════════ -->
 <div id="cursor" class="cursor" aria-hidden="true">
   <div class="cursor-lock"></div>
-  <div class="cursor-trail" id="cursorTrail"><i></i><i></i><i></i><i></i></div>
+  <!-- Exhaust plume: one element per segment, kept deliberately dumb. Each is a
+       linked earlier position of the ship (chrome.js walks a ring buffer), lit
+       once at mount as a ramp from hot white at the nozzle through cyan into
+       amber, and after that only ever moved. Fourteen segments is the length
+       that reads as a long trail without becoming a smear, and the per-frame
+       cost is a transform and an opacity write per segment — compositor work,
+       no layout. -->
+  <div class="cursor-trail" id="cursorTrail">
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+  </div>
   <svg class="cursor-ship" viewBox="0 0 48 48">
     <defs>
       <!-- the plume fades out along its length instead of ending in a hard tip -->
