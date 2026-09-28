@@ -357,6 +357,22 @@ export function mountIntegrationSection({ camera } = {}) {
     };
     draw();
 
+    /* Bind only text nodes to the shared camera telemetry. Rebuilding the whole
+       integration section at 18 Hz would cause jank; these seven small updates
+       keep the displayed output genuinely realtime without touching the video. */
+    const updateLiveRows = () => {
+      const live = state.camera;
+      const hz = c?.hz?.mean ? c.hz.mean().toFixed(1) : '—';
+      liveRows.samples.querySelector('b').textContent = c ? String(c.samples) : '0';
+      liveRows.rate.querySelector('b').textContent = `${hz} Hz`;
+      liveRows.head.querySelector('b').textContent = live?.running ? `${live.headMotion.toFixed(2)} deg/s` : '—';
+      liveRows.quality.querySelector('b').textContent = live?.running ? `${Math.round(live.quality * 100)}%` : '—';
+      liveRows.energy.querySelector('b').textContent = c ? Math.max(0, c.motionEnergy - (c.noiseFloor?.energy ?? 0)).toFixed(4) : '—';
+      liveRows.jitter.querySelector('b').textContent = c ? Math.max(0, c.jitter - (c.noiseFloor?.jitter ?? 0)).toFixed(4) : '—';
+      if (c?.running) requestAnimationFrame(updateLiveRows);
+    };
+    if (c?.running) requestAnimationFrame(updateLiveRows);
+
     return wrap;
 
     function row(k, v) {

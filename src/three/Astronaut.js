@@ -43,6 +43,53 @@ function orientHumanoid(root) {
   return best;
 }
 
+/* The NASA ACES GLB is a single rigid mesh with no animation clips. These
+   lightweight pressure-suit motion parts sit on the real asset only to provide
+   readable human body language: a restrained greeting, finger spread and
+   breathing/swimming motion. They are not used as sensor output. */
+function makeGreetingRig() {
+  const rig = new THREE.Group();
+  rig.name = 'human-greeting-rig';
+  rig.position.set(0.37, 1.14, 0.10);
+
+  const suit = SUIT();
+  const glove = SUIT_DARK();
+  const accent = GOLD();
+  const capsule = (material, length, radius = 0.065) => new THREE.Mesh(
+    new THREE.CapsuleGeometry(radius, length, 8, 12), material,
+  );
+
+  const upper = new THREE.Group();
+  const upperMesh = capsule(suit, 0.26, 0.09);
+  upperMesh.position.y = -0.14;
+  upper.add(upperMesh);
+  const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.018, 8, 18), accent);
+  cuff.rotation.x = Math.PI / 2;
+  cuff.position.y = -0.28;
+  upper.add(cuff);
+
+  const fore = new THREE.Group();
+  fore.position.y = -0.29;
+  const foreMesh = capsule(suit, 0.22, 0.075);
+  foreMesh.position.y = -0.115;
+  fore.add(foreMesh);
+
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), glove);
+  palm.position.y = -0.27;
+  fore.add(palm);
+  for (let i = -1; i <= 1; i++) {
+    const finger = capsule(glove, 0.105, 0.022);
+    finger.position.set(i * 0.032, -0.36, 0.012);
+    finger.rotation.z = i * 0.15;
+    fore.add(finger);
+  }
+
+  upper.add(fore);
+  rig.add(upper);
+  rig.userData = { upper, fore, palm };
+  return rig;
+}
+
 /* ── Shared body builder ─────────────────────────────────
    Proportions are anthropometric ratios, scaled so that the
    standing figure measures 2.00 units (metres) head to foot.
@@ -204,6 +251,7 @@ export class FloatingAstronaut {
     this.pointer = { x: 0, y: 0 };
     this.scale = 1;
     this.assetFront = 1;
+    this.greetingRig = null;
   }
 
   /**
@@ -243,6 +291,10 @@ export class FloatingAstronaut {
       this.body.visible = false;
       this.realBody = carrier;
       this.root.add(carrier);
+      /* Real asset has no clips: add a small, blended greeting rig in front of
+         the rigid suit so the first view communicates a living crew member. */
+      this.greetingRig = makeGreetingRig();
+      this.root.add(this.greetingRig);
 
       /* Mirrored visor, helmet work lights, chest status cluster and a
          grounding rim, all placed by measuring the asset's own material
@@ -336,6 +388,17 @@ export class FloatingAstronaut {
       this.realBody.rotation.z = interactive ? Math.sin(t * 0.33) * 0.035 * floatAmt : 0;
       this.realBody.rotation.x = interactive ? Math.cos(t * 0.27) * 0.024 * floatAmt : 0;
       this.realBody.position.y = 0.02 + (interactive ? Math.sin(t * 0.4) * 0.008 * floatAmt : 0);
+      if (this.greetingRig) {
+        const r = this.greetingRig.userData;
+        /* One natural greeting at the entrance, then a slow relaxed swim. */
+        const wave = this.poseAge < 5.2 ? Math.sin(this.poseAge * 5.2) * 0.18 : Math.sin(t * 0.55) * 0.025;
+        r.upper.rotation.z = -0.38 + wave;
+        r.upper.rotation.y = Math.sin(t * 0.42) * 0.04;
+        r.fore.rotation.z = Math.sin(this.poseAge * 5.2 + 0.7) * 0.22;
+        r.fore.rotation.x = Math.sin(t * 0.8) * 0.08;
+        r.palm.rotation.z = Math.sin(this.poseAge * 5.2) * 0.16;
+        this.greetingRig.position.y = 1.14 + Math.sin(t * 1.1) * 0.012;
+      }
       return;
     }
 
