@@ -20,6 +20,12 @@ import {
   mountSubjectSection, mountEarSection, mountBrainSection, mountVorSection,
   mountLabSection, mountResearchSection,
 } from './ui/labs.js';
+import { mountConsoleSection } from './ui/console.js';
+import { mountIntegrationSection } from './ui/integration.js';
+/* Registered onto the hub at runtime rather than inside providers.js: the
+   camera provider needs SensorProvider from that module, and importing it
+   back from there would make the dependency circular. */
+import { CameraProvider } from './sensors/webcam.js';
 
 /* ── Error boundary: nothing raw ever reaches the user ──── */
 function installErrorBoundary() {
@@ -127,6 +133,9 @@ async function main() {
 
   await boot.step(1, async () => {
     ctx.hub = new SensorHub();
+    /* Constructed but never started without an explicit user action, so no
+       permission prompt can appear unprompted. */
+    ctx.hub.providers.camera = new CameraProvider();
     startClock();
     startLinkWatchdog();
   });
@@ -152,6 +161,18 @@ async function main() {
     ctx.space = mountSpaceSection({ scene: ctx.scene, onMode: (m) => setMode(ctx, m) });
     mountVorSection();
     ctx.lab = mountLabSection();
+
+    /* The Mission Console is the product the roadmap specifies. It reads live
+       channels and degrades honestly when a channel has no source. */
+    ctx.console = mountConsoleSection({
+      getReactionMs: () => (typeof ctx.lab?.getReactionMs === 'function' ? ctx.lab.getReactionMs() : undefined),
+    });
+    /* integration.js measures an ingested payload against the same reference
+       the crew established, so it needs the console's captured sessions. */
+    window.__VGPS_CONSOLE__ = ctx.console;
+
+    ctx.integration = mountIntegrationSection({ camera: ctx.hub.providers.camera });
+
     mountResearchSection();
     mountBodySection();
   });

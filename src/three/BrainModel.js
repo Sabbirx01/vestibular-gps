@@ -7,7 +7,7 @@
 
 import * as THREE from '../../vendor/three.module.js';
 import { PAL, energyMaterial, tissueMaterial, glowLine, labelSprite, disposeTree } from './materials.js';
-import { loadModel, dressMaterials, normalizeModel, trianglesOf } from './ModelLibrary.js';
+import { loadModel, dressTissue, normalizeModel, trianglesOf } from './ModelLibrary.js';
 import { clamp, damp, TAU } from '../core/util.js';
 import { BRAIN_STAGES } from '../science/content.js';
 
@@ -197,6 +197,10 @@ export class BrainModel {
     const fill = new THREE.DirectionalLight(PAL.violet, 1.5); fill.position.set(-2.6, 0.4, 1.4); g.add(fill);
     const back = new THREE.PointLight(PAL.cyan, 3.0, 6, 2); back.position.set(0, 0.3, -2.2); g.add(back);
     const front = new THREE.PointLight(0xdfefff, 1.6, 5, 2); front.position.set(0, 0.4, 2.4); g.add(front);
+    /* dedicated tissue key — the scene environment is deliberately dark, which
+       left the real anatomy without enough illumination to read its form */
+    const tissueKey = new THREE.DirectionalLight(0xfff0e6, 2.6); tissueKey.position.set(1.4, 1.8, 2.6); g.add(tissueKey);
+    const tissueWarm = new THREE.PointLight(0xffbfa8, 1.2, 4, 2); tissueWarm.position.set(-1.2, 0.2, 1.6); g.add(tissueWarm);
     g.add(new THREE.AmbientLight(0x46618c, 1.9));
 
     this.setLabelsVisible(false);
@@ -216,22 +220,13 @@ export class BrainModel {
     try {
       const gltf = await loadModel('brain');
       const model = gltf.scene.clone(true);
-      dressMaterials(model, { roughness: 0.62, metalness: 0.06, emissiveFloor: 0.16 });
+      /* The NIH mesh ships a single untextured material. Tinting it flat blue
+         made it read as a plastic blob, so it gets a real tissue response
+         instead: matte-warm, faintly translucent, no fake self-glow. */
+      dressTissue(model, { tone: 0xd8b6ad });
 
-      /* Real anatomy is denser and more detailed than the placeholder, so give
-         it a softer, semi-translucent tissue look that still shows the form. */
       model.traverse((o) => {
         if (!o.isMesh) return;
-        const m = o.material;
-        if (!m) return;
-        m.transparent = true;
-        m.opacity = 0.88;
-        m.side = THREE.DoubleSide;
-        m.depthWrite = true;
-        if ('emissive' in m) {
-          m.emissive = new THREE.Color(PAL.blue);
-          m.emissiveIntensity = 0.2;
-        }
         o.userData.pickId = 'cortex';
         this.pickables.push(o);
       });

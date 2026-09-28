@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════════
    VESTIBULAR GPS — chrome & sections
    topbar · nav · journey · hud · hero · cursor · footer · debug
    ═══════════════════════════════════════════════════════════ */
@@ -22,7 +22,7 @@
 .brand-mark svg { width: 100%; height: 100%; }
 .brand-text { display: grid; line-height: 1.1; }
 .brand-text b { font-size: var(--fs-xs); letter-spacing: .16em; font-weight: 600; }
-.brand-text small { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: .18em; color: var(--faint); }
+.brand-text small { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: .18em; color: var(--faint); }
 
 .nav { display: flex; gap: 3px; margin-inline: auto; flex-wrap: wrap; }
 .nav a {
@@ -61,7 +61,7 @@
 /* Vertical text keeps the rail inside the page gutter so it can never
    paint over the section cards. */
 .journey li {
-  font-family: var(--font-mono); font-size: 0.55rem; letter-spacing: .18em;
+  font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: .18em;
   color: var(--faint); opacity: .5; transition: color var(--t-mid), opacity var(--t-mid);
   writing-mode: vertical-rl; text-orientation: mixed;
   white-space: nowrap; height: 62px;
@@ -83,7 +83,7 @@
 .hud.is-in { opacity: 1; transform: none; }
 .hud-row {
   display: flex; justify-content: space-between; gap: var(--sp-3);
-  padding: 4px 0; font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: .07em;
+  padding: 4px 0; font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .07em;
 }
 .hud-row span { color: var(--faint); }
 .hud-row b { color: var(--text-2); font-weight: 500; }
@@ -102,7 +102,7 @@
 .hero-title em { color: var(--cyan); }
 .hero-specs { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-3); }
 .spec { padding: var(--sp-4); }
-.spec-k { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: .13em; color: var(--faint); }
+.spec-k { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: .13em; color: var(--faint); }
 .spec-v { font-size: 2rem; font-weight: 620; line-height: 1.1; color: var(--cyan); margin: 6px 0; letter-spacing: -.02em; }
 .spec-v small { font-size: .8rem; color: var(--muted); margin-left: 3px; }
 .spec-d { font-size: var(--fs-2xs); color: var(--muted); line-height: 1.5; }
@@ -135,10 +135,10 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
 }
 .footer-left { display: grid; gap: 3px; }
 .footer-left b { font-size: var(--fs-xs); letter-spacing: var(--ls-wide); }
-.footer-left span { font-family: var(--font-mono); font-size: 0.6rem; color: var(--faint); letter-spacing: .08em; }
+.footer-left span { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--faint); letter-spacing: .08em; }
 .footer-sources { display: grid; gap: 4px; }
 .footer-sources > span, .footer-right > span {
-  font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: .14em; color: var(--faint);
+  font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: .14em; color: var(--faint);
 }
 .footer-right { display: flex; gap: var(--sp-4); align-items: center; flex-wrap: wrap; }
 
@@ -152,7 +152,7 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
 }
 /* `display:grid` above would otherwise defeat the [hidden] attribute. */
 .debug[hidden] { display: none !important; }
-.debug p { display: flex; justify-content: space-between; gap: var(--sp-3); font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: .06em; }
+.debug p { display: flex; justify-content: space-between; gap: var(--sp-3); font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .06em; }
 .debug span { color: var(--faint); }
 .debug b { color: var(--green); font-weight: 500; }
 
@@ -180,7 +180,7 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
 @keyframes lockPulse { 0%,100% { transform: scale(1); opacity: .85; } 50% { transform: scale(1.14); opacity: .4; } }
 .cursor-label {
   position: absolute; left: 34px; top: 4px; white-space: nowrap;
-  font-family: var(--font-mono); font-size: 0.56rem; letter-spacing: .12em;
+  font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: .12em;
   color: var(--cyan); opacity: 0; transition: opacity var(--t-fast);
 }
 .cursor.is-hover .cursor-label, .cursor.is-target .cursor-label { opacity: .9; }

@@ -20,6 +20,7 @@
 import * as THREE from '../../vendor/three.module.js';
 import { GLTFLoader } from '../../vendor/loaders/GLTFLoader.js';
 import { DRACOLoader } from '../../vendor/loaders/DRACOLoader.js';
+import { applySurface } from './surfaceDetail.js';
 
 const loader = new GLTFLoader();
 
@@ -110,43 +111,179 @@ export function normalizeModel(root, { targetSize = 2, dropToFloor = true, axis 
   return carrier;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   Material dressing.
+
+   LESSON BAKED IN HERE: an earlier version of this function blanket-set
+   roughness/metalness, replaced near-black albedo with grey, and added an
+   emissive floor. That destroyed what the asset actually specifies. The NASA
+   suit carries KHR_materials_transmission, KHR_materials_ior and
+   KHR_materials_specular on its helmet parts — real glass and a real dark
+   visor — and the flat overwrite is precisely why the model looked like a
+   cartoon toy.
+
+   So now: match materials BY NAME, keep every authored albedo, and only tune
+   surface response. Illumination comes from the scene environment map
+   (see environment.js), not from faked emissive.
+   ═══════════════════════════════════════════════════════════ */
+
 /**
- * Bring a loaded GLB into the project's lighting model.
- *
- * The NASA suit ships with 14 materials but no textures and no environment
- * map, so MeshStandardMaterial renders flat and very dark. Giving the parts
- * sensible roughness/metalness and a modest emissive floor makes the asset
- * read properly against a dark space background.
+ * Real NASA ACES suit material names, e.g.
+ *   acesjustforroomshow:ACES_INTERIOR_OBJ_ACES8_sized_<KEY>.<n>
+ * The prefix is stable but ugly; matching on the key is enough and survives
+ * the exporter's naming churn.
  */
-export function dressMaterials(root, { roughness = 0.52, metalness = 0.22, emissiveFloor = 0.06 } = {}) {
+/* `surface` names a procedural detail set from surfaceDetail.js.
+   The GLB has NO textures at all, so without this every panel is one smooth
+   uniform colour — the loudest CG tell. Glass and mirror parts get no
+   surface detail on purpose: they should stay perfectly smooth. */
+const SUIT_RULES = [
+  /* helmet visor — the black mirrored pane. Glossy, opaque, strongly reflective */
+  { key: 'aceshelme.008', roughness: 0.04, metalness: 0.72, env: 3.2 },
+  /* helmet glass — transmission/ior already authored; reinforce as real glass */
+  { key: 'aceshelme.009', roughness: 0.02, metalness: 0.06, env: 2.4, glass: true },
+  /* helmet shell — the white outer dome, glossy composite, faint tooling marks */
+  { key: 'aceshelme.007', roughness: 0.22, metalness: 0.06, env: 1.5, clearcoat: 0.65, surface: 'metal', repeat: 2, normalScale: 0.14 },
+  /* near-white outer shell */
+  { key: 'lambert4S', roughness: 0.3, metalness: 0.08, env: 1.3, surface: 'metal', repeat: 2, normalScale: 0.12 },
+  /* dark interior / dark fittings — rubberised */
+  { key: 'lambert6S', roughness: 0.72, metalness: 0.05, env: 0.9, surface: 'rubber', repeat: 4, normalScale: 0.5 },
+  /* grey metal hardware — brushed */
+  { key: 'blinn1SG', roughness: 0.3, metalness: 0.85, env: 1.6, surface: 'metal', repeat: 3, normalScale: 0.35 },
+  { key: 'blinn2SG', roughness: 0.34, metalness: 0.14, env: 1.3, surface: 'metal', repeat: 3, normalScale: 0.18 },
+  /* fabric body of the suit — the orange one is blinn3SG (0.69, 0.25, 0.11) */
+  /* Repeat is deliberately LOW. At repeat 5 the 512 px weave tile was tiled so
+     finely on a 2 m figure that it became sub-pixel dither and vanished at
+     normal viewing distance — the suit read as perfectly smooth plastic. ~2.2
+     puts the weave at a scale the eye can actually resolve. */
+  { key: 'anisotrop', roughness: 0.86, metalness: 0.0, env: 0.8, aniso: 0.7, surface: 'fabric', repeat: 2.4, normalScale: 1.35 },
+  { key: 'blinn3SG', roughness: 0.72, metalness: 0.02, env: 0.85, surface: 'fabric', repeat: 2.2, normalScale: 1.25 },
+  { key: 'lambert3S', roughness: 0.72, metalness: 0.02, env: 0.85, surface: 'fabric', repeat: 2.2, normalScale: 1.25 },
+  /* red and blue accent patches — same woven shell fabric */
+  { key: 'lambert8S', roughness: 0.7, metalness: 0.03, env: 0.85, surface: 'fabric', repeat: 5, normalScale: 0.5 },
+  { key: 'lambert5S', roughness: 0.7, metalness: 0.03, env: 0.85, surface: 'fabric', repeat: 5, normalScale: 0.5 },
+  /* boots — coarse rubber */
+  { key: 'shoe_lamb.004', roughness: 0.82, metalness: 0.06, env: 0.8, surface: 'rubber', repeat: 5, normalScale: 0.7 },
+  { key: 'shoe_lamb.005', roughness: 0.6, metalness: 0.08, env: 1.0, surface: 'rubber', repeat: 5, normalScale: 0.45 },
+];
+
+const DEFAULT_RULE = { roughness: 0.55, metalness: 0.12, env: 1.0, surface: 'fabric', repeat: 4, normalScale: 0.35 };
+
+function ruleFor(name) {
+  if (!name) return DEFAULT_RULE;
+  for (const r of SUIT_RULES) {
+    if (name.includes(r.key)) return r;
+  }
+  return DEFAULT_RULE;
+}
+
+function applyRule(m, rule) {
+  if (!m) return m;
+
+  m.side = THREE.FrontSide;
+  m.envMapIntensity = rule.env ?? 1.0;
+
+  if ('roughness' in m && rule.roughness !== undefined) m.roughness = rule.roughness;
+  if ('metalness' in m && rule.metalness !== undefined) m.metalness = rule.metalness;
+
+  if (rule.clearcoat !== undefined && 'clearcoat' in m) {
+    m.clearcoat = rule.clearcoat;
+    m.clearcoatRoughness = 0.28;
+  }
+  if (rule.aniso !== undefined && 'anisotropy' in m) m.anisotropy = rule.aniso;
+
+  if (rule.glass) {
+    /* KHR_materials_transmission / ior are already on these materials; make
+       sure they read as glass rather than being flattened into plastic. */
+    m.transparent = true;
+    if ('transmission' in m) m.transmission = Math.max(m.transmission ?? 0, 0.92);
+    if ('ior' in m) m.ior = 1.48;
+    if ('thickness' in m) m.thickness = 0.02;
+    m.depthWrite = false;
+  }
+
+  /* Procedural surface detail. The asset carries no textures whatsoever, so
+     without this every panel is a perfectly smooth uniform colour, which is
+     the loudest "this is CG" cue. Glass and mirror parts are skipped. */
+  if (rule.surface && !rule.glass) {
+    applySurface(m, rule.surface, {
+      repeat: rule.repeat ?? 4,
+      normalScale: rule.normalScale ?? 0.4,
+      roughnessMix: rule.roughness ?? 0.6,
+    });
+  }
+
+  /* Never lift or replace an authored albedo, and never fake lighting with
+     emissive — the environment map does that job properly. */
+  if ('emissiveIntensity' in m && !m.emissiveMap) m.emissiveIntensity = 0;
+
+  m.needsUpdate = true;
+  return m;
+}
+
+/** Astronaut / hard-surface assets. */
+export function dressMaterials(root) {
   const seen = new Set();
   root.traverse((o) => {
     if (!o.isMesh) return;
-    const mats = Array.isArray(o.material) ? o.material : [o.material];
-    o.material = Array.isArray(o.material) ? mats.map(up) : up(mats[0]);
+    const list = Array.isArray(o.material) ? o.material : [o.material];
+    const out = list.map((m) => {
+      if (!m || seen.has(m.uuid)) return m;
+      seen.add(m.uuid);
+      return applyRule(m, ruleFor(m.name));
+    });
+    o.material = Array.isArray(o.material) ? out : out[0];
     o.castShadow = false;
     o.receiveShadow = false;
     o.frustumCulled = true;
+  });
+  return root;
+}
 
-    function up(m) {
-      if (!m) return m;
-      if (seen.has(m.uuid)) return m;
+/**
+ * Biological tissue — the brain mesh.
+ *
+ * The NIH mesh has a single material and no textures, so it needs a genuine
+ * tissue response: matte-warm, very slightly translucent, with a soft
+ * subsurface feel rather than a hard plastic shell.
+ */
+export function dressTissue(root, { tone = 0xe4c4ba } = {}) {
+  const seen = new Set();
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const list = Array.isArray(o.material) ? o.material : [o.material];
+    const out = list.map((m) => {
+      if (!m || seen.has(m.uuid)) return m;
       seen.add(m.uuid);
 
+      if (m.color) m.color.set(tone);
+
+      /* Mesh conversions out of STL/Sketchfab often carry a near-black vertex
+         colour layer. `material.color` is MULTIPLIED by it, so the tissue tone
+         was rendering as graphite. Dropping the vertex layer lets the
+         intended anatomical tone through. */
+      if (m.vertexColors) m.vertexColors = false;
+
+      if ('roughness' in m) m.roughness = 0.62;
+      if ('metalness' in m) m.metalness = 0.0;
+      m.envMapIntensity = 1.35;
       m.side = THREE.FrontSide;
-      if ('roughness' in m) m.roughness = roughness;
-      if ('metalness' in m) m.metalness = metalness;
-      if (m.color) {
-        /* lift near-black albedo so shapes are readable on a dark background */
-        if (m.color.r + m.color.g + m.color.b < 0.35) m.color.setRGB(0.62, 0.68, 0.78);
-      }
-      if ('emissive' in m) {
-        m.emissive = new THREE.Color(m.color ? m.color.getHex() : 0x8899aa);
-        m.emissiveIntensity = emissiveFloor;
-      }
+
+      /* a touch of transmission gives the waxy read real cortex has, without
+         turning the whole thing into jelly */
+      if ('transmission' in m) m.transmission = 0.14;
+      if ('thickness' in m) m.thickness = 0.35;
+      if ('ior' in m) m.ior = 1.38;
+      if ('sheen' in m) { m.sheen = 0.35; m.sheenColor = new THREE.Color(0xffd9cc); m.sheenRoughness = 0.6; }
+      if ('emissiveIntensity' in m) m.emissiveIntensity = 0;
+
+      m.transparent = false;
+      m.depthWrite = true;
       m.needsUpdate = true;
       return m;
-    }
+    });
+    o.material = Array.isArray(o.material) ? out : out[0];
+    o.userData.pickId = 'cortex';
   });
   return root;
 }

@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════════
    labs — the interactive science layer.
    Inner-ear explorer · brain pathway · VOR · six lab tests ·
    research index. Interactive pieces use real input; modelled
@@ -77,14 +77,16 @@ export function mountSubjectSection() {
 
   bus.on('frame', () => {
     if (!badge) return;
-    if (state.reducedMotion) { setBadge('ARMS EXTENDED · STATIC (REDUCED MOTION)'); return; }
+    /* The NASA ACES asset is a standing suit with the arms at the sides, so
+       the badge must say that rather than claiming an extended-arm pose. */
+    if (state.reducedMotion) { setBadge('NASA ACES SUIT · STATIC (REDUCED MOTION)'); return; }
     const yaw = stage.current?.body?.rotation?.y ?? 0;
     const now = performance.now();
     if (lastYaw === null || Math.abs(yaw - lastYaw) > 0.004) lastMove = now;
     lastYaw = yaw;
     setBadge(now - lastMove > 1200
-      ? 'ARMS EXTENDED · PAUSED (TAB NOT VISIBLE)'
-      : 'ARMS EXTENDED · ROTATING · MEASUREMENT FRAME ACTIVE');
+      ? 'NASA ACES SUIT · PAUSED (TAB NOT VISIBLE)'
+      : 'NASA ACES SUIT · ROTATING IN THE MEASUREMENT FRAME');
   });
 
   window.addEventListener('resize', () => stage.resize());
@@ -306,7 +308,11 @@ export function mountVorSection() {
   const badge = $('#vorGainBadge');
   if (!canvas) return;
 
-  const ctl = { freq: 0.5, amp: 20, gain: 1, playing: true };
+  /* Gain defaults below 1.0 on purpose. At exactly 1.0 the eye counter-rotation
+     perfectly cancels the head movement, so gaze error and retinal slip sit
+     pinned at zero and the demonstration looks dead. 0.82 shows the reflex
+     working while leaving a visible residual. */
+  const ctl = { freq: 0.5, amp: 20, gain: 0.82, playing: true };
   const bind = (sel, valSel, key, fmt) => {
     const i = $(sel), v = $(valSel);
     if (!i) return;
@@ -347,64 +353,241 @@ export function mountVorSection() {
     const cx = cw * 0.34, cy = ch * 0.52, R = Math.min(cw, ch) * 0.19;
     const reduced = state.reducedMotion;
 
-    /* target crosshair — fixed in the world */
-    const tx = cw * 0.78, ty = ch * 0.34;
-    ctx.strokeStyle = cssVar('--faint') || '#647a99';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(tx, ty, 13, 0, TAU); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(tx - 19, ty); ctx.lineTo(tx - 6, ty); ctx.moveTo(tx + 6, ty); ctx.lineTo(tx + 19, ty); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(tx, ty - 19); ctx.lineTo(tx, ty - 6); ctx.moveTo(tx, ty + 6); ctx.lineTo(tx, ty + 19); ctx.stroke();
-    ctx.fillStyle = cssVar('--green') || '#4ade80';
-    ctx.beginPath(); ctx.arc(tx, ty, 3, 0, TAU); ctx.fill();
-
-    /* the head, seen from above, rotating in the transverse plane */
+    const accent = cssVar('--cyan') || '#5fe3ff';
+    const faint = cssVar('--faint') || '#647a99';
+    const muted = cssVar('--muted') || '#8ba0c0';
     const hair = (headAngle * Math.PI) / 180;
+    const headYaw = reduced ? 0 : hair * 0.42;
+
+    /* World-fixed target. Kept inside the field and on the gaze ray, clear of
+       the right-hand panel — it previously sat in the corner, detached. */
+    const ttx = cw * 0.66, tty = ch * 0.42;
+
+    /* ── measurement grid: concentric rings + radial ticks, so the panel
+          reads as an instrument field rather than empty space ── */
+    ctx.save();
+    ctx.strokeStyle = 'rgba(122,170,220,0.11)';
+    ctx.lineWidth = 1;
+    for (let r = R * 0.75; r <= R * 3.1; r += R * 0.58) {
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke();
+    }
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * TAU;
+      const long = i % 6 === 0;
+      const r0 = R * 3.1;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      ctx.lineTo(cx + Math.cos(a) * (r0 + (long ? 11 : 5)), cy + Math.sin(a) * (r0 + (long ? 11 : 5)));
+      ctx.stroke();
+    }
+    /* Radial scale: a numbered ring at 0/90/180/270 plus tick labels every 30°
+       so the field reads as a graduated instrument, not a bare circle. */
+    ctx.fillStyle = faint;
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let deg = 0; deg < 360; deg += 30) {
+      const a = (deg * Math.PI) / 180;
+      const rr = R * 3.1 + 24;
+      const lx = cx + Math.cos(a) * rr;
+      const ly = cy + Math.sin(a) * rr;
+      ctx.globalAlpha = deg % 90 === 0 ? 1 : 0.55;
+      ctx.fillText(`${deg}°`, lx, ly);
+    }
+    ctx.globalAlpha = 1;
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+
+    /* ── the head, seen from above, rotating in the transverse plane ── */
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(reduced ? 0 : hair * 0.42);
+    ctx.rotate(headYaw);
 
-    ctx.fillStyle = 'rgba(120,150,190,0.13)';
+    /* cranium: slightly egg-shaped, wider at the back, tapering to the nose */
+    const grad = ctx.createLinearGradient(-R * 1.2, -R, R * 1.2, R);
+    grad.addColorStop(0, 'rgba(150,180,220,0.20)');
+    grad.addColorStop(0.55, 'rgba(120,150,190,0.10)');
+    grad.addColorStop(1, 'rgba(90,120,165,0.16)');
+    ctx.fillStyle = grad;
     ctx.strokeStyle = cssVar('--line-strong') || 'rgba(122,170,220,.3)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.ellipse(0, 0, R * 1.12, R, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.ellipse(0, 0, R * 1.16, R, 0, 0, TAU); ctx.fill(); ctx.stroke();
 
-    /* nose marker so rotation is legible */
-    ctx.fillStyle = cssVar('--muted') || '#8ba0c0';
+    /* posterior skull emphasis — a small occipital bulge */
+    ctx.beginPath(); ctx.ellipse(-R * 0.72, 0, R * 0.42, R * 0.72, 0, 0, TAU); ctx.stroke();
+
+    /* Mid-sagittal axis — runs front-to-back, straight through the nose. */
+    ctx.strokeStyle = 'rgba(232,240,255,0.26)';
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(-R * 1.16, 0); ctx.lineTo(R * 1.16, 0); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = muted;
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('MID-SAGITTAL AXIS', -R * 1.1, -R * 0.14);
+
+    /* Interaural axis — this one runs LEFT-RIGHT, perpendicular to the nose.
+       An earlier version drew it along the nose direction and mislabelled it,
+       which made the plan view anatomically wrong. */
+    ctx.strokeStyle = 'rgba(168,119,255,0.5)';
+    ctx.setLineDash([5, 3]);
+    ctx.beginPath(); ctx.moveTo(0, -R * 1.1); ctx.lineTo(0, R * 1.1); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(168,119,255,0.85)';
+    ctx.textAlign = 'center';
+    ctx.fillText('INTERAURAL', 0, -R * 1.18);
+    ctx.fillText('AXIS', 0, -R * 1.18 + 9);
+
+    /* nose: a tapered wedge, so rotation is unmistakable */
+    ctx.fillStyle = 'rgba(190,212,240,0.55)';
     ctx.beginPath();
-    ctx.moveTo(R * 1.02, 0); ctx.lineTo(R * 1.24, -5); ctx.lineTo(R * 1.24, 5);
+    ctx.moveTo(R * 0.98, 0);
+    ctx.quadraticCurveTo(R * 1.28, -R * 0.16, R * 1.22, -R * 0.02);
+    ctx.quadraticCurveTo(R * 1.28, R * 0.16, R * 0.98, 0);
     ctx.closePath(); ctx.fill();
 
-    /* eyes counter-rotate inside the head */
+    /* inner-ear markers, one per side */
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(-R * 0.30, s * R * 0.60, 4.4, 0, TAU);
+      ctx.fillStyle = 'rgba(168,119,255,0.75)';
+      ctx.fill();
+    }
+
+    /* ── eyes: sclera, iris, pupil, corneal catch-light, gaze vector ── */
     const eyeOffset = reduced ? 0 : -hair * 0.42 * ctl.gain;
     for (const s of [-1, 1]) {
       ctx.save();
-      ctx.translate(0, s * R * 0.44);
-      ctx.fillStyle = 'rgba(233,242,255,0.9)';
-      ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.fill();
+      ctx.translate(R * 0.42, s * R * 0.44);
+
+      /* socket shadow */
+      ctx.beginPath(); ctx.arc(0, 0, 11.5, 0, TAU);
+      ctx.fillStyle = 'rgba(8,14,26,0.65)'; ctx.fill();
+
+      /* sclera with a soft gradient so it is not a flat disc */
+      const sg = ctx.createRadialGradient(-2, -2, 1, 0, 0, 10);
+      sg.addColorStop(0, '#ffffff');
+      sg.addColorStop(0.7, '#e7eef8');
+      sg.addColorStop(1, '#b9c8dc');
+      ctx.beginPath(); ctx.arc(0, 0, 10, 0, TAU);
+      ctx.fillStyle = sg; ctx.fill();
+
       ctx.save();
       ctx.rotate(eyeOffset);
-      ctx.fillStyle = '#05080f';
-      ctx.beginPath(); ctx.arc(5, 0, 4.2, 0, TAU); ctx.fill();
+      /* iris */
+      ctx.beginPath(); ctx.arc(5.4, 0, 5.0, 0, TAU);
+      const ig = ctx.createRadialGradient(5.4, 0, 1, 5.4, 0, 5);
+      ig.addColorStop(0, '#6fd4ff');
+      ig.addColorStop(0.6, '#2b7fb8');
+      ig.addColorStop(1, '#0d3050');
+      ctx.fillStyle = ig; ctx.fill();
+      /* pupil */
+      ctx.beginPath(); ctx.arc(5.4, 0, 2.3, 0, TAU);
+      ctx.fillStyle = '#04070d'; ctx.fill();
+      /* corneal catch-light */
+      ctx.beginPath(); ctx.arc(3.9, -1.9, 1.35, 0, TAU);
+      ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fill();
+      /* gaze direction stub */
+      ctx.strokeStyle = `rgba(95,227,255,${clamp(0.85 - slip * 0.5, 0.2, 0.85)})`;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(17, 0); ctx.stroke();
       ctx.restore();
+
+      /* eyelid rim */
+      ctx.beginPath(); ctx.arc(0, 0, 10, 0, TAU);
+      ctx.strokeStyle = 'rgba(150,178,210,0.55)'; ctx.lineWidth = 1; ctx.stroke();
       ctx.restore();
     }
-    /* gaze direction line out to the target */
-    ctx.strokeStyle = `rgba(95,227,255,${clamp(0.9 - slip, 0.15, 0.9)})`;
-    ctx.setLineDash([4, 4]);
+
+    /* vestibular signal lines: each labyrinth to the brainstem origin */
+    ctx.strokeStyle = 'rgba(168,119,255,0.42)';
+    ctx.lineWidth = 1;
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(-R * 0.30, s * R * 0.60);
+      ctx.quadraticCurveTo(-R * 0.06, s * R * 0.24, 0, 0);
+      ctx.stroke();
+    }
+
+    /* head-yaw arc with an arrowhead, measured from the reference axis */
+    if (Math.abs(headAngle) > 0.6 && !reduced) {
+      const a0 = 0, a1 = headYaw;
+      ctx.strokeStyle = 'rgba(255,181,71,0.85)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(0, 0, R * 1.34, Math.min(a0, a1), Math.max(a0, a1)); ctx.stroke();
+      const tip = a1;
+      const tx2 = Math.cos(tip) * R * 1.34, ty2 = Math.sin(tip) * R * 1.34;
+      ctx.save();
+      ctx.translate(tx2, ty2); ctx.rotate(tip + (a1 < a0 ? -Math.PI / 2 : Math.PI / 2));
+      ctx.beginPath(); ctx.moveTo(-4, -4); ctx.lineTo(4, 0); ctx.lineTo(-4, 4); ctx.closePath();
+      ctx.fillStyle = 'rgba(255,181,71,0.9)'; ctx.fill();
+      ctx.restore();
+    }
+
+    /* ── gaze ray from the head centre out to the world-fixed target ── */
+    ctx.strokeStyle = `rgba(95,227,255,${clamp(0.85 - slip, 0.15, 0.85)})`;
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([5, 4]);
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(tx - cx, ty - cy);
+    ctx.moveTo(R * 1.05, 0);
+    ctx.lineTo(ttx - cx, tty - cy);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.restore();
 
-    /* labels */
-    ctx.fillStyle = cssVar('--faint') || '#647a99';
-    ctx.font = '9px ui-monospace, monospace';
+    /* ── world-fixed target: concentric reticle that reacts to slip ── */
+    const ringPulse = 1 + Math.sin(t * 6) * 0.06;
+    ctx.strokeStyle = slip > 0.4
+      ? `rgba(255,95,109,${clamp(0.5 + slip * 0.5, 0.5, 1)})`
+      : 'rgba(74,222,128,0.75)';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.arc(ttx, tty, 15 * ringPulse, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ttx, tty, 5.5, 0, TAU); ctx.stroke();
+
+    ctx.strokeStyle = cssVar('--faint') || '#647a99';
+    ctx.beginPath();
+    ctx.moveTo(ttx - 22, tty); ctx.lineTo(ttx - 8, tty);
+    ctx.moveTo(ttx + 8, tty); ctx.lineTo(ttx + 22, tty);
+    ctx.moveTo(ttx, tty - 22); ctx.lineTo(ttx, tty - 8);
+    ctx.moveTo(ttx, tty + 8); ctx.lineTo(ttx, tty + 22);
+    ctx.stroke();
+    /* four corner brackets, the way a tracking reticle is drawn */
+    ctx.strokeStyle = 'rgba(74,222,128,0.5)';
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(ttx + sx * 20, tty + sy * 15);
+      ctx.lineTo(ttx + sx * 20, tty + sy * 20);
+      ctx.lineTo(ttx + sx * 15, tty + sy * 20);
+      ctx.stroke();
+    }
+    ctx.fillStyle = cssVar('--green') || '#4ade80';
+    ctx.beginPath(); ctx.arc(ttx, tty, 3, 0, TAU); ctx.fill();
+
+    /* ── on-canvas readouts ── */
+    ctx.fillStyle = faint;
+    ctx.font = '11px ui-monospace, monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('HEAD + EYES (PLAN VIEW)', 12, 16);
+    ctx.fillText('HEAD + EYES — PLAN VIEW', 12, 16);
+    ctx.fillStyle = muted;
+    ctx.fillText('HEAD YAW', 12, 30);
+    ctx.fillStyle = accent;
+    ctx.font = '13px ui-monospace, monospace';
+    ctx.fillText(`${headAngle.toFixed(1)}°`, 12, 46);
+
     ctx.textAlign = 'right';
-    ctx.fillText('FIXED WORLD TARGET', cw - 12, 16);
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.fillStyle = faint;
+    ctx.fillText('WORLD-FIXED TARGET', cw - 12, 16);
+    ctx.fillStyle = muted;
+    ctx.fillText('GAZE ERROR', cw - 12, 30);
+    ctx.font = '13px ui-monospace, monospace';
+    ctx.fillStyle = slip > 0.4 ? 'rgba(255,95,109,0.95)' : accent;
+    ctx.fillText(`${gazeError.toFixed(2)}°`, cw - 12, 46);
+
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.fillStyle = faint;
+    ctx.textAlign = 'center';
+    ctx.fillText('SUPERIOR VIEW · SCHEMATIC · NOT A MEASUREMENT OF ANY PERSON', cw / 2, ch - 10);
 
     /* slip warning */
     if (slip > 0.35) {
@@ -623,7 +806,7 @@ export function mountLabSection() {
           ctx.lineTo(cx + input.x * S, cy + input.y * S);
           ctx.stroke(); ctx.setLineDash([]);
 
-          ctx.fillStyle = C.muted; ctx.font = '9px ui-monospace, monospace';
+          ctx.fillStyle = C.muted; ctx.font = '11px ui-monospace, monospace';
           ctx.textAlign = 'left'; ctx.fillText('TARGET', 12, 16);
           ctx.fillStyle = C.cyan; ctx.fillText('YOUR INPUT', 12, 30);
         },
@@ -662,7 +845,7 @@ export function mountLabSection() {
           for (let g = 0; g <= 1; g += 0.25) { ctx.beginPath(); ctx.moveTo(pad, Y(g)); ctx.lineTo(w - 14, Y(g)); ctx.stroke(); }
           for (const f of [0.05, 0.1, 0.5, 1, 2, 5]) { ctx.beginPath(); ctx.moveTo(X(f), 12); ctx.lineTo(X(f), h - 30); ctx.stroke(); }
 
-          ctx.fillStyle = C.muted; ctx.font = '9px ui-monospace, monospace';
+          ctx.fillStyle = C.muted; ctx.font = '11px ui-monospace, monospace';
           ctx.textAlign = 'right';
           [0, 0.5, 1].forEach((g) => ctx.fillText(g.toFixed(1), pad - 6, Y(g) + 3));
           ctx.textAlign = 'center';
@@ -751,7 +934,7 @@ export function mountLabSection() {
             ctx.fillStyle = C.amber;
             ctx.beginPath(); ctx.arc(cx + last.x * S * 12, cy + last.y * S * 12, 4, 0, TAU); ctx.fill();
           }
-          ctx.fillStyle = C.muted; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'left';
+          ctx.fillStyle = C.muted; ctx.font = '11px ui-monospace, monospace'; ctx.textAlign = 'left';
           ctx.fillText('SIMULATED CENTRE OF PRESSURE — STOCHASTIC MODEL, NOT A FORCE-PLATE RECORDING', 12, 16);
         },
       };
@@ -829,7 +1012,7 @@ export function mountLabSection() {
             const bw = (w - 80) / bins.length;
             ctx.fillRect(40 + i * bw, h - 30 - n * 4, bw - 6, n * 4);
           });
-          ctx.fillStyle = C.muted; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'left';
+          ctx.fillStyle = C.muted; ctx.font = '11px ui-monospace, monospace'; ctx.textAlign = 'left';
           ctx.fillText('PRESS ← → ↑ ↓ TO MATCH THE BURST DIRECTION', 12, 16);
           ctx.fillText('CORRECT-RESPONSE LATENCY DISTRIBUTION', 40, h - 8);
         },
@@ -900,7 +1083,7 @@ export function mountLabSection() {
           }
           ctx.closePath(); ctx.fill();
 
-          ctx.fillStyle = C.muted; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'left';
+          ctx.fillStyle = C.muted; ctx.font = '11px ui-monospace, monospace'; ctx.textAlign = 'left';
           ctx.fillText('VISUAL FLOW (CYAN) vs INERTIAL SIGNAL (VIOLET) — CONFLICT SHADED RED', pad, 12);
         },
       };
@@ -938,7 +1121,7 @@ export function mountLabSection() {
         }
         ctx.fillStyle = C.muted; ctx.font = '10px ui-monospace, monospace'; ctx.textAlign = 'center';
         ctx.fillText('EARTH · 1.000 g', 30 + cw2 / 2, 20);
-        ctx.font = '9px ui-monospace, monospace';
+        ctx.font = '11px ui-monospace, monospace';
         ctx.fillText('FULL OTOLITH LOAD', 30 + cw2 / 2, h - 28);
 
         /* active environment */
@@ -955,7 +1138,7 @@ export function mountLabSection() {
         }
         ctx.fillStyle = C.cyan; ctx.font = '10px ui-monospace, monospace';
         ctx.fillText(`${state.mode} · ${eq.toFixed(3)} g`, 30 + cw2 + 30 + cw2 / 2, 20);
-        ctx.font = '9px ui-monospace, monospace';
+        ctx.font = '11px ui-monospace, monospace';
         ctx.fillStyle = C.muted;
         ctx.fillText(eq > 0.6 ? 'OTOLITH LOADED' : eq > 0.1 ? 'REDUCED LOAD' : 'NO STEADY LOAD', 30 + cw2 + 30 + cw2 / 2, h - 28);
 

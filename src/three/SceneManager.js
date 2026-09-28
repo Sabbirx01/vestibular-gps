@@ -12,6 +12,7 @@ import { SolarSystem } from './SolarSystem.js';
 import { InnerEar } from './InnerEar.js';
 import { BrainModel } from './BrainModel.js';
 import { PAL } from './materials.js';
+import { applyStudioLighting } from './environment.js';
 import {
   state, set, bus, showError, QUALITY_PRESETS, stepQuality, toast,
 } from '../core/store.js';
@@ -29,6 +30,10 @@ const FRAMING = {
   'sec-sensors':    { focus: 'astronaut',dist: 4.4,  height: 1.7, look: 1.6,  env: 0.5 },
   'sec-space':      { focus: 'planet',   dist: 7.0,  height: 0.85, look: -0.75, offset: [-1.7, 0.35], env: 0.72 },
   'sec-lab':        { focus: 'astronaut',dist: 5.8,  height: 1.6, look: 1.4,  env: 0.4 },
+  /* Dense instrument panels: pulled far back and dimmed so nothing drifts
+     behind a readout. */
+  'sec-console':    { focus: 'wide',     dist: 13.5, height: 0.8, look: 0.6,  env: 0.2  },
+  'sec-integration':{ focus: 'wide',     dist: 14.0, height: 0.9, look: 0.7,  env: 0.2  },
   'sec-research':   { focus: 'wide',     dist: 14.0, height: 1.2, look: 1.2,  env: 0.5 },
   'sec-final':      { focus: 'astronaut',dist: 7.4,  height: 1.8, look: 1.5,  env: 0.5 },
 };
@@ -50,6 +55,10 @@ const SECTION_LAYERS = {
   'sec-sensors':  { solar: false, astronaut: true,  subject: false, core: false },
   'sec-space':    { solar: true,  astronaut: true,  subject: false, core: true  },
   'sec-lab':      { solar: false, astronaut: true,  subject: false, core: false },
+  /* The console and integration sections are dense instrument panels: no
+     planets, no figures, nothing that could drift behind a readout. */
+  'sec-console':  { solar: false, astronaut: false, subject: false, core: false },
+  'sec-integration': { solar: false, astronaut: false, subject: false, core: false },
   'sec-research': { solar: true,  astronaut: false, subject: false, core: true  },
   'sec-final':    { solar: false, astronaut: true,  subject: false, core: false },
 };
@@ -104,6 +113,12 @@ export class SceneManager {
     this.scene = new THREE.Scene();
     /* NOTE: no scene.fog — the custom ShaderMaterials here do not implement
        fog chunks, and a global fog silently blackens additive layers. */
+
+    /* Image-based lighting. This is the single change that stops real meshes
+       reading as flat toy shapes: with no environment there is nothing for a
+       metal, glass or tissue material to reflect, so every surface collapses
+       to one diffuse tone. */
+    applyStudioLighting(this.scene, this.renderer, { intensity: 1.0 });
 
     this.camera = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 0.1, 600);
     this.camera.position.set(0, 1.4, 14);
@@ -358,11 +373,22 @@ export class SceneManager {
     this.qualityCooldown -= dt;
     if (!this.autoQuality || this.qualityCooldown > 0 || this.fpsSamples.length < 90) return;
 
-    /* Only ever step down automatically. Stepping back up needs the user. */
-    if (avg < 34 && state.quality !== 'MOBILE') {
+    /* Only ever step down automatically. Stepping back up needs the user.
+       Two guards here, both learned from a real regression:
+        - the threshold was 34 fps, which a single heavy frame (loading the
+          13 MB brain mesh, or an environment-map shader compile) could drag
+          under, so a capable machine silently demoted itself to MEDIUM;
+        - now two consecutive low windows are required before acting, and the
+          bar is 26 fps, which is where a scene genuinely stops feeling smooth. */
+    if (avg < 26 && state.quality !== 'MOBILE') {
+      this.lowWindows = (this.lowWindows || 0) + 1;
+      if (this.lowWindows < 2) return;
+      this.lowWindows = 0;
       stepQuality(true);
-      this.qualityCooldown = 12;
+      this.qualityCooldown = 20;
       this.fpsSamples.length = 0;
+    } else {
+      this.lowWindows = 0;
     }
   }
 
@@ -429,6 +455,10 @@ export class MiniStage {
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.05, 100);
     this.pivot = new THREE.Group();
     this.scene.add(this.pivot);
+
+    /* Same IBL rig as the background scene, so the inline viewports read with
+       the same lighting language as the rest of the site. */
+    applyStudioLighting(this.scene, this.renderer, { intensity: 1.05 });
 
     this.content = build({ stage: this });
     if (this.content?.root) this.pivot.add(this.content.root);

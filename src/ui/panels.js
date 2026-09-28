@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════════
    panels — the data-driven sections.
    Body (sensory weighting) · Sensors (permissions, simulator,
    charts, recorder) · Space (gravity, otolith, timeline).
@@ -75,7 +75,7 @@ export class RollingChart {
       ctx.beginPath(); ctx.moveTo(padL, zy); ctx.lineTo(padL + iw, zy); ctx.stroke();
 
       ctx.fillStyle = muted;
-      ctx.font = '9px ui-monospace, monospace';
+      ctx.font = '11px ui-monospace, monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       ctx.fillText(y1.toFixed(0), padL - 6, padT + 2);
@@ -151,7 +151,7 @@ export class PathChart {
         ctx.beginPath(); ctx.moveTo(padL, zy); ctx.lineTo(padL + iw, zy); ctx.stroke();
       }
       ctx.fillStyle = muted;
-      ctx.font = '9px ui-monospace, monospace';
+      ctx.font = '11px ui-monospace, monospace';
       ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
       ctx.fillText(y1.toFixed(1), padL - 6, padT + 3);
       ctx.fillText(y0.toFixed(1), padL - 6, padT + ih - 3);

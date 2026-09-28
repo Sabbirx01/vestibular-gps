@@ -21,6 +21,7 @@
 <link rel="stylesheet" href="./src/styles/base.css" />
 <link rel="stylesheet" href="./src/styles/components.css" />
 <link rel="stylesheet" href="./src/styles/sections.css" />
+<link rel="stylesheet" href="./src/styles/console.css" />
 </head>
 <body class="vg-boot">
 
@@ -100,6 +101,8 @@
     <a href="#sec-sensors">Sensors</a>
     <a href="#sec-space">Space</a>
     <a href="#sec-lab">Lab</a>
+    <a href="#sec-console">Console</a>
+    <a href="#sec-integration">Integration</a>
     <a href="#sec-research">Research</a>
   </nav>
 
@@ -497,10 +500,58 @@
     </div>
   </section>
 
-  <!-- ═══════════ RESEARCH ═══════════ -->
-  <section class="section" id="sec-research" data-journey="09 RESEARCH">
+  <!-- ═══════════ MISSION CONSOLE ═══════════ -->
+  <section class="section" id="sec-console" data-journey="09 CONSOLE">
     <header class="section-head">
-      <p class="eyebrow">09 / RESEARCH</p>
+      <p class="eyebrow">09 / MISSION CONSOLE</p>
+      <h2>The instrument, not just the explanation.</h2>
+      <p class="lede">Everything above this line explains the vestibular system. From here down it behaves like the product that would actually fly: a reference the crew maintains for themselves, an index that carries its own uncertainty, an advisory that respects who really holds the authority, and countermeasures that are only credited when the change clears the measurement noise floor.</p>
+    </header>
+
+    <div class="glass panel reveal">
+      <div class="panel-head">
+        <h3>Session controls</h3>
+        <p>The index cannot report until a personal reference exists. Capture at least three baseline sessions &mdash; from the live channels, from the simulator in section 06, or by ingesting a payload in section 10. Until then the console says so rather than inventing a number.</p>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" id="consoleCapture">CAPTURE BASELINE SESSION</button>
+        <span class="tag tag-info">SELF-REFERENCED &middot; NOT A POPULATION NORM</span>
+      </div>
+      <div class="ctl-row">
+        <label for="consoleSymptoms">MOTION SYMPTOMS (SELF-REPORT)</label>
+        <input type="range" id="consoleSymptoms" min="0" max="10" step="1" value="1" />
+        <output id="consoleSymptomsOut">1/10</output>
+      </div>
+      <div class="ctl-row">
+        <label for="consoleTask">UPCOMING TASK</label>
+        <select id="consoleTask" class="ingest-box" style="margin:0;padding:9px 12px;max-width:340px">
+          <option value="Mars surface EVA">Mars surface EVA</option>
+          <option value="Post-landing egress">Post-landing egress</option>
+          <option value="Manual docking">Manual docking</option>
+          <option value="Rover traverse">Rover traverse</option>
+          <option value="Routine monitoring">Routine monitoring</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="consoleBody"></div>
+  </section>
+
+  <!-- ═══════════ INTEGRATION ═══════════ -->
+  <section class="section" id="sec-integration" data-journey="10 INTEGRATION">
+    <header class="section-head">
+      <p class="eyebrow">10 / INTEGRATION</p>
+      <h2>How this connects to real instruments.</h2>
+      <p class="lede">A monitor is only as good as what feeds it. This section is the honest answer to &ldquo;how would you hook this up to the astronaut&rsquo;s actual equipment&rdquo;: a documented ingestion contract, three transport paths, a mapping from every domain to the instrument NASA or its analogs really use, and a live path you can test right here by pasting a payload.</p>
+    </header>
+
+    <div id="integrationBody"></div>
+  </section>
+
+  <!-- ═══════════ RESEARCH ═══════════ -->
+  <section class="section" id="sec-research" data-journey="11 RESEARCH">
+    <header class="section-head">
+      <p class="eyebrow">11 / RESEARCH</p>
       <h2>Where the science comes from.</h2>
       <p class="lede">Every scientific statement on this site is traceable to a source below. Where something is a model or a simplification, it says so on the page. Where it is documented practice or published research, the reference is listed here.</p>
     </header>
@@ -525,7 +576,7 @@
   </section>
 
   <!-- ═══════════ FINAL ═══════════ -->
-  <section class="section sec-final" id="sec-final" data-journey="10 FINAL">
+  <section class="section sec-final" id="sec-final" data-journey="12 FINAL">
     <div class="final-inner float-field">
       <h2 class="final-title float" data-float="0.5">You are always navigating.</h2>
       <p class="final-sub float" data-float="0.3">The question is how your brain knows where you are.</p>

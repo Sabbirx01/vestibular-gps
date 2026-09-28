@@ -188,11 +188,15 @@ export class FloatingAstronaut {
     try {
       const gltf = await loadModel('suit');
       const model = gltf.scene.clone(true);
-      /* The asset uses KHR_materials_pbrSpecularGlossiness, which this
-         GLTFLoader build does not implement, so materials fall back to a
-         flat matte look. Raising metalness and lowering roughness restores a
-         specular response on the helmet and suit panels. */
-      dressMaterials(model, { roughness: 0.3, metalness: 0.42, emissiveFloor: 0.1 });
+      /* NOTE: the suit's KHR_materials_pbrSpecularGlossiness fallback is what
+         used to make it look plastic. The authored baseColorFactor values are
+         valid, and the helmet's transmission/ior glass IS supported, so the
+         fix is to stop overwriting them and light the scene with an
+         environment map instead. */
+      /* Name-aware dressing: it keeps the suit's authored albedo and its
+         transmission/ior glass for the helmet, and tunes only surface
+         response. Lighting comes from the scene environment map. */
+      dressMaterials(model);
 
       const carrier = normalizeModel(model, { targetSize: 1.86, dropToFloor: false });
       carrier.position.y = 0.02;
@@ -478,7 +482,7 @@ export class MeasurementSubject {
       /* Lower emissive floor than the floating figure: inside the instrument
          frame the subject was washing out to near-white with no readable
          surface detail. More metalness and less self-glow restores contrast. */
-      dressMaterials(model, { roughness: 0.4, metalness: 0.34, emissiveFloor: 0.05 });
+      dressMaterials(model);
 
       const carrier = normalizeModel(model, { targetSize: 2.0, dropToFloor: true });
 

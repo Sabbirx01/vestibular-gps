@@ -16,11 +16,16 @@
   --line:        rgba(122, 170, 220, 0.14);
   --line-strong: rgba(122, 170, 220, 0.30);
 
-  /* ── Text ── */
-  --text:        #e9f2ff;
-  --text-2:      #b9c9e2;
-  --muted:       #8ba0c0;
-  --faint:       #647a99;
+  /* ── Text ──
+     Contrast raised deliberately. The previous --muted (#8ba0c0) and
+     --faint (#647a99) were around 5.4:1 and 4.2:1 against the panel, and
+     --faint carried a lot of small labels — readable on a calibrated
+     monitor, genuinely hard work on a laptop at an angle or on a projector.
+     These values are now all comfortably above 4.5:1 on the panel colour. */
+  --text:        #eef5ff;
+  --text-2:      #c6d5ec;
+  --muted:       #a6bad8;
+  --faint:       #8ba3c4;
 
   /* ── Semantic spectrum ── */
   --cyan:        #5fe3ff;   /* active / acquisition */
@@ -44,21 +49,32 @@
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, "Noto Sans Bengali", sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Code", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
 
+  /* ── Type scale ──
+     Raised across the board. The old bottom of the scale (--fs-2xs at
+     0.68rem ≈ 10.9px, --fs-xs at 0.76rem ≈ 12.2px) was below the size most
+     people read comfortably on a screen, and it carried a lot of the
+     interface. Nothing in the UI should render below ~13px now. */
   --fs-display: clamp(2.6rem, 7.2vw, 6.4rem);
   --fs-h1:      clamp(2.1rem, 5.4vw, 4.3rem);
-  --fs-h2:      clamp(1.7rem, 3.6vw, 3rem);
-  --fs-h3:      clamp(1.05rem, 1.6vw, 1.35rem);
-  --fs-body:    clamp(0.95rem, 1.05vw, 1.06rem);
-  --fs-sm:      0.86rem;
-  --fs-xs:      0.76rem;
-  --fs-2xs:     0.68rem;
+  --fs-h2:      clamp(1.75rem, 3.6vw, 3.05rem);
+  --fs-h3:      clamp(1.14rem, 1.7vw, 1.5rem);
+  --fs-body:    clamp(1.02rem, 1.18vw, 1.18rem);
+  --fs-lead:    clamp(1.08rem, 1.35vw, 1.32rem);
+  --fs-sm:      1rem;
+  --fs-xs:      0.9rem;
+  --fs-2xs:     0.82rem;
+  /* the smallest permitted size anywhere in the interface */
+  --fs-floor:   0.8rem;
 
-  --lh-tight: 1.06;
-  --lh-snug:  1.35;
-  --lh-body:  1.68;
+  --lh-tight: 1.1;
+  --lh-snug:  1.42;
+  --lh-body:  1.78;
 
-  --ls-wide:  0.16em;
-  --ls-wider: 0.24em;
+  /* Wide tracking on tiny uppercase labels makes them harder, not easier,
+     to read, so these are trimmed. */
+  --ls-wide:  0.12em;
+  --ls-wider: 0.18em;
+  --ls-label: 0.1em;
 
   /* ── Space ── */
   --sp-1: 4px;  --sp-2: 8px;   --sp-3: 12px; --sp-4: 16px;

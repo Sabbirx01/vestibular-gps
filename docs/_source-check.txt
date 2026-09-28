@@ -1,0 +1,16 @@
+﻿2026-09-28T10:32:36.9434101+06:00
+OK	assetNasaSuit	200	https://science.nasa.gov/3d-resources/advanced-crew-escape-suit/
+OK	assetNihBrain	200	https://3d.nih.gov/entries/3DPX-021161
+OK	nidcdBalance	200	https://www.nidcd.nih.gov/health/balance-disorders
+OK	nidcdGlossary	200	https://www.nidcd.nih.gov/glossary/vestibular-system
+OK	statpearlsVestibularPathways	200	https://www.ncbi.nlm.nih.gov/books/NBK557380/
+FAIL	nasaSensorimotorRisk	n/a	https://humanresearchroadmap.nasa.gov/Risks/risk.aspx?i=88
+OK	nasaSensorimotorHub	200	https://www.nasa.gov/directorates/esdmd/hhp/sensorimotor-risk/
+OK	nasaDagNarrative	200	https://www.nasa.gov/wp-content/uploads/2025/07/sensorimotor-dag-narrative.pdf
+OK	nasaTechPort157166	200	https://techport.nasa.gov/projects/157166
+OK	cipherVestibularHealth	200	https://ntrs.nasa.gov/citations/20230014013
+OK	cipherVhit	200	https://ntrs.nasa.gov/citations/20230014322
+OK	nasaNeuroVestibularIws25	200	https://ntrs.nasa.gov/api/citations/20250000348/downloads/IWS25%20Neuro-Vestibular.pdf
+OK	nasaMotionSicknessCountermeasures	200	https://ntrs.nasa.gov/api/citations/20250000739/downloads/NSL_IWS25_Widhalm_Inscop_Poster.pdf
+OK	ntrsSensorimotorCountermeasures	200	https://ntrs.nasa.gov/citations/20240008210
+OK	cipherProgram	200	https://www.nasa.gov/reference/about-cipher/
