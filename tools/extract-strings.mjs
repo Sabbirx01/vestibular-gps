@@ -76,8 +76,13 @@ function scanJs(src, file) {
 function walk(dir, out = []) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, e.name);
-    if (e.isDirectory()) { if (e.name !== 'vendor' && e.name !== 'assets') walk(p, out); }
-    else if (extname(e.name) === '.js') out.push(p);
+    if (e.isDirectory()) {
+      /* src/i18n holds the translations themselves. Scanning it made the
+         dictionary's own Bengali strings count as "English copy still to
+         translate", which inflated the denominator every time the dictionary
+         grew — the coverage figure has to measure the site, not itself. */
+      if (e.name !== 'vendor' && e.name !== 'assets' && e.name !== 'i18n') walk(p, out);
+    } else if (extname(e.name) === '.js') out.push(p);
   }
   return out;
 }
