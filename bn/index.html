@@ -73,13 +73,29 @@
 <!-- ═══════════ CUSTOM CURSOR ═══════════ -->
 <div id="cursor" class="cursor" aria-hidden="true">
   <div class="cursor-lock"></div>
-  <svg class="cursor-ship" viewBox="0 0 40 40">
-    <g class="ship-body">
-      <path d="M20 3 L26 22 L20 18 L14 22 Z" fill="currentColor" opacity=".95"/>
-      <path d="M20 18 L25 27 L20 25 L15 27 Z" fill="currentColor" opacity=".45"/>
-      <circle cx="20" cy="20" r="2.2" fill="#0b1220"/>
-    </g>
-    <path class="ship-flame" d="M18.4 25.5 L20 33 L21.6 25.5 Z" fill="#5fe3ff" opacity=".75"/>
+  <div class="cursor-trail" id="cursorTrail"><i></i><i></i><i></i><i></i></div>
+  <svg class="cursor-ship" viewBox="0 0 48 48">
+    <defs>
+      <!-- the plume fades out along its length instead of ending in a hard tip -->
+      <linearGradient id="cursorFlame" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#eafcff" stop-opacity=".95"/>
+        <stop offset="45%" stop-color="#5fe3ff" stop-opacity=".55"/>
+        <stop offset="100%" stop-color="#5fe3ff" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <!-- exhaust: scaled and brightened with travel speed -->
+    <path class="ship-flame" d="M21.6 29.5 L24 45 L26.4 29.5 Z" fill="url(#cursorFlame)"/>
+    <!-- swept wings -->
+    <path class="ship-wing" d="M24 11.5 L41 31 L24 25.5 Z" fill="currentColor" opacity=".34"/>
+    <path class="ship-wing" d="M24 11.5 L7 31 L24 25.5 Z" fill="currentColor" opacity=".34"/>
+    <!-- tail fins -->
+    <path class="ship-fin" d="M24 22 L31 34 L24 30.5 L17 34 Z" fill="currentColor" opacity=".5"/>
+    <!-- fuselage -->
+    <path class="ship-body" d="M24 2.5 L29.3 27 L24 23 L18.7 27 Z" fill="currentColor"/>
+    <!-- canopy -->
+    <ellipse class="ship-canopy" cx="24" cy="13.5" rx="2.5" ry="4.4" fill="#07202f" opacity=".92"/>
+    <!-- core light: the ship's own glow, at the true pointer position -->
+    <circle class="ship-core" cx="24" cy="24" r="1.9" fill="#f2feff"/>
   </svg>
   <span class="cursor-label" id="cursorLabel"></span>
 </div>

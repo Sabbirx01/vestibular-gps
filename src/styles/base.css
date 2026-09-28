@@ -30,11 +30,23 @@ body {
 }
 main > .section { scroll-snap-align: start; scroll-margin-top: calc(var(--topbar-h) + 18px); }
 body.vg-boot, body.vg-intro { overflow: hidden; height: 100vh; }
-/* Keep the browser's native hit cursor visible. The cinematic cursor is a
-   pointer-events:none visual follower; hiding the real cursor made the glow's
-   eased position look offset and caused users to click beside controls. */
-body.vg-custom-cursor, body.vg-custom-cursor * { cursor: auto; }
-body.vg-custom-cursor .cursor { cursor: none; }
+/* On a pointer device the cinematic cursor is the ONLY cursor.
+   This rule used to do the opposite on purpose: the follower was eased so far
+   behind the pointer that its glow did not mark the click point, so hiding the
+   native cursor made people click beside controls — and the fix was to keep
+   the native one visible, which meant two cursors on screen at once (reported).
+   The follower now tracks within a pixel or two, and gets its flight feel from
+   a trail and from rotating into its direction of travel instead of from lag,
+   so the native cursor can be hidden safely.
+   Coarse pointers keep native behaviour: see the (pointer: coarse) block in
+   sections.css, which restores `cursor: auto` and hides the overlay. */
+body.vg-custom-cursor,
+body.vg-custom-cursor * { cursor: none; }
+/* The rule above cannot reach <html>, because that is body's PARENT and the
+   selector only walks down. Normally invisible (body paints over the whole
+   viewport), but an overscroll bounce can expose the root and bring the native
+   cursor back for a frame. `:has()` lets the root opt in from its descendant. */
+html:has(body.vg-custom-cursor) { cursor: none; }
 
 img, svg, canvas { display: block; max-width: 100%; }
 h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }

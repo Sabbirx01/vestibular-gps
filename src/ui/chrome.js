@@ -70,12 +70,29 @@ export function mountCursor() {
   document.body.classList.add('vg-custom-cursor');
   cursor.classList.add('is-on');
 
+  const ship = cursor.querySelector('.cursor-ship');
+  const ghosts = cursor.querySelectorAll('.cursor-trail i');
   const pos = { x: innerWidth / 2, y: innerHeight / 2, tx: innerWidth / 2, ty: innerHeight / 2 };
-  let down = false;
+  /* Recent path as a ring buffer of numbers, so the trail costs no
+     allocations. The ghosts are simply earlier positions: the ship itself
+     never lags, because the trail is what makes it fly. */
+  /* The oldest ghost sits 6 frames back and the rest step 4 frames apart, so
+     the nearest echo is clearly BEHIND the hull. At a 3-frame step the first
+     ghost still overlapped the ship, because the ship barely lags — which is
+     the point of the change, but it left the brightest echo looking like part
+     of the hull (caught in verification). */
+  const TRAIL_FIRST = 6;
+  const TRAIL_STEP = 4;
+  const N = TRAIL_FIRST + TRAIL_STEP * Math.max(1, ghosts.length) + 4;
+  const hx = new Float32Array(N);
+  const hy = new Float32Array(N);
+  let head = 0;
+  let angle = -90;        // screen degrees; -90 is nose-up
+  let idleFrames = 0;
 
   on(window, 'pointermove', (e) => { pos.tx = e.clientX; pos.ty = e.clientY; }, { passive: true });
-  on(window, 'pointerdown', () => { down = true; cursor.classList.add('is-click'); });
-  on(window, 'pointerup', () => { down = false; cursor.classList.remove('is-click'); });
+  on(window, 'pointerdown', () => cursor.classList.add('is-click'));
+  on(window, 'pointerup', () => cursor.classList.remove('is-click'));
 
   on(document, 'pointerover', (e) => {
     /* PointerEvent targets can be non-Element nodes in synthetic events. A
@@ -86,16 +103,59 @@ export function mountCursor() {
     const target = node?.closest('[data-cursor-target]');
     cursor.classList.toggle('is-hover', !!t);
     cursor.classList.toggle('is-target', !!target);
-    label.textContent = target?.dataset.cursorTarget || (t?.dataset.cursor || '');
+    if (label) label.textContent = target?.dataset.cursorTarget || (t?.dataset.cursor || '');
   });
 
   const tick = () => {
     requestAnimationFrame(tick);
-    pos.x = damp(pos.x, pos.tx, 15, 1 / 60);
-    pos.y = damp(pos.y, pos.ty, 15, 1 / 60);
-    /* The overlay is visual only (`pointer-events:none`); keep its centre on
-       the actual pointer so the glow never suggests a different click point. */
+    /* 45, not 15. At the old rate the ship sat tens of pixels behind the
+       pointer, which is exactly why the native cursor had to stay visible and
+       two cursors showed on screen at once. This tracks within a pixel or two
+       at normal mouse speeds; the overlay is pointer-events:none and centred
+       on the pointer either way. */
+    pos.x = damp(pos.x, pos.tx, 45, 1 / 60);
+    pos.y = damp(pos.y, pos.ty, 45, 1 / 60);
+    /* Safety net: damp() is frame-rate independent only if it is called every
+       frame, and a throttled tab (or a long pause) leaves the ship far behind
+       the pointer. Since the native cursor is now hidden, being far off is not
+       cosmetic — it is a wrong click point. Snap instead of drifting. */
+    if (Math.abs(pos.tx - pos.x) + Math.abs(pos.ty - pos.y) > 48) {
+      pos.x = pos.tx;
+      pos.y = pos.ty;
+    }
     cursor.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`;
+
+    const dx = pos.tx - pos.x;
+    const dy = pos.ty - pos.y;
+    const speed = Math.hypot(dx, dy);
+    cursor.classList.toggle('is-fast', speed > 9);
+
+    if (ship) {
+      if (speed > 0.6) {
+        /* the nose leads the way */
+        const want = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+        const d = ((want - angle + 180) % 360 + 360) % 360 - 180;   // shortest way round
+        angle += d * 0.25;
+        idleFrames = 0;
+      } else {
+        /* at rest, drift back to nose-up rather than freezing mid-turn */
+        idleFrames++;
+        if (idleFrames > 45) angle += (-90 - angle) * 0.05;
+      }
+      ship.style.rotate = `${angle.toFixed(2)}deg`;
+    }
+
+    hx[head] = pos.x;
+    hy[head] = pos.y;
+    head = (head + 1) % N;
+    for (let i = 0; i < ghosts.length; i++) {
+      const at = (head - 1 - TRAIL_FIRST - i * TRAIL_STEP + N * 2) % N;
+      const g = ghosts[i];
+      const k = 1 - i / ghosts.length;
+      g.style.transform = `translate3d(${(hx[at] - pos.x).toFixed(1)}px, ${(hy[at] - pos.y).toFixed(1)}px, 0)`;
+      g.style.opacity = (0.5 * k * k).toFixed(3);
+      g.style.scale = (0.4 + 0.6 * k).toFixed(3);
+    }
   };
   tick();
 }

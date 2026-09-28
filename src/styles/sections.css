@@ -175,36 +175,89 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
 .debug span { color: var(--faint); }
 .debug b { color: var(--green); font-weight: 500; }
 
-/* ── Custom cursor ──────────────────────────────────────── */
+/* ── Custom cursor ────────────────────────────────────────
+   A ship that flies where the pointer is. Two things matter here:
+   1) It marks the exact pointer position. The old follower was eased so hard
+      that it drifted tens of pixels behind the pointer, which is why the
+      native cursor had to be left visible — and why two cursors showed at
+      once. The flight feel now comes from the trail and from rotating into
+      the direction of travel, never from lag.
+   2) Rotation and scale are separate properties. The ship's rotation is
+      rewritten every frame from JS; hovering changes its scale. A transition
+      on `transform` would lag the rotation, so rotation uses the independent
+      `rotate` property (set inline) and scale uses `scale` (set by state
+      classes).                                           */
 .cursor {
   position: fixed; top: 0; left: 0; z-index: 350;
-  width: 40px; height: 40px; margin: -20px 0 0 -20px;
+  width: 46px; height: 46px; margin: -23px 0 0 -23px;
   pointer-events: none; color: var(--cyan);
   transition: opacity var(--t-mid);
   will-change: transform;
   opacity: 0;
 }
 .cursor.is-on { opacity: 1; }
-.cursor-ship { width: 100%; height: 100%; filter: drop-shadow(0 0 7px rgba(95,227,255,.95)) drop-shadow(0 0 18px rgba(95,227,255,.52)); transition: transform var(--t-fast) var(--ease-out); }
-.cursor::before { content: ""; position: absolute; inset: -9px; border-radius: 50%; border: 1px solid rgba(95,227,255,.4); box-shadow: 0 0 22px rgba(95,227,255,.35), inset 0 0 13px rgba(95,227,255,.18); animation: cursorPulse 1.8s ease-in-out infinite; }
-@keyframes cursorPulse { 0%,100% { transform: scale(.92); opacity: .55; } 50% { transform: scale(1.12); opacity: 1; } }
-.cursor.is-hover .cursor-ship { transform: scale(1.24); color: #b7f0ff; }
-.cursor.is-click .cursor-ship { transform: scale(.82); }
-.cursor.is-target .cursor-ship { color: var(--amber); }
-.ship-flame { transform-origin: 50% 0%; animation: flame 700ms var(--ease-in-out) infinite alternate; }
-@keyframes flame { from { opacity: .35; } to { opacity: .9; } }
-.cursor-lock {
-  position: absolute; inset: -12px; border-radius: 50%;
-  border: 1px solid transparent; transition: all var(--t-mid) var(--ease-out);
+
+.cursor-ship {
+  position: relative; width: 100%; height: 100%;
+  transform-origin: 50% 50%;
+  filter:
+    drop-shadow(0 0 5px rgba(95,227,255,.95))
+    drop-shadow(0 0 13px rgba(95,227,255,.6))
+    drop-shadow(0 0 28px rgba(95,227,255,.32));
+  transition: scale var(--t-fast) var(--ease-out), color var(--t-fast), filter var(--t-mid);
 }
-.cursor.is-target .cursor-lock { border-color: rgba(255,181,71,.75); box-shadow: 0 0 18px rgba(255,181,71,.5) inset; animation: lockPulse 1200ms var(--ease-in-out) infinite; }
-@keyframes lockPulse { 0%,100% { transform: scale(1); opacity: .85; } 50% { transform: scale(1.14); opacity: .4; } }
+.cursor.is-hover .cursor-ship { scale: 1.3; color: #cdf6ff; }
+.cursor.is-click .cursor-ship { scale: .78; }
+.cursor.is-target .cursor-ship { color: var(--amber); }
+
+/* exhaust — brighter and longer the faster the ship is travelling */
+.ship-flame { transform-box: fill-box; transform-origin: 50% 0%; opacity: .5; transition: opacity 150ms linear, scale 150ms linear; }
+.cursor.is-fast .ship-flame { opacity: 1; scale: 1.4; }
+
+/* the outer scan ring: an instrument, not a decoration */
+.cursor-lock {
+  position: absolute; inset: -13px; border-radius: 50%;
+  border: 1px solid rgba(95,227,255,.42);
+  box-shadow: 0 0 20px rgba(95,227,255,.3), inset 0 0 12px rgba(95,227,255,.16);
+  animation: cursorPulse 1.9s ease-in-out infinite;
+}
+@keyframes cursorPulse { 0%,100% { scale: .9; opacity: .45; } 50% { scale: 1.14; opacity: .95; } }
+.cursor.is-hover .cursor-lock {
+  border-color: rgba(150,240,255,.85);
+  box-shadow: 0 0 26px rgba(95,227,255,.5), inset 0 0 16px rgba(95,227,255,.28);
+}
+.cursor.is-target .cursor-lock {
+  border-color: rgba(255,181,71,.8);
+  box-shadow: 0 0 22px rgba(255,181,71,.5), inset 0 0 14px rgba(255,181,71,.3);
+  animation: lockPulse 1200ms var(--ease-in-out) infinite;
+}
+@keyframes lockPulse { 0%,100% { scale: 1; opacity: .85; } 50% { scale: 1.16; opacity: .4; } }
+.cursor.is-click .cursor-lock { animation: none; scale: 1.55; opacity: 1; border-color: #ffffff; }
+
+/* trail — echoes along the path already travelled, so precision is untouched */
+.cursor-trail { position: absolute; inset: 0; }
+.cursor-trail i {
+  position: absolute; left: 50%; top: 50%;
+  width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%; background: var(--cyan); opacity: 0;
+  box-shadow: 0 0 9px rgba(95,227,255,.85);
+  will-change: transform, opacity, scale;
+}
+.cursor.is-target .cursor-trail i { background: var(--amber); box-shadow: 0 0 9px rgba(255,181,71,.85); }
+
 .cursor-label {
-  position: absolute; left: 34px; top: 4px; white-space: nowrap;
+  position: absolute; left: 38px; top: 6px; white-space: nowrap;
   font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: .12em;
   color: var(--cyan); opacity: 0; transition: opacity var(--t-fast);
+  text-shadow: 0 0 12px rgba(95,227,255,.6);
 }
-.cursor.is-hover .cursor-label, .cursor.is-target .cursor-label { opacity: .9; }
+.cursor.is-hover .cursor-label, .cursor.is-target .cursor-label { opacity: .95; }
+.cursor.is-target .cursor-label { color: var(--amber); text-shadow: 0 0 12px rgba(255,181,71,.6); }
+
+/* The cursor itself stays (it is the pointer); only its pulsing stops. */
+@media (prefers-reduced-motion: reduce) {
+  .cursor-lock, .ship-flame { animation: none !important; }
+}
 
 /* ── Responsive chrome ──────────────────────────────────── */
 @media (max-width: 1180px) {
