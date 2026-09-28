@@ -11,7 +11,16 @@ import * as THREE from '../../vendor/three.module.js';
 import { starMaterial, nebulaMaterial, PAL } from './materials.js';
 import { BlackHole } from './BlackHole.js';
 import { Comet } from './Comet.js';
-import { TAU } from '../core/util.js';
+import { TAU, clamp } from '../core/util.js';
+
+/* Where the black hole sits inside the frame, as a fraction of the half-frame
+   (0 = centre, 1 = the edge), and how far in front of the camera it is drawn.
+   Expressed against the frame rather than as a world position so it survives
+   every aspect ratio: a fixed world x of 58 fell outside the horizontal
+   frustum of a portrait phone, which is 35 degrees wide against 46 of height. */
+const BH_DEPTH = 240;
+const BH_KX = 0.34;
+const BH_KY = 0.46;
 
 export class SpaceEnvironment {
   constructor({ quality, reducedMotion }) {
@@ -104,17 +113,27 @@ export class SpaceEnvironment {
        layers, none of which needed this shell. */
 
     /* ── Black hole ──────────────────────────────────────────
-       Parked 246 units out — about twenty times the hero framing distance — so
-       it sits deep in the backdrop rather than competing with the astronaut.
-       It is wrapped in a pivot because applyPointer() overwrites the position
-       of every layer it parallaxes; the far offset has to live one level down
-       or the black hole would snap to the origin on the first mouse move. */
+       A backdrop object this far out has no meaningful parallax — something
+       two hundred units away does not move against the frame when the camera
+       shifts, and treating it as a parallax layer was the bug: the pointer
+       orbit swept it across a quarter of the screen. So it is anchored TO THE
+       FRAME instead of to a world position (attachBackdrop / fitBackdrop, called
+       from SceneManager once the camera is placed).
+
+       The old fixed position (58, 22, -246) was also outside the horizontal
+       frustum on a phone — a portrait viewport is ~35 degrees wide against the
+       same 46 degrees of height, so at that distance only ~51 world units of
+       half-width exist and the object sat at 58. On a narrow laptop window it
+       drifted off the right edge for the same reason. "The black hole is
+       missing on my laptop and my phone" was one object being framed three
+       different ways. */
     this.blackHole = new BlackHole({ quality: q, radius: q.stars > 4000 ? 26 : 20 });
-    this.blackHole.group.position.set(58, 22, -246);
-    this.blackHolePivot = new THREE.Group();
-    this.blackHolePivot.name = 'black-hole-pivot';
-    this.blackHolePivot.add(this.blackHole.group);
-    this.group.add(this.blackHolePivot);
+    this.group.add(this.blackHole.group);
+    /* A default that is on-screen at every aspect ratio, for the one path where
+       the backdrop is never attached to a camera. It is then re-parked in front
+       of the camera by attachBackdrop(), which SceneManager calls immediately
+       after this constructor. */
+    this.blackHole.group.position.set(0, 0, -BH_DEPTH);
 
     /* ── Comet ───────────────────────────────────────────────
        Two Points clouds plus its own draw calls is real budget for pure
@@ -131,9 +150,10 @@ export class SpaceEnvironment {
       this.group.add(this.cometPivot);
     }
 
+    /* The black hole is deliberately NOT in this list: it is frame-anchored,
+       and a pointer parallax would fight the anchoring every frame. */
     this.layers = [
       { obj: this.galaxyBand, depth: 0.003 },
-      { obj: this.blackHolePivot, depth: 0.002 },
       { obj: this.starsFar, depth: 0.006 },
       { obj: this.starsNear, depth: 0.026 },
       { obj: this.dust, depth: 0.05 },
@@ -324,6 +344,46 @@ export class SpaceEnvironment {
     }
   }
 
+  /**
+   * Hold the black hole at a fixed place in the frame.
+   *
+   * Parenting it to the camera makes that exact rather than approximate: after
+   * this, no camera move, no section framing and no device tilt can push it off
+   * the edge or across the astronaut. It is also the honest behaviour for an
+   * object 240 units away — something that distant does not move against the
+   * frame in reality either, which is why "parallax" for it was always a
+   * fiction that happened to cost the composition.
+   */
+  attachBackdrop(camera) {
+    if (!this.blackHole || !camera) return;
+    this.blackHole.group.parent?.remove(this.blackHole.group);
+    camera.add(this.blackHole.group);
+    this._backdropCamera = camera;
+    this.fitBackdrop();
+  }
+
+  /** Take the backdrop off the camera and free it, ready for a rebuild. */
+  _releaseBackdrop() {
+    const bh = this.blackHole;
+    if (!bh) return;
+    bh.group.parent?.remove(bh.group);
+    bh.dispose();
+    this.blackHole = null;
+  }
+
+  /** Re-place it after a resize, a FOV change or a quality change. */
+  fitBackdrop() {
+    const cam = this._backdropCamera;
+    const bh = this.blackHole;
+    if (!cam || !bh) return;
+    const halfH = Math.tan((cam.fov * Math.PI) / 360) * BH_DEPTH;
+    const halfW = halfH * cam.aspect;
+    bh.group.position.set(halfW * BH_KX, halfH * BH_KY, -BH_DEPTH);
+    /* A portrait viewport has barely a third of the width to give it, so the
+       same world radius would cover most of the screen. */
+    bh.group.scale.setScalar(clamp(cam.aspect / 1.78, 0.55, 1));
+  }
+
   update(dt) {
     this.time += dt;
     const t = this.time;
@@ -361,9 +421,15 @@ export class SpaceEnvironment {
     /* Full rebuild is the honest cheap path — these are all generated buffers. */
     const keep = this.intensity ?? 1;
     this.q = q;
+    /* The black hole hangs off the camera, not off this.group, so a rebuild has
+       to take it down by hand: clear() cannot reach it, and without this the
+       rebuild would leave the old one parented to the camera and add a second
+       one into the group at the origin. */
+    this._releaseBackdrop();
     this.dispose();
     this.group.clear();
     this.build();
+    this.attachBackdrop(this._backdropCamera);
     /* build() resets the backdrop to full strength; restore the current
        section's dimming so an adaptive quality step mid-scroll does not
        brighten the backdrop behind the instrument panels. */

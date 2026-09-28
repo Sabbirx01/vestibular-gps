@@ -45,11 +45,38 @@ const FRAMING = {
    It now sits clear to the RIGHT of the figure and below the spec-card grid:
      world x 5.0  -> screen x ~1258   (astronaut body ends near x 1140)
      world y -3.5 -> screen y ~815    (card grid bottom is y ~745)
-   The body's own drift and the camera orbit are both small compared with that
-   clearance. On phones it would fall off-screen, but the camera focus switches
-   to 'planet' there (see the mobilePlanet branch in updateCamera), so the
-   planet is tracked instead of being left behind. */
-const SOLAR_POS = [5.0, -3.5, -8.8];
+   The clearance was measured with the pointer at rest and that was the whole
+   problem: it is NOT clearance, it is clearance at one camera angle. The orbit
+   is worth up to 0.34 rad and a point 8.8 units behind the focus moves with it,
+   so at the left end of the pointer range the planet's screen x fell to ~1.8
+   world units and it sat on the suit. Two things now hold it in place — the
+   offset is rotated with the camera in updateCamera (so the orbit cannot move
+   it) and x was raised from 5.0 to 7.4 to give the figure a real gap at rest.
+     world x 7.4 -> screen x ~1402 at 1920 (astronaut ends ~1202), radius ~57 px
+   The second half of the clearance problem was vertical, and it only shows up
+   on a laptop. The spec-card grid is a DOM column, so its bottom edge sits at a
+   different fraction of the viewport at every size: measured with the panel
+   visible, the grid ends near y 745 of 1080 but near y 645 of 768. At the old
+   y of -3.5 the planet fell at y ~528..618 on a 1366x768 laptop — entirely
+   inside the CANAL ARRANGEMENT card, so on a normal laptop the reference body
+   was not on screen at all. Dropping it to -5.4 clears the panel's bottom edge
+   at every size measured in a browser, page as shipped, pointer parked at both
+   extremes:
+     1920x1080   panel ends y 746   globe y 808..945   62 px clear
+     1440x900    panel ends y 655   globe y 715..820   60 px clear
+     1366x768    panel ends y 647   globe y 643..762   4 px of the globe's top
+                 sits behind the panel and it clears the viewport bottom by
+                 6 px — the tight one, on a short viewport with no other gap
+   The astronaut is 185 px away at 1920, 140 px at 1440 and 108 px at 1366, and
+   the pointer now moves the planet by <=10 px rather than a quarter of the
+   screen. Pixel boxes were read off full-resolution screenshots by eye, so
+   treat each as +/-10-15 px.
+   On phones it still falls outside the frame, and the 'planet' focus used to
+   compensate for that; that branch is currently disabled (mobilePlanet is
+   hard-false in updateCamera), so on a portrait phone the reference body is
+   simply off-frame. Recorded here rather than left as a comment claiming a
+   behaviour the code no longer has. */
+const SOLAR_POS = [7.4, -5.4, -8.8];
 
 /* Which 3D layers are drawn in which section. Solar bodies are hidden on text-heavy
    sections so a planet can never end up sitting on top of a paragraph. */
@@ -152,6 +179,10 @@ export class SceneManager {
     layer('environment', () => {
       this.env = new SpaceEnvironment({ quality: q, reducedMotion: state.reducedMotion });
       this.scene.add(this.env.group);
+      /* The black hole is a backdrop, not a subject: it hangs off the camera so
+         it keeps its place in the frame at every aspect ratio and every camera
+         move. See SpaceEnvironment.attachBackdrop. */
+      this.env.attachBackdrop(this.camera);
     });
 
     layer('solarSystem', () => {
@@ -379,6 +410,33 @@ export class SceneManager {
     /* subtle FOV breathing on interaction — never enough to be nauseating */
     this.camera.fov = damp(this.camera.fov, 46 + (this._pointerDown ? -1.4 : 0), 4, dt);
     this.camera.updateProjectionMatrix();
+
+    /* The frame-anchored backdrop tracks the live FOV and aspect, so it holds
+       its fractional position through a resize or a projection change instead
+       of sliding. Cheap: two multiplications. */
+    try { this.env?.fitBackdrop?.(); } catch { /* backdrop is optional */ }
+
+    /* The Earth reference holds its column.
+       It sits 8.8 units behind the hero focus, so in reality it would barely
+       parallax — but the pointer orbit swings the camera by up to 0.34 rad and
+       a point that far behind the focus moves with it, which slid the planet
+       under the astronaut's feet. Reported as "when I move the mouse the Earth
+       comes to the front". Rotating its offset from the focus by the same angle
+       the camera turned keeps it exactly where the composition put it: the
+       screen position of a point behind the focus is unchanged by that
+       rotation, and the residual is the planet's own slow drift, which is
+       motion the composition was built around. */
+    if (this.solar) {
+      const sdx = SOLAR_POS[0] - cx;
+      const sdz = SOLAR_POS[2] - cz;
+      const ca = Math.cos(az);
+      const sa = Math.sin(az);
+      this.solar.root.position.set(
+        cx + sdx * ca + sdz * sa,
+        SOLAR_POS[1],
+        cz - sdx * sa + sdz * ca,
+      );
+    }
 
     /* layer visibility per section so text stays readable */
     this._applyEnvOpacity(this._section || 'sec-hero', f.focus);

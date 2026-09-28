@@ -121,10 +121,9 @@ export class BlackHole {
     this.radius = radius;
     this.time = 0;
     this._fadeable = [];
-    /* MEDIUM and above carry the full assembly. LOW and MOBILE get the horizon
-       and a single thin ring only: a black hole without its disk still reads
-       correctly and costs one draw call. */
-    this.full = quality.nebula !== false;
+    /* MEDIUM and above also carry the outer bloom plane. The disk itself is
+       built on every tier — see the note in build(). */
+    this.bloom = quality.nebula !== false;
     this.build();
   }
 
@@ -167,7 +166,15 @@ export class BlackHole {
     this.group.add(this.photonRing);
     this._fadeable.push({ mat: rimMat, base: 1 });
 
-    if (this.full) {
+    /* The disk is built on EVERY tier, and that is a correction rather than a
+       preference. It used to sit behind `quality.nebula`, so LOW and MOBILE got
+       the horizon and a thin ring and nothing else — and a black disc on a dark
+       sky is not a black hole, it is a hole in the sky. The object was present
+       on those tiers the whole time and could not be seen, which is how it was
+       reported: "the black hole does not show on my laptop or my phone". The
+       tier gate now buys the outer bloom plane only, which is the genuinely
+       expensive one. */
+    {
       /* ── Accretion disk ───────────────────────────────── */
       const diskMat = new THREE.ShaderMaterial({
         uniforms: {
@@ -186,22 +193,27 @@ export class BlackHole {
       this.group.add(this.disk);
       this._fadeable.push({ mat: diskMat, base: 1 });
 
-      /* ── Outer bloom, so the disk does not end on a hard edge ── */
-      const glowMat = new THREE.ShaderMaterial({
-        uniforms: {
-          uTime: { value: 0 }, uIntensity: { value: 0.34 },
-          uInner: { value: R * 0.98 }, uOuter: { value: R * 1.5 },
-          uColour: { value: new THREE.Color(PAL.blue) },
-        },
-        vertexShader: RING_VERT,
-        fragmentShader: HALO_FRAG,
-        transparent: true, depthWrite: false, depthTest: true,
-        blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-      });
-      this.glow = new THREE.Mesh(new THREE.RingGeometry(R * 0.98, R * 1.5, 128), glowMat);
-      this.glow.renderOrder = 6;
-      this.group.add(this.glow);
-      this._fadeable.push({ mat: glowMat, base: 0.34 });
+      /* ── Outer bloom, so the disk does not end on a hard edge ──
+         This is the plane the tier gate still buys: it is additive and covers
+         several times the disk's area, so on a device that asked for the
+         lighter sky it is left out and the disk keeps its own edge. */
+      if (this.bloom) {
+        const glowMat = new THREE.ShaderMaterial({
+          uniforms: {
+            uTime: { value: 0 }, uIntensity: { value: 0.34 },
+            uInner: { value: R * 0.98 }, uOuter: { value: R * 1.5 },
+            uColour: { value: new THREE.Color(PAL.blue) },
+          },
+          vertexShader: RING_VERT,
+          fragmentShader: HALO_FRAG,
+          transparent: true, depthWrite: false, depthTest: true,
+          blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+        });
+        this.glow = new THREE.Mesh(new THREE.RingGeometry(R * 0.98, R * 1.5, 128), glowMat);
+        this.glow.renderOrder = 6;
+        this.group.add(this.glow);
+        this._fadeable.push({ mat: glowMat, base: 0.34 });
+      }
     }
 
     /* Inclined the way the familiar images are: close to edge-on, tipped a
