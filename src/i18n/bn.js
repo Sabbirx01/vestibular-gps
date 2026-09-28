@@ -438,4 +438,38 @@ export const BN = {
   'GRANTED': 'দেওয়া হয়েছে',
   'YES': 'হ্যাঁ',
   'NO': 'না',
+
+  /* ── console: domain names, chips, small tokens ────────
+     A browser pass listed these as the most visible remaining English: the six
+     domain names (defined in src/core/osi.js) and the provenance chips, which
+     the renderer upper-cases, so the TEXT NODE is exactly these words and an
+     exact-match entry works. Strings the renderer builds with interpolation
+     (e.g. "BASELINE SESSIONS CAPTURED: 9 / 3", "CONFIDENCE: REDUCED",
+     "COVERAGE 5/6", "CREW BURDEN ≈ 27.0 MIN TODAY") cannot be reached this way
+     — they need a t() call at the render site. That limit is documented in the
+     README rather than papered over. */
+  'Eye–head coordination': 'চোখ–মাথার সমন্বয়',
+  'Postural control': 'ভারসাম্য নিয়ন্ত্রণ',
+  'Task performance': 'কাজের পারফরম্যান্স',
+  'Motion symptoms': 'motion-জনিত উপসর্গ',
+  'Head movement': 'মাথার নড়াচড়া',
+  'Baseline drift': 'baseline-এর সরণ',
+  'SIMULATED': 'সিমুলেটেড',
+  'REPORTED': 'নিজের বলা',
+  'DERIVED': 'হিসাব করা',
+  'MEASURED': 'মাপা',
+  'START': 'শুরু',
+  'IDLE': 'নিষ্ক্রিয়',
+  'AVAILABLE': 'পাওয়া যাচ্ছে',
+  '09 / MISSION CONSOLE': '০৯ / মিশন কনসোল',
+  'MISSION CONSOLE': 'মিশন কনসোল',
+  'UPCOMING TASK': 'পরের কাজ',
+  'OUT OF RANGE': 'সীমার বাইরে',
+  'WITHIN RANGE': 'সীমার ভেতরে',
+  'NO SESSIONS YET': 'এখনো কোনো session নেই',
+  'Proprioception': 'proprioception',
+  'Vestibular': 'vestibular',
+  'Vision': 'দৃষ্টি (vision)',
+  'Gravity': 'gravity',
+  'Orientation': 'অরিয়েন্টেশন',
 };
