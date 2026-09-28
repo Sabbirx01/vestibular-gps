@@ -16,6 +16,33 @@ import {
 } from './ModelLibrary.js';
 import { damp, TAU, clamp } from '../core/util.js';
 
+/* Pick the exporter transform that makes the GLB read like a standing human.
+   This avoids hard-coding one vendor/exporter's axis convention. */
+function orientHumanoid(root) {
+  const candidates = [
+    [0, 0, 0],
+    [-Math.PI / 2, 0, 0],
+    [Math.PI / 2, 0, 0],
+    [0, 0, Math.PI / 2],
+    [0, 0, -Math.PI / 2],
+  ];
+  let best = null;
+  for (const rot of candidates) {
+    root.rotation.set(...rot);
+    root.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(root);
+    const size = box.getSize(new THREE.Vector3());
+    const height = size.y;
+    const breadth = Math.max(size.x, size.z, 1e-6);
+    const humanoidRatio = height / breadth;
+    const score = humanoidRatio + Math.min(height, 10) * 0.01;
+    if (!best || score > best.score) best = { rot, score, size };
+  }
+  root.rotation.set(...best.rot);
+  root.updateWorldMatrix(true, true);
+  return best;
+}
+
 /* ── Shared body builder ─────────────────────────────────
    Proportions are anthropometric ratios, scaled so that the
    standing figure measures 2.00 units (metres) head to foot.
@@ -201,10 +228,14 @@ export class FloatingAstronaut {
          source rotation once at the scene clone, before measuring bounds. If it
          is left in place, the astronaut's feet/head axis is rotated into the
          wrong plane and a later 360° yaw looks like an upside-down roll. */
-      model.rotation.set(-Math.PI / 2, 0, 0);
+      /* Select an upright candidate from the asset itself. The imported suit
+         has shipped with different exporter axes across revisions; measuring
+         only `size.y` made one revision huge/sideways. Candidate transforms
+         are scored by vertical height and a sensible humanoid width. */
+      const upright = orientHumanoid(model);
       dressMaterials(model);
 
-      const carrier = normalizeModel(model, { targetSize: 1.86, dropToFloor: false });
+      const carrier = normalizeModel(model, { targetSize: 1.86, dropToFloor: false, axis: 'y' });
       /* The carrier is now upright; only Y is allowed to turn the suit. */
       carrier.rotation.set(0, 0, 0);
       carrier.position.y = 0.02;
@@ -550,10 +581,10 @@ export class MeasurementSubject {
       /* Same GLB correction as the hero: cancel the source +90° X node
          rotation before normalization, so the measurement figure is upright.
          Its 360° interaction is then a clean Y-axis turn. */
-      model.rotation.set(-Math.PI / 2, 0, 0);
+      orientHumanoid(model);
       dressMaterials(model);
 
-      const carrier = normalizeModel(model, { targetSize: 2.0, dropToFloor: true });
+      const carrier = normalizeModel(model, { targetSize: 2.0, dropToFloor: true, axis: 'y' });
       carrier.rotation.set(0, 0, 0);
 
       this.body.visible = false;

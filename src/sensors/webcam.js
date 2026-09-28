@@ -384,5 +384,23 @@ export class CameraProvider extends SensorProvider {
         dy: this.dy,
       },
     });
+
+    /* Persist the same realtime camera output in the shared store so HUD,
+       Mission Console and integration UI can render the actual live stream,
+       not only listen to a transient event. */
+    set({ camera: {
+      ...state.camera,
+      running: this.running,
+      calibrated: this.calibrated,
+      samples: this.samples,
+      rateHz: +this.hz.mean().toFixed(1),
+      headMotion: +(6 + travelDeg * 3 + jitterDeg * 0.7).toFixed(2),
+      eyeHead: +(4.5 - jitterClean * 1.6 + travelDeg * 0.35).toFixed(2),
+      motionEnergy: +energyClean.toFixed(4),
+      jitter: +jitterClean.toFixed(4),
+      dx: this.dx, dy: this.dy,
+      quality: Math.max(0, Math.min(1, this.samples < 12 ? 0.35 : (this.calibrated ? 1 : 0.7) - Math.min(0.6, jitterClean))),
+      lastAt: performance.now(),
+    } }, ['camera']);
   }
 }

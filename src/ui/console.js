@@ -67,12 +67,21 @@ export function mountConsoleSection(ctx = {}) {
 
   /* ── Live channel sampling ───────────────────────────── */
   let lastSample = null;
+  let lastLiveRenderAt = 0;
   const camRoll = [];
   bus.on('sample', (s) => {
     lastSample = s;
     if (s.source === 'camera') {
       camRoll.push(s);
       if (camRoll.length > 40) camRoll.shift();
+      /* CameraProvider emits at ~18 Hz. Recompute the live OSI view at 4 Hz:
+         fast enough to be visibly realtime, slow enough that replacing the
+         large console DOM never competes with the camera estimator or WebGL. */
+      const now = performance.now();
+      if (now - lastLiveRenderAt >= 250) {
+        lastLiveRenderAt = now;
+        recompute();
+      }
     }
   });
 

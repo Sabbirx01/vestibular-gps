@@ -67,6 +67,13 @@ export const state = {
   /* link quality */
   link: { hz: 0, latencyMs: 0, strength: 0, samples: 0, lastAt: 0, stale: true },
 
+  /* camera pipeline telemetry — updated by CameraProvider at analysis rate */
+  camera: {
+    running: false, calibrated: false, samples: 0, rateHz: 0,
+    headMotion: 0, eyeHead: 0, motionEnergy: 0, jitter: 0,
+    dx: 0, dy: 0, quality: 0, lastAt: 0,
+  },
+
   geo: null,
 
   /* focus / interaction */
@@ -289,6 +296,16 @@ export function ingest(source, payload) {
   }
 
   bus.emit('sample', state.sample);
+}
+
+/* CameraProvider publishes an already-derived measurement. Keep it as a live
+   state channel without pretending it is a gyroscope sample: the camera has
+   no yaw/pitch/roll radians, but it does have head-motion and eye-head proxy
+   outputs that the Mission Console can consume in realtime. */
+export function ingestCamera(payload) {
+  if (!payload) return;
+  set({ camera: { ...state.camera, ...payload, running: true, lastAt: performance.now() } }, ['camera']);
+  bus.emit('camera-sample', { ...state.camera });
 }
 
 /** Watchdog: if a "live" stream stops arriving, say so rather than freezing silently. */

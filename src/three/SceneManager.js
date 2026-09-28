@@ -160,7 +160,10 @@ export class SceneManager {
          419 px clearance from the HUD, but it sat high with a ~157 px dead band
          under the boots, so it is dropped to balance the composition. */
       this.astronaut.root.position.set(2.05, -0.5, 2.05);
-      this.astronaut.root.scale.setScalar(2.75);
+      /* The suit is already normalized to 1.86 world units. 2.75 was tuned
+         against the old sideways axis and made the corrected asset fill the
+         entire hero. Keep a judge-readable half-height figure. */
+      this.astronaut.root.scale.setScalar(1.72);
       /* Straight-on entrance pose. The astronaut may respond to pointer input
          after its own settle window, but it must not arrive tilted. */
       this.astronaut.root.rotation.set(0, 0, 0);
