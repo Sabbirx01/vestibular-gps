@@ -205,11 +205,17 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
   .nav.is-open a { padding: 12px 14px; font-size: var(--fs-xs); }
   .hud { display: none; }
   .sec-hero { grid-template-columns: minmax(0,1fr); min-height: auto; }
+  /* Keep the foreground 3D planet visible below the hero copy on tablets. */
+  .sec-hero .hero-stage { min-height: 330px; }
   .hero-specs { grid-template-columns: repeat(2, 1fr); }
   .footer { padding-inline: var(--sp-4); }
   .debug { left: var(--sp-3); bottom: var(--sp-3); }
 }
 @media (max-width: 620px) {
+  .sec-hero .hero-stage { min-height: 360px; margin-top: -8px; }
+  .sec-hero .hero-stage canvas { min-height: 360px; }
+  .sec-space .stage { min-height: 400px; }
+  .sec-space .stage-canvas { min-height: 400px; }
   .topbar { padding: 0 var(--sp-3); gap: var(--sp-3); }
   .brand-text small { display: none; }
   .topbar-tools .chip-ghost:not(#menuToggle):not(#modeToggle) { display: none; }

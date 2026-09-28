@@ -518,10 +518,10 @@ export function mountSpaceSection({ scene, onMode }) {
     if (readout) {
       readout.innerHTML = '';
       const cells = [
-        ['GRAVITATIONAL LOAD', g.short, G_TEXT[id]],
-        ['OTOLITH LOAD (MODEL)', `${(g.otolith * 100).toFixed(0)}%`, 'Conceptual model relative to the 1 g reference — not a measurement.'],
-        ['CANAL ROTATION SIGNAL', '100%', 'Angular motion detection is essentially unaffected by the gravitational environment.'],
-        ['FREE-FLOAT INDEX', `${(g.float * 100).toFixed(0)}%`, 'How much the visual scene simulates unconstrained drifting.'],
+        ['GRAVITATIONAL LOAD', `${g.short} · ENVIRONMENT MODEL`, G_TEXT[id]],
+        ['OTOLITH LOAD (MODEL)', `${(g.otolith * 100).toFixed(0)}% · MODEL`, 'Conceptual model relative to the 1 g reference — not a direct onboard measurement.'],
+        ['CANAL ROTATION SIGNAL', state.link.samples ? `${Math.round(Math.hypot(state.sample.yawRate, state.sample.pitchRate, state.sample.rollRate))} deg/s · LIVE` : 'NO LIVE ROTATION SAMPLE', 'Actual device/simulator angular-rate magnitude when a source is connected; otherwise no measured value is claimed.'],
+        ['FREE-FLOAT INDEX', `${(g.float * 100).toFixed(0)}% · SCENE MODEL`, 'How much the visual scene simulates unconstrained drifting; it is not a physiological measurement.'],
       ];
       cells.forEach(([k, v, d]) => readout.append(
         el('div', { class: 'gr' }, el('span', { text: k }), el('b', { text: v }), el('p', { text: d })),
@@ -573,7 +573,18 @@ export function mountSpaceSection({ scene, onMode }) {
     }
   }
 
+  /* The environment model changes immediately on mode selection, while the
+     canal readout follows the actual live angular-rate stream. Throttle the
+     paint to 4 Hz so the DOM stays smooth during an 18 Hz sensor feed. */
+  let lastLivePaint = 0;
   bus.on('mode', paint);
+  bus.on('sample', () => {
+    const now = performance.now();
+    if (now - lastLivePaint >= 250) {
+      lastLivePaint = now;
+      paint(state.mode);
+    }
+  });
   paint(state.mode);
 
   /* ── timeline ── */

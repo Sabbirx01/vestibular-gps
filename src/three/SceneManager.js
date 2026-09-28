@@ -17,7 +17,7 @@ import { damp, clamp } from '../core/util.js';
 
 /* ── Section → camera framing ───────────────────────────── */
 const FRAMING = {
-  'sec-hero':       { focus: 'wide',     dist: 12.5, height: 1.0, look: 1.0, env: 1.0 },
+  'sec-hero':       { focus: 'wide',     dist: 12.5, height: 1.0, look: 0.6, offset: [0.35, -0.15], env: 1.0 },
   /* offset shifts the look-at target so the subject lands in the open right-hand
      column instead of centred behind the panel grid */
   'sec-body':       { focus: 'subject',  dist: 4.6,  height: 1.55, look: 1.15, offset: [-1.75, 0.15], env: 0.42 },
@@ -25,7 +25,7 @@ const FRAMING = {
   'sec-brain':      { focus: 'wide',     dist: 12.0, height: 1.4,  look: 1.3,  env: 0.3  },
   'sec-vor':        { focus: 'astronaut',dist: 5.0,  height: 1.7, look: 1.6,  env: 0.42 },
   'sec-sensors':    { focus: 'astronaut',dist: 4.4,  height: 1.7, look: 1.6,  env: 0.5 },
-  'sec-space':      { focus: 'planet',   dist: 7.0,  height: 0.85, look: -0.75, offset: [-1.7, 0.35], env: 0.72 },
+  'sec-space':      { focus: 'planet',   dist: 5.8,  height: 0.15, look: -1.0, offset: [0.0, -0.35], env: 0.72 },
   'sec-lab':        { focus: 'astronaut',dist: 5.8,  height: 1.6, look: 1.4,  env: 0.4 },
   /* Dense instrument panels: pulled far back and dimmed so nothing drifts
      behind a readout. */
@@ -38,7 +38,7 @@ const FRAMING = {
   /* Earth reference sits below the astronaut in the hero composition. The
      active planet is a gravity reference, not a floating bubble beside the
      helmet. */
-const SOLAR_POS = [1.75, -2.35, -9.2];
+const SOLAR_POS = [1.55, -2.05, 0.15];
 
 /* Which 3D layers are drawn in which section. Solar bodies are hidden on text-heavy
    sections so a planet can never end up sitting on top of a paragraph. */
@@ -292,6 +292,8 @@ export class SceneManager {
 
     /* ── camera framing per section ── */
     const f = this.framing || FRAMING['sec-hero'];
+    const mobile = innerWidth <= 720;
+    const mobilePlanet = mobile && (this._section === 'sec-hero' || this._section === 'sec-space');
     const k = this.framingInstant ? 40 : 2.0;
     this.framingInstant = false;
 
@@ -300,8 +302,8 @@ export class SceneManager {
        when the user had not interacted. Any intentional motion now comes from
        pointer/sensor input, not a hidden cinematic orbit. */
     const orbit = 0;
-    const targetDist = f.dist;
-    const targetHeight = f.height;
+    const targetDist = mobilePlanet ? (this._section === 'sec-space' ? 4.2 : 7.2) : f.dist;
+    const targetHeight = mobilePlanet ? (this._section === 'sec-space' ? -0.25 : 0.1) : f.height;
 
     this.camState.dist = damp(this.camState.dist, targetDist, k, dt);
     this.camState.height = damp(this.camState.height, targetHeight, k, dt);
@@ -313,7 +315,7 @@ export class SceneManager {
     let cx = 0, cz = 0;
     if (f.focus === 'subject' && this.subject) { cx = this.subject.root.position.x; cz = this.subject.root.position.z; }
     else if (f.focus === 'astronaut' && this.astronaut) { cx = this.astronaut.root.position.x; cz = this.astronaut.root.position.z; }
-    else if (f.focus === 'planet') { cx = SOLAR_POS[0]; cz = SOLAR_POS[2]; }
+    else if (f.focus === 'planet' || mobilePlanet) { cx = SOLAR_POS[0]; cz = SOLAR_POS[2]; }
 
     /* Composition offset: the camera sits relative to the subject but aims slightly
        off-axis, which pushes the subject into the open column beside the panels. */
@@ -324,7 +326,7 @@ export class SceneManager {
 
     this.camera.position.set(
       cx + Math.sin(az) * this.camState.dist,
-      this.camState.height + el * 2.2 + (f.focus === 'planet' ? 1.2 : 0),
+      this.camState.height + el * 2.2 + (f.focus === 'planet' || mobilePlanet ? 1.2 : 0),
       cz + Math.cos(az) * this.camState.dist,
     );
     this.camera.lookAt(cx + this.camState.ox, this.camState.look + this.camState.oy, cz);

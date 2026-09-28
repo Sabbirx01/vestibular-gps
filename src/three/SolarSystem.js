@@ -51,7 +51,10 @@ export class SolarSystem {
       mat.emissive = new THREE.Color(0xffffff);
       mat.emissiveIntensity = 0.42;
     }
-    const surface = new THREE.Mesh(new THREE.SphereGeometry(spec.radius, seg, seg / 2), mat);
+    /* Foreground showcase body: the planet must read as a real object in front
+       of the starfield, not as a faint background dot. */
+    const showcaseRadius = spec.radius * 1.55;
+    const surface = new THREE.Mesh(new THREE.SphereGeometry(showcaseRadius, seg, seg / 2), mat);
     surface.rotation.z = spec.tilt;
     grp.add(surface);
 
@@ -68,7 +71,7 @@ export class SolarSystem {
         alphaMap: maps.cloudMap,
         color: 0xffffff,
       });
-      clouds = new THREE.Mesh(new THREE.SphereGeometry(spec.radius * 1.012, seg, seg / 2), cloudMat);
+      clouds = new THREE.Mesh(new THREE.SphereGeometry(showcaseRadius * 1.012, seg, seg / 2), cloudMat);
       clouds.rotation.z = spec.tilt;
       clouds.rotation.y = 0.4;
       grp.add(clouds);
@@ -79,7 +82,7 @@ export class SolarSystem {
        peaks on the dayside limb and fades across the terminator instead of
        ringing the whole planet evenly. */
     const atmo = new THREE.Mesh(
-      new THREE.SphereGeometry(spec.radius * 1.10, 56, 36),
+      new THREE.SphereGeometry(showcaseRadius * 1.10, 56, 36),
       atmosphereMaterial(spec.atmo, {
         power: spec.atmoPower,
         intensity: spec.atmoIntensity,
@@ -92,14 +95,14 @@ export class SolarSystem {
 
     /* A thin forward-scatter shell for the sunlit limb */
     const limb = new THREE.Mesh(
-      new THREE.SphereGeometry(spec.radius * 1.055, 56, 36),
+      new THREE.SphereGeometry(showcaseRadius * 1.055, 56, 36),
       fresnelMaterial(0xffffff, { power: 5.5, intensity: 0.5, side: THREE.FrontSide }),
     );
     grp.add(limb);
 
     /* Label */
     const label = labelSprite(id === 'MICROGRAVITY' ? 'FREE FLOAT' : id, { size: 38, scale: 0.5, color: '#bfe6ff' });
-    label.position.set(0, spec.radius + 0.42, 0);
+    label.position.set(0, showcaseRadius + 0.52, 0);
     label.userData.target = id;
     grp.add(label);
     this.labels.push(label);
@@ -119,14 +122,22 @@ export class SolarSystem {
     bounce.position.set(0, -spec.radius * 4, spec.radius * 1.5);
     grp.add(bounce);
 
-    grp.userData = { surface, clouds, atmo, limb, spec, radius: spec.radius, opacity: 1 };
+    grp.userData = { surface, clouds, atmo, limb, spec, radius: showcaseRadius, opacity: 1 };
     this.root.add(grp);
     this.bodies[id] = grp;
     return grp;
   }
 
   build() {
-    this.root.add(new THREE.AmbientLight(0x46618c, 1.35));
+    this.root.add(new THREE.AmbientLight(0x46618c, 1.65));
+    /* A controlled key/fill pair makes the foreground planet readable against
+       the starfield on both desktop and mobile, without flattening the texture. */
+    const key = new THREE.DirectionalLight(0xfff1d2, 2.2);
+    key.position.set(6, 5, 8);
+    this.root.add(key);
+    const fill = new THREE.DirectionalLight(0x73b8ff, 0.8);
+    fill.position.set(-5, 1, 4);
+    this.root.add(fill);
 
     for (const g of GRAVITIES) this._createBody(g.id);
 
@@ -189,7 +200,7 @@ export class SolarSystem {
 
       /* Scale in with the same fast crossfade so the new planet feels like a
          deliberate animated mode transition rather than a delayed pop. */
-      b.scale.setScalar(0.88 + o * 0.12);
+      b.scale.setScalar(0.96 + o * 0.04);
       /* fresnelMaterial exposes uIntensity / uTime — there is no uOpacity.
          Guarded so a future uniform rename can never kill the render loop. */
       const au = b.userData.atmo.material.uniforms;
