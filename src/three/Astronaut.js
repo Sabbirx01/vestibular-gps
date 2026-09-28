@@ -1,0 +1,559 @@
+/* ═══════════════════════════════════════════════════════════
+   Astronaut — two procedural figures, no external models.
+   1. FloatingAstronaut : the site's visual narrator, drifting
+      in the background and reacting to pointer + microgravity.
+   2. MeasurementSubject : a standing, arms-extended figure that
+      rotates slowly inside an instrument frame, with body axis,
+      head axis, centre-of-gravity marker and vestibular signal
+      lines drawn around it.
+   ═══════════════════════════════════════════════════════════ */
+
+import * as THREE from '../../vendor/three.module.js';
+import {
+  SUIT, SUIT_PANEL, SUIT_DARK, VISOR, GOLD, PAL, glowLine,
+} from './materials.js';
+import {
+  loadModel, dressMaterials, normalizeModel, trianglesOf, boundsOf,
+} from './ModelLibrary.js';
+import { damp, TAU, clamp } from '../core/util.js';
+
+/* ── Shared body builder ─────────────────────────────────
+   Proportions are anthropometric ratios, scaled so that the
+   standing figure measures 2.00 units (metres) head to foot.
+   ───────────────────────────────────────────────────────── */
+function buildBody({ detail = 'high', suit = true } = {}) {
+  const seg = { low: 6, mid: 10, high: 18 }[detail] ?? 12;
+  const g = new THREE.Group();
+  const joints = {};
+
+  const mSuit = suit ? SUIT() : new THREE.MeshStandardMaterial({ color: 0xcfd8e4, roughness: 0.6 });
+  const mPanel = suit ? SUIT_PANEL() : mSuit;
+  const mDark = suit ? SUIT_DARK() : mSuit;
+  const mGold = suit ? GOLD() : mPanel;
+  const mSkin = new THREE.MeshStandardMaterial({ color: 0xd8b49a, roughness: 0.62 });
+
+  const add = (parent, geo, mat, pos = [0, 0, 0], rot = [0, 0, 0]) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(...pos);
+    m.rotation.set(...rot);
+    parent.add(m);
+    return m;
+  };
+
+  /* ── Pelvis + torso ── */
+  const hips = new THREE.Group(); hips.position.y = 1.02; g.add(hips);
+  add(hips, new THREE.SphereGeometry(0.115, seg, seg), mSuit, [0, 0, 0]);
+  add(hips, new THREE.BoxGeometry(0.30, 0.10, 0.20), mPanel, [0, -0.02, 0]);
+
+  const spine = new THREE.Group(); spine.position.y = 0.10; hips.add(spine);
+  joints.spine = spine;
+  add(spine, new THREE.CapsuleGeometry(0.125, 0.30, Math.min(8, seg / 2), seg), mSuit, [0, 0.20, 0]);
+  add(spine, new THREE.BoxGeometry(0.26, 0.16, 0.19), mPanel, [0, 0.34, 0]);
+
+  const chest = new THREE.Group(); chest.position.y = 0.42; spine.add(chest);
+  joints.chest = chest;
+  add(chest, new THREE.CapsuleGeometry(0.135, 0.16, Math.min(8, seg / 2), seg), mSuit, [0, 0.02, 0]);
+  if (suit) {
+    add(chest, new THREE.BoxGeometry(0.14, 0.10, 0.06), mDark, [0, 0.02, 0.135]);
+    add(chest, new THREE.CylinderGeometry(0.022, 0.022, 0.03, 12), mGold, [-0.06, 0.06, 0.14], [Math.PI / 2, 0, 0]);
+    add(chest, new THREE.CylinderGeometry(0.014, 0.014, 0.03, 10), mGold, [0.04, 0.02, 0.145], [Math.PI / 2, 0, 0]);
+  }
+
+  /* ── Neck + head ── */
+  add(chest, new THREE.CylinderGeometry(0.045, 0.05, 0.07, seg), mSuit, [0, 0.14, 0]);
+  const head = new THREE.Group(); head.position.y = 0.245; chest.add(head);
+  joints.head = head;
+
+  if (suit) {
+    /* helmet shell + visor, semi-transparent so the face reads */
+    const shell = new THREE.Mesh(
+      new THREE.SphereGeometry(0.125, seg + 6, seg + 4, 0, TAU, 0, Math.PI * 0.86),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xdfe9f6, roughness: 0.14, metalness: 0.2,
+        transparent: true, opacity: 0.5, transmission: 0.35, thickness: 0.3, ior: 1.4,
+        clearcoat: 1, clearcoatRoughness: 0.1,
+      }),
+    );
+    /* attach the mesh directly — passing a Mesh as a geometry to add()
+       makes Three rebuild a Mesh from a Mesh and throws in updateMorphTargets */
+    shell.position.set(0, 0.02, 0);
+    head.add(shell);
+    const visor = add(head, new THREE.SphereGeometry(0.082, 16, 14, 0, Math.PI), VISOR(), [0, 0.015, 0.028], [0, 0, 0]);
+    visor.scale.set(0.95, 0.92, 0.8);
+    add(head, new THREE.TorusGeometry(0.118, 0.012, 8, 26), mPanel, [0, 0.02, 0], [Math.PI / 2, 0, 0]);
+    add(head, new THREE.SphereGeometry(0.02, 10, 8), new THREE.MeshStandardMaterial({
+      color: 0xffffff, emissive: new THREE.Color(PAL.cyan), emissiveIntensity: 2.4, roughness: 0.2,
+    }), [-0.08, 0.08, 0.07]);
+  } else {
+    add(head, new THREE.SphereGeometry(0.093, seg + 4, seg + 2), mSkin, [0, 0.02, 0]).scale.set(0.92, 1, 0.96);
+    add(head, new THREE.BoxGeometry(0.13, 0.02, 0.005), mDark, [0, 0.03, 0.088]);
+  }
+
+  /* ── Arms ── */
+  const mkArm = (side) => {
+    const shoulder = new THREE.Group();
+    shoulder.position.set(side * 0.165, 0.10, 0);
+    chest.add(shoulder);
+    add(shoulder, new THREE.SphereGeometry(0.055, seg, seg), mSuit);
+    const upper = new THREE.Group(); shoulder.add(upper);
+    add(upper, new THREE.CapsuleGeometry(0.042, 0.22, 6, seg), mSuit, [0, -0.13, 0]);
+    const elbow = new THREE.Group(); elbow.position.y = -0.26; upper.add(elbow);
+    add(elbow, new THREE.SphereGeometry(0.042, seg, seg), mPanel);
+    add(elbow, new THREE.CapsuleGeometry(0.035, 0.20, 6, seg), mSuit, [0, -0.12, 0]);
+    const wrist = new THREE.Group(); wrist.position.y = -0.24; elbow.add(wrist);
+    add(wrist, new THREE.BoxGeometry(0.055, 0.075, 0.032), suit ? mPanel : mSkin);
+    return { shoulder, upper, elbow, wrist };
+  };
+  joints.armL = mkArm(-1);
+  joints.armR = mkArm(1);
+
+  /* ── Legs ── */
+  const mkLeg = (side) => {
+    const hip = new THREE.Group();
+    hip.position.set(side * 0.082, -0.06, 0);
+    hips.add(hip);
+    const thigh = new THREE.Group(); hip.add(thigh);
+    add(thigh, new THREE.CapsuleGeometry(0.056, 0.30, 6, seg), mSuit, [0, -0.19, 0]);
+    const knee = new THREE.Group(); knee.position.y = -0.40; thigh.add(knee);
+    add(knee, new THREE.SphereGeometry(0.05, seg, seg), mPanel);
+    add(knee, new THREE.CapsuleGeometry(0.044, 0.32, 6, seg), mSuit, [0, -0.19, 0]);
+    const ankle = new THREE.Group(); ankle.position.y = -0.40; knee.add(ankle);
+    add(ankle, new THREE.BoxGeometry(0.085, 0.055, 0.19), suit ? mDark : mSkin, [0, -0.03, 0.03]);
+    return { hip, thigh, knee, ankle };
+  };
+  joints.legL = mkLeg(-1);
+  joints.legR = mkLeg(1);
+
+  return { group: g, joints, materials: { mSuit, mPanel, mDark, mGold } };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   1. FloatingAstronaut
+   ═══════════════════════════════════════════════════════════ */
+export class FloatingAstronaut {
+  constructor({ quality = 'HIGH', reducedMotion = false } = {}) {
+    this.reduced = reducedMotion;
+    this.root = new THREE.Group();
+    this.root.name = 'astronaut-floating';
+
+    const { group, joints } = buildBody({ detail: quality.astronautDetail, suit: true });
+    this.body = group;
+    this.joints = joints;
+    this.root.add(group);
+
+    /* life-support backpack + status LED, parented to the chest */
+    const packMesh = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.36, 0.13), SUIT_PANEL());
+    packMesh.position.set(0, 0.02, -0.19);
+    joints.chest.add(packMesh);
+    const led = new THREE.Mesh(
+      new THREE.SphereGeometry(0.012, 8, 6),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: new THREE.Color(PAL.green), emissiveIntensity: 2.6 }),
+    );
+    led.position.set(0.09, 0.14, -0.26);
+    joints.chest.add(led);
+
+    /* warm interior light so the suit is not flat */
+    const l = new THREE.PointLight(PAL.cyan, 1.1, 4.2, 2);
+    l.position.set(0, 1.7, 0.35);
+    this.root.add(l);
+
+    /* rim glow shell */
+    const rim = new THREE.Mesh(
+      new THREE.SphereGeometry(0.62, 20, 16),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(PAL.blue), transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false }),
+    );
+    rim.position.y = 1.35;
+    this.root.add(rim);
+
+    this.tether = glowLine(
+      [new THREE.Vector3(0, 0.4, 0), new THREE.Vector3(-0.7, -0.3, 0.6), new THREE.Vector3(-1.9, -1.4, 1.5)],
+      PAL.cyan, { radius: 0.006, opacity: 0.32 },
+    );
+    this.root.add(this.tether);
+
+    this.t = Math.random() * 10;
+    this.baseY = 0;
+    this.baseRot = Math.random() * TAU;
+    this.pointer = { x: 0, y: 0 };
+    this.scale = 1;
+  }
+
+  /**
+   * Swap the procedural body for the real NASA asset.
+   * Source: NASA 3D Resources - Advanced Crew Escape Suit (public domain).
+   * Returns true on success; on any failure the procedural body stays, so a
+   * missing or unparsable file can never break the scene.
+   */
+  async loadReal() {
+    try {
+      const gltf = await loadModel('suit');
+      const model = gltf.scene.clone(true);
+      /* The asset uses KHR_materials_pbrSpecularGlossiness, which this
+         GLTFLoader build does not implement, so materials fall back to a
+         flat matte look. Raising metalness and lowering roughness restores a
+         specular response on the helmet and suit panels. */
+      dressMaterials(model, { roughness: 0.3, metalness: 0.42, emissiveFloor: 0.1 });
+
+      const carrier = normalizeModel(model, { targetSize: 1.86, dropToFloor: false });
+      carrier.position.y = 0.02;
+
+      this.body.visible = false;
+      this.realBody = carrier;
+      this.root.add(carrier);
+
+      /* Three-point rig. The earlier single dim point light left the lower
+         legs and boots merging into the starfield. */
+      const key = new THREE.DirectionalLight(0xffffff, 3.2);
+      key.position.set(1.6, 2.4, 2.6);
+      this.root.add(key);
+
+      const fill = new THREE.DirectionalLight(0x9fc4ff, 1.5);
+      fill.position.set(-2.2, 0.6, 1.4);
+      this.root.add(fill);
+
+      const rim = new THREE.PointLight(PAL.cyan, 4.2, 6, 2);
+      rim.position.set(0.55, 1.5, -1.4);
+      this.root.add(rim);
+
+      const bounce = new THREE.DirectionalLight(0x6f9fe0, 1.0);
+      bounce.position.set(0, -2, 1.2);
+      this.root.add(bounce);
+
+      const b = boundsOf(carrier);
+      this.realMetrics = {
+        height: +(b.max.y - b.min.y).toFixed(3),
+        width: +(b.max.x - b.min.x).toFixed(3),
+        tris: trianglesOf(carrier),
+      };
+      this.usingRealModel = true;
+      return true;
+    } catch (e) {
+      console.warn('[FloatingAstronaut] real suit unavailable, keeping procedural body:', e.message);
+      return false;
+    }
+  }
+
+  setPointer(nx, ny) { this.pointer.x = nx; this.pointer.y = ny; }
+
+  update(dt, state) {
+    this.t += dt;
+    const t = this.t;
+    const floatAmt = state.mode === 'MICROGRAVITY' ? 1.45 : 0.85;
+    const q = state.reducedMotion || this.reduced ? 0 : 1;
+
+    this.root.position.y = this.baseY + Math.sin(t * 0.31) * 0.14 * floatAmt * q;
+    this.root.position.x = Math.sin(t * 0.19) * 0.09 * floatAmt * q;
+    this.root.position.z = Math.cos(t * 0.23) * 0.07 * floatAmt * q;
+
+    this.root.rotation.y = this.baseRot + t * 0.055 * q + this.pointer.x * 0.32;
+    this.root.rotation.x = damp(this.root.rotation.x, -this.pointer.y * 0.16, 3, dt);
+    this.root.rotation.z = Math.sin(t * 0.17) * 0.05 * floatAmt * q;
+
+    /* The real suit is a single rigid mesh with no skeleton attached, so the
+       microgravity drift is expressed by the whole figure instead of joints. */
+    if (this.usingRealModel && this.realBody) {
+      this.realBody.rotation.z = Math.sin(t * 0.33) * 0.09 * floatAmt * q;
+      this.realBody.rotation.x = Math.cos(t * 0.27) * 0.055 * floatAmt * q;
+      this.realBody.position.y = 0.02 + Math.sin(t * 0.4) * 0.035 * floatAmt * q;
+      return;
+    }
+
+    /* limbs: microgravity drift, damped */
+    const J = this.joints;
+    const slow = t * 0.24;
+    J.armL.shoulder.rotation.z = damp(J.armL.shoulder.rotation.z,  1.02 + Math.sin(slow) * 0.16 * q, 3, dt);
+    J.armR.shoulder.rotation.z = damp(J.armR.shoulder.rotation.z, -0.96 + Math.cos(slow * 1.1) * 0.16 * q, 3, dt);
+    J.armL.shoulder.rotation.x = damp(J.armL.shoulder.rotation.x, 0.28 + Math.sin(slow * 0.8) * 0.2 * q, 3, dt);
+    J.armR.shoulder.rotation.x = damp(J.armR.shoulder.rotation.x, 0.22 + Math.cos(slow * 0.9) * 0.2 * q, 3, dt);
+    J.armL.elbow.rotation.x = damp(J.armL.elbow.rotation.x, -0.55 - Math.sin(slow * 1.3) * 0.2 * q, 3, dt);
+    J.armR.elbow.rotation.x = damp(J.armR.elbow.rotation.x, -0.48 - Math.cos(slow * 1.2) * 0.2 * q, 3, dt);
+
+    J.legL.hip.rotation.x = Math.sin(slow * 0.85) * 0.22 * q + 0.14;
+    J.legR.hip.rotation.x = Math.cos(slow * 0.78) * 0.22 * q + 0.1;
+    J.legL.knee.rotation.x = -0.34 - Math.sin(slow) * 0.14 * q;
+    J.legR.knee.rotation.x = -0.28 - Math.cos(slow) * 0.14 * q;
+
+    J.spine.rotation.y = Math.sin(t * 0.21) * 0.07 * q;
+    J.chest.rotation.z = Math.sin(t * 0.26) * 0.05 * q;
+    J.head.rotation.y = Math.sin(t * 0.33) * 0.2 * q + this.pointer.x * 0.25;
+    J.head.rotation.x = -this.pointer.y * 0.18;
+  }
+
+  dispose() {
+    this.root.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   2. MeasurementSubject — standing, arms extended, rotating
+   inside an instrument frame. Reads as "being measured".
+   ═══════════════════════════════════════════════════════════ */
+export class MeasurementSubject {
+  constructor({ quality = 'HIGH', reducedMotion = false, bare = true } = {}) {
+    this.reduced = reducedMotion;
+    this.root = new THREE.Group();
+    this.root.name = 'measurement-subject';
+
+    const { group, joints } = buildBody({ detail: quality.astronautDetail, suit: false });
+    this.body = group;
+    this.joints = joints;
+    this.root.add(group);
+
+    /* ── Pose: arms fully extended, feet aligned, neutral ── */
+    joints.armL.shoulder.rotation.z = 1.42;
+    joints.armR.shoulder.rotation.z = -1.42;
+    joints.armL.elbow.rotation.x = 0;
+    joints.armR.elbow.rotation.x = 0;
+    joints.legL.hip.rotation.z = 0.03;
+    joints.legR.hip.rotation.z = -0.03;
+
+    /* eyes on the head so gaze direction reads */
+    const eyeGeo = new THREE.SphereGeometry(0.012, 10, 8);
+    const eyeMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, emissive: new THREE.Color(PAL.cyan), emissiveIntensity: 0.7, roughness: 0.2,
+    });
+    for (const s of [-1, 1]) {
+      const e = new THREE.Mesh(eyeGeo, eyeMat);
+      e.position.set(s * 0.032, 0.028, 0.086);
+      joints.head.add(e);
+    }
+
+    /* ── Vertical reference: height scale bars ── */
+    this.scaleGroup = new THREE.Group();
+    for (let i = 0; i <= 8; i++) {
+      const y = i * 0.25;
+      const isMajor = i % 4 === 0;
+      const w = isMajor ? 0.5 : 0.24;
+      const bar = glowLine(
+        [new THREE.Vector3(-w / 2, y, -0.30), new THREE.Vector3(w / 2, y, -0.30)],
+        isMajor ? PAL.cyan : PAL.blue,
+        { radius: 0.0035, opacity: isMajor ? 0.7 : 0.32 },
+      );
+      this.scaleGroup.add(bar);
+    }
+    this.scaleGroup.add(glowLine(
+      [new THREE.Vector3(0, 0, -0.30), new THREE.Vector3(0, 2.0, -0.30)],
+      PAL.cyan, { radius: 0.003, opacity: 0.3 },
+    ));
+    this.root.add(this.scaleGroup);
+
+    /* ── Body axis, head axis, COG, orientation vectors ── */
+    this.axes = new THREE.Group();
+
+    this.bodyAxis = glowLine(
+      [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 2.0, 0)],
+      PAL.cyan, { radius: 0.005, opacity: 0.85 },
+    );
+    this.headAxis = glowLine(
+      [new THREE.Vector3(0, 1.62, 0), new THREE.Vector3(0, 2.22, 0)],
+      PAL.violet, { radius: 0.005, opacity: 0.9 },
+    );
+    this.axes.add(this.bodyAxis, this.headAxis);
+
+    /* forward / lateral orientation vectors from the head */
+    this.vecGroup = new THREE.Group();
+    this.vecGroup.position.set(0, 1.86, 0);
+    this.vecFwd = glowLine([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0.62)], PAL.green, { radius: 0.005, opacity: 0.9 });
+    this.vecLat = glowLine([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.62, 0, 0)], PAL.amber, { radius: 0.005, opacity: 0.9 });
+    this.vecUp = glowLine([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.62, 0)], PAL.cyan, { radius: 0.005, opacity: 0.9 });
+    this.vecGroup.add(this.vecFwd, this.vecLat, this.vecUp);
+    this.axes.add(this.vecGroup);
+
+    /* centre-of-gravity marker */
+    this.cog = new THREE.Mesh(
+      new THREE.SphereGeometry(0.032, 14, 12),
+      new THREE.MeshStandardMaterial({
+        color: 0xffd27a, emissive: new THREE.Color(PAL.amber), emissiveIntensity: 2.0, roughness: 0.3,
+      }),
+    );
+    this.cog.position.set(0, 1.05, 0);
+    this.cogRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.075, 0.004, 8, 34),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(PAL.amber), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }),
+    );
+    this.cogRing.position.copy(this.cog.position);
+    this.cogRing.rotation.x = Math.PI / 2;
+    this.axes.add(this.cog, this.cogRing);
+
+    /* The overlay group must actually be attached to the model root — building
+       it without adding it leaves every axis and marker invisible. */
+    this.root.add(this.axes);
+
+    /* ── Vestibular signal lines: inner ear → brainstem ── */
+    this.signalGroup = new THREE.Group();
+    this.signals = [];
+    for (const s of [-1, 1]) {
+      const line = glowLine([
+        new THREE.Vector3(s * 0.075, 1.86, 0),
+        new THREE.Vector3(s * 0.11, 1.72, -0.02),
+        new THREE.Vector3(s * 0.055, 1.58, -0.04),
+        new THREE.Vector3(0, 1.50, -0.05),
+      ], PAL.violet, { radius: 0.004, opacity: 0.9 });
+      this.signalGroup.add(line);
+      this.signals.push(line);
+    }
+    /* travelling pulse along each signal line — one moving point per line */
+    this.pulses = [];
+    for (const line of this.signals) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3));
+      const pulse = new THREE.Points(geo, new THREE.PointsMaterial({
+        color: new THREE.Color(PAL.cyan), size: 0.055, transparent: true,
+        opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false,
+        sizeAttenuation: true,
+      }));
+      pulse.frustumCulled = false;
+      pulse.userData.curve = line.userData.curve;
+      this.pulses.push(pulse);
+      this.signalGroup.add(pulse);
+    }
+    this.axes.add(this.signalGroup);
+
+    /* ── Instrument frame: rotating arcs around the subject ── */
+    this.frame = new THREE.Group();
+    for (let i = 0; i < 3; i++) {
+      const r = 0.95 + i * 0.22;
+      const arc = new THREE.Mesh(
+        new THREE.TorusGeometry(r, 0.0035, 6, 120, Math.PI * (1.1 + i * 0.24)),
+        new THREE.MeshBasicMaterial({
+          color: new THREE.Color(i === 1 ? PAL.violet : PAL.cyan),
+          transparent: true, opacity: 0.34 - i * 0.06,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+        }),
+      );
+      arc.rotation.set(Math.PI / 2 + i * 0.34, i * 0.8, i * 0.5);
+      arc.position.y = 1.0;
+      arc.userData.spin = (i % 2 ? 1 : -1) * (0.16 + i * 0.05);
+      this.frame.add(arc);
+    }
+    this.root.add(this.frame);
+
+    /* ── Lighting rig ──
+       The subject sits outside the planet groups, so it needs its own lights
+       or a MeshStandardMaterial body renders as a black silhouette. */
+    const keyL = new THREE.DirectionalLight(0xffffff, 2.6);
+    keyL.position.set(2.2, 3.4, 3.0);
+    this.root.add(keyL);
+
+    const fillL = new THREE.DirectionalLight(PAL.blue, 1.4);
+    fillL.position.set(-2.8, 0.8, 1.8);
+    this.root.add(fillL);
+
+    const rimL = new THREE.PointLight(PAL.violet, 2.2, 6, 2);
+    rimL.position.set(-0.6, 1.4, -2.2);
+    this.root.add(rimL);
+
+    const bounceL = new THREE.DirectionalLight(0x6f9fe0, 0.75);
+    bounceL.position.set(0, -2.5, 1.2);
+    this.root.add(bounceL);
+
+    this.root.add(new THREE.AmbientLight(0x4a6690, 1.5));
+
+    /* ── Base disc ── */
+    const disc = new THREE.Mesh(
+      new THREE.CircleGeometry(0.72, 64),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(PAL.cyan), transparent: true, opacity: 0.07,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }),
+    );
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.y = 0.001;
+    this.root.add(disc);
+
+    this.t = 0;
+    this.spinSpeed = 0.16;
+    this.pointer = { x: 0, y: 0 };
+  }
+
+  /**
+   * Replace the procedural mannequin with the real NASA suit, kept in the
+   * instrument frame so the axis, centre-of-gravity and signal overlays still
+   * describe a real figure.
+   */
+  async loadReal() {
+    try {
+      const gltf = await loadModel('suit');
+      const model = gltf.scene.clone(true);
+      /* Lower emissive floor than the floating figure: inside the instrument
+         frame the subject was washing out to near-white with no readable
+         surface detail. More metalness and less self-glow restores contrast. */
+      dressMaterials(model, { roughness: 0.4, metalness: 0.34, emissiveFloor: 0.05 });
+
+      const carrier = normalizeModel(model, { targetSize: 2.0, dropToFloor: true });
+
+      this.body.visible = false;
+      this.realBody = carrier;
+      this.root.add(carrier);
+
+      const b = boundsOf(carrier);
+      this.realMetrics = {
+        height: +(b.max.y - b.min.y).toFixed(3),
+        width: +(b.max.x - b.min.x).toFixed(3),
+        tris: trianglesOf(carrier),
+      };
+      this.usingRealModel = true;
+      return true;
+    } catch (e) {
+      console.warn('[MeasurementSubject] real suit unavailable, keeping procedural figure:', e.message);
+      return false;
+    }
+  }
+
+  setPointer(nx, ny) { this.pointer.x = nx; this.pointer.y = ny; }
+
+  update(dt, state) {
+    this.t += dt;
+    const t = this.t;
+    const q = state.reducedMotion || this.reduced ? 0 : 1;
+
+    /* the subject rotates; slow breathing keeps it alive */
+    this.body.rotation.y = t * this.spinSpeed * q + this.pointer.x * 0.5;
+    this.body.rotation.x = Math.sin(t * 0.4) * 0.012 * q;
+    this.joints.chest.scale.y = 1 + Math.sin(t * 1.1) * 0.006 * q;
+
+    /* When the real suit is in use it is a single rigid mesh, so it turns as a
+       whole. The hidden procedural body below keeps running, which costs
+       nothing and means the overlays always update on the same code path. */
+    if (this.usingRealModel && this.realBody) {
+      this.realBody.rotation.y = t * this.spinSpeed * q + this.pointer.x * 0.5;
+      this.realBody.rotation.x = Math.sin(t * 0.4) * 0.012 * q;
+    }
+
+    /* arms settle into the extended pose with micro-drift */
+    const J = this.joints;
+    J.armL.shoulder.rotation.z = 1.42 + Math.sin(t * 0.5) * 0.03 * q;
+    J.armR.shoulder.rotation.z = -1.42 - Math.sin(t * 0.5 + 0.4) * 0.03 * q;
+    J.armL.shoulder.rotation.x = damp(J.armL.shoulder.rotation.x, -this.pointer.y * 0.2, 3, dt);
+    J.armR.shoulder.rotation.x = damp(J.armR.shoulder.rotation.x, -this.pointer.y * 0.2, 3, dt);
+    J.legL.hip.rotation.x = Math.sin(t * 0.44) * 0.014 * q;
+    J.legR.hip.rotation.x = Math.sin(t * 0.44 + 1.2) * 0.014 * q;
+    J.head.rotation.y = Math.sin(t * 0.28) * 0.16 * q + this.pointer.x * 0.3;
+    J.head.rotation.x = -this.pointer.y * 0.2;
+
+    /* axes stay world-aligned while the body turns → shows the offset */
+    this.headAxis.visible = true;
+    this.cogRing.rotation.z += dt * 0.7 * q;
+    this.cog.position.y = 1.05 + Math.sin(t * 0.9) * 0.008 * q;
+    this.cogRing.position.y = this.cog.position.y;
+
+    /* vestibular pulse travelling ear → brainstem, driven by live motion */
+    const drive = clamp(Math.abs(state.sample.yawRate) / 60 + Math.abs(state.sample.pitchRate) / 60 + Math.abs(state.sample.rollRate) / 60, 0.06, 1);
+    this.pulses.forEach((p, i) => {
+      p.material.opacity = 0.35 + drive * 0.6;
+      const u = (t * (0.35 + drive * 0.9) + i * 0.5) % 1;
+      const pt = p.userData.curve.getPointAt(u);
+      p.geometry.attributes.position.setXYZ(0, pt.x, pt.y, pt.z);
+      p.geometry.attributes.position.needsUpdate = true;
+    });
+    this.signals.forEach((l) => { l.material.opacity = 0.35 + drive * 0.45; });
+
+    this.frame.children.forEach((arc) => { arc.rotation.z += dt * arc.userData.spin * q; });
+  }
+
+  dispose() {
+    this.root.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
+  }
+}
+
+export { buildBody };

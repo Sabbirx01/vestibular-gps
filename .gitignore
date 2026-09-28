@@ -1,0 +1,17 @@
+﻿# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+
+# download artefacts
+_probe.bin
+_nih-brain*.zip
+*.tmp
+
+# local logs
+*.log
