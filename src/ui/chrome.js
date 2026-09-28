@@ -63,12 +63,33 @@ export function mountCursor() {
   const cursor = $('#cursor');
   const label = $('#cursorLabel');
   if (!cursor) return;
-  /* Touch devices keep their native cursor; the custom one only makes sense
-     with a pointer. (This check used to appear twice.) */
-  if (matchMedia('(pointer: coarse)').matches) return;
 
-  document.body.classList.add('vg-custom-cursor');
-  cursor.classList.add('is-on');
+  /* Whether the cinematic cursor IS the cursor is decided here and re-checked
+     when the pointer type changes — not by a CSS media query, which Chrome can
+     flip mid-session on a hybrid or touchscreen laptop, handing the native
+     cursor back while the overlay was still drawn. That was the reported bug:
+     hold still or touch, and the PC cursor kept returning. See base.css. */
+  const coarse = matchMedia('(pointer: coarse)');
+  const sync = () => {
+    const custom = !coarse.matches;
+    /* data-cursor-MODE, not data-cursor: this file also reads `data-cursor`
+       and `data-cursor-target` off hovered elements to label the cursor, and
+       `closest('[data-cursor]')` walks UP the tree — so putting data-cursor on
+       <html> made every element's closest match <html>, which permanently
+       switched the hover state on and printed the attribute's value next to
+       the ship. Reported as a stray "custom" label on the cursor. */
+    document.documentElement.dataset.cursorMode = custom ? 'custom' : 'native';
+    document.body.classList.toggle('vg-custom-cursor', custom);
+    cursor.classList.toggle('is-on', custom);
+  };
+  /* Decided ONCE, at load, and deliberately not re-decided on a `change`
+     event. Re-deciding meant that on a hybrid or touchscreen laptop a media
+     flip could hand the native cursor back mid-session while the custom one
+     was still on screen — the exact "two cursors" report. A phone reports
+     coarse at load and keeps its native cursor; a machine that reports fine at
+     load keeps the cinematic one for the session. Re-run this by hand
+     (data-cursor-mode) if a device is ever genuinely both. */
+  sync();
 
   const ship = cursor.querySelector('.cursor-ship');
   const ghosts = cursor.querySelectorAll('.cursor-trail i');
@@ -88,9 +109,17 @@ export function mountCursor() {
   const hy = new Float32Array(N);
   let head = 0;
   let angle = -90;        // screen degrees; -90 is nose-up
-  let idleFrames = 0;
 
-  on(window, 'pointermove', (e) => { pos.tx = e.clientX; pos.ty = e.clientY; }, { passive: true });
+  on(window, 'pointermove', (e) => {
+    pos.tx = e.clientX;
+    pos.ty = e.clientY;
+    /* Re-show the overlay if it was hidden while the pointer was outside. */
+    if (document.documentElement.dataset.cursorMode === 'custom') cursor.classList.add('is-on');
+  }, { passive: true });
+
+  /* Parked at the window edge with the pointer outside, the ship just sits
+     there looking like a stuck cursor. Hide it instead. */
+  on(document, 'pointerleave', () => cursor.classList.remove('is-on'));
   on(window, 'pointerdown', () => cursor.classList.add('is-click'));
   on(window, 'pointerup', () => cursor.classList.remove('is-click'));
 
@@ -103,11 +132,17 @@ export function mountCursor() {
     const target = node?.closest('[data-cursor-target]');
     cursor.classList.toggle('is-hover', !!t);
     cursor.classList.toggle('is-target', !!target);
-    if (label) label.textContent = target?.dataset.cursorTarget || (t?.dataset.cursor || '');
+    /* Label only from data-cursor-TARGET. The old fallback printed whatever a
+       hovered element carried in `data-cursor`, which is how the state
+       attribute on <html> ended up rendered as the word "custom" next to the
+       ship. One documented attribute, no surprises. */
+    if (label) label.textContent = target?.dataset.cursorTarget || '';
   });
 
   const tick = () => {
     requestAnimationFrame(tick);
+    /* A touch device owns the native cursor; nothing to draw or track then. */
+    if (document.documentElement.dataset.cursorMode !== 'custom') return;
     /* 45, not 15. At the old rate the ship sat tens of pixels behind the
        pointer, which is exactly why the native cursor had to stay visible and
        two cursors showed on screen at once. This tracks within a pixel or two
@@ -136,12 +171,10 @@ export function mountCursor() {
         const want = Math.atan2(dy, dx) * 180 / Math.PI + 90;
         const d = ((want - angle + 180) % 360 + 360) % 360 - 180;   // shortest way round
         angle += d * 0.25;
-        idleFrames = 0;
-      } else {
-        /* at rest, drift back to nose-up rather than freezing mid-turn */
-        idleFrames++;
-        if (idleFrames > 45) angle += (-90 - angle) * 0.05;
       }
+      /* No idle re-orientation. The ship used to drift back to nose-up after a
+         moment of stillness, which reads as the cursor moving on its own while
+         the mouse is parked. It now keeps the heading it last flew. */
       ship.style.rotate = `${angle.toFixed(2)}deg`;
     }
 

@@ -31,22 +31,109 @@ body {
 main > .section { scroll-snap-align: start; scroll-margin-top: calc(var(--topbar-h) + 18px); }
 body.vg-boot, body.vg-intro { overflow: hidden; height: 100vh; }
 /* On a pointer device the cinematic cursor is the ONLY cursor.
-   This rule used to do the opposite on purpose: the follower was eased so far
-   behind the pointer that its glow did not mark the click point, so hiding the
-   native cursor made people click beside controls — and the fix was to keep
-   the native one visible, which meant two cursors on screen at once (reported).
-   The follower now tracks within a pixel or two, and gets its flight feel from
-   a trail and from rotating into its direction of travel instead of from lag,
-   so the native cursor can be hidden safely.
-   Coarse pointers keep native behaviour: see the (pointer: coarse) block in
-   sections.css, which restores `cursor: auto` and hides the overlay. */
-body.vg-custom-cursor,
-body.vg-custom-cursor * { cursor: none; }
-/* The rule above cannot reach <html>, because that is body's PARENT and the
-   selector only walks down. Normally invisible (body paints over the whole
-   viewport), but an overscroll bounce can expose the root and bring the native
-   cursor back for a frame. `:has()` lets the root opt in from its descendant. */
-html:has(body.vg-custom-cursor) { cursor: none; }
+   Two bugs are baked into this rule's history, and both are why it looks the
+   way it does now:
+
+   1) It once did the opposite on purpose. The follower was eased so far behind
+      the pointer (damping 15) that its glow did not mark the click point, so
+      hiding the native cursor made people click beside controls, and the
+      "fix" was to leave the native one visible — two cursors on screen.
+      The follower tracks within a pixel or two now, so that is settled.
+
+   2) It used to be keyed off a `@media (pointer: coarse)` block that set
+      `cursor: auto !important` and hid the overlay. Chrome re-evaluates the
+      `pointer` media feature when the last-used input changes, so on a
+      hybrid or touchscreen laptop a touch could flip it mid-session: the
+      native cursor came back while the overlay was still drawn, and it stayed
+      that way until the feature flipped again. Reported as "if I hold it a
+      little, the PC cursor keeps coming back".
+      The state is now an ATTRIBUTE the cursor code owns and can re-check, not
+      a media query that flips behind its back.
+
+   `!important` plus pseudo-elements because `body *` cannot reach either:
+   `cursor` is inherited, so any explicit rule on a child — or on a ::before /
+   ::after — would win back a native cursor for that element. */
+html[data-cursor-mode="custom"],
+html[data-cursor-mode="custom"] body,
+html[data-cursor-mode="custom"] *,
+html[data-cursor-mode="custom"] *::before,
+html[data-cursor-mode="custom"] *::after { cursor: none !important; }
+
+/* A press-and-hold on the chrome used to begin a native text-selection drag,
+   and Chrome paints the OS cursor for the whole duration of a drag whatever
+   `cursor` says — which is the other half of "the PC cursor came back".
+   Nothing in the navigation or the controls is meant to be selectable; prose
+   stays selectable, so the science can still be copied. */
+.nav,
+.btn,
+.hud,
+.tag,
+.cam-rows,
+[data-cursor-target] { -webkit-user-select: none; user-select: none; }
+.nav a, .btn, img, svg { -webkit-user-drag: none; }
+
+/* With the cinematic cursor on, the document is not selectable.
+   Reason, and it is the last way a native cursor could still appear OVER the
+   page: a press-and-hold anywhere begins a native text-selection drag, and
+   Chrome paints the OS cursor for the whole duration of that drag whatever
+   `cursor` says. Nothing in this experience asks to be selected and the
+   science is also in docs/, so the trade is worth it — and a press-hold now
+   only ever shows the ship. Inputs stay editable. */
+html[data-cursor-mode="custom"] body,
+html[data-cursor-mode="custom"] body * { -webkit-user-select: none; user-select: none; }
+html[data-cursor-mode="custom"] input,
+html[data-cursor-mode="custom"] textarea,
+html[data-cursor-mode="custom"] select,
+html[data-cursor-mode="custom"] [contenteditable] { -webkit-user-select: text; user-select: text; }
+
+/* ── Bengali typography ───────────────────────────────────
+   Two things made the Bengali pages look wrong, and neither was the words:
+   1) The display stack is a Latin grotesque with no Bengali glyphs, so every
+      Bengali character fell back to whatever face the OS happened to pick —
+      usually a heavy one — while the Latin words beside it kept the designed
+      face. The two did not look like the same page.
+   2) The display sizes carry `letter-spacing: -.028em` and `line-height: 1.05`
+      tuned for that Latin face. Bengali has conjunct clusters that negative
+      tracking pulls into each other, and ascenders/descenders that stack above
+      and below the baseline, so tight leading makes the lines collide.
+   System faces only — nothing is fetched, so the offline guarantee holds. */
+html[lang="bn"],
+html[data-lang="bn"] {
+  --font-bn: 'Noto Sans Bengali', 'Nirmala UI', 'Vrinda', 'Kohinoor Bangla',
+             'Bangla MN', 'Shonar Bangla', 'Noto Serif Bengali', system-ui, sans-serif;
+}
+html[lang="bn"] body, html[data-lang="bn"] body,
+html[lang="bn"] p, html[data-lang="bn"] p,
+html[lang="bn"] .lede, html[data-lang="bn"] .lede,
+html[lang="bn"] .caption, html[data-lang="bn"] .caption,
+html[lang="bn"] .intro-sub, html[data-lang="bn"] .intro-sub,
+html[lang="bn"] h1, html[data-lang="bn"] h1,
+html[lang="bn"] h2, html[data-lang="bn"] h2,
+html[lang="bn"] h3, html[data-lang="bn"] h3,
+html[lang="bn"] .hero-title, html[data-lang="bn"] .hero-title,
+html[lang="bn"] .final-title, html[data-lang="bn"] .final-title {
+  font-family: var(--font-bn);
+}
+html[lang="bn"] h1, html[data-lang="bn"] h1,
+html[lang="bn"] h2, html[data-lang="bn"] h2,
+html[lang="bn"] h3, html[data-lang="bn"] h3,
+html[lang="bn"] .hero-title, html[data-lang="bn"] .hero-title,
+html[lang="bn"] .final-title, html[data-lang="bn"] .final-title,
+html[lang="bn"] .intro-sub, html[data-lang="bn"] .intro-sub {
+  letter-spacing: 0;
+  line-height: 1.35;
+  font-weight: 700;
+}
+/* Bengali is set a touch smaller than the Latin display sizes. The same
+   sentence occupies noticeably more width in a Bengali face, and the Bengali
+   hero line is authored as a full thought rather than a fragment, so at
+   --fs-h1 it ran to five lines and pushed the hero past one screen height on a
+   1440x900 laptop. Measured with the browser at 1920x1080, 1440x900 and
+   390 px wide before and after. */
+html[lang="bn"] .hero-title, html[data-lang="bn"] .hero-title {
+  font-size: calc(var(--fs-h1) * .9);
+  line-height: 1.28;
+}
 
 img, svg, canvas { display: block; max-width: 100%; }
 h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }

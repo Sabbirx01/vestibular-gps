@@ -158,7 +158,11 @@
   <section class="section sec-hero" id="sec-hero" data-journey="01 SPACE">
     <div class="hero-copy float-field">
       <p class="eyebrow float" data-float="0.9">NEURO-VESTIBULAR SPACE NAVIGATION LABORATORY</p>
-      <h1 class="hero-title float" data-float="0.6">Navigate the space between <em>motion</em>, <em>balance</em> and the <em>brain</em>.</h1>
+      <!-- data-bn: the Bengali headline is authored as a whole line, in its own
+           grammar, because the English one is split across four nodes so that
+           motion / balance / brain can be coloured. src/i18n/index.js swaps the
+           whole element when this attribute is present, on /bn only. -->
+      <h1 class="hero-title float" data-float="0.6" data-bn="মহাকাশে উঠলেই তোমার কানের ভেতরের GPS-টা দিক হারায় কেন?<span class='hero-title-sub'>উত্তরটা আছে ভেতরে — <em>গোটা ল্যাবটা ঘুরে দেখো</em>।</span>">Navigate the space between <em>motion</em>, <em>balance</em> and the <em>brain</em>.</h1>
       <p class="lede float" data-float="0.4">Your inner ear is a biological navigation instrument. It senses rotation, detects gravity, and reports to your brainstem and cerebellum in milliseconds — a system you never notice until it disagrees with what your eyes see. This is an interactive laboratory for that system, and for what happens to it when gravity changes.</p>
       <div class="cta-row float" data-float="0.3">
         <a class="btn btn-primary" href="#sec-ear"><span>ENTER THE EXPERIENCE</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>

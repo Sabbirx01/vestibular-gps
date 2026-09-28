@@ -32,7 +32,15 @@ export const QUALITY_PRESETS = {
 };
 const TIER_ORDER = ['MOBILE', 'LOW', 'MEDIUM', 'HIGH', 'ULTRA'];
 
-/* ── Initial state ──────────────────────────────────────── */
+/* ── Initial state ────────────────────────────────────────
+   `quality` here is only the value before initEnvironment() runs; the real
+   tier comes from detectQuality() below, which probes the WebGL renderer, the
+   core count, memory and the user agent, and respects a stored choice.
+   A second, simpler picker briefly existed here and was removed: a browser
+   check showed it returning MOBILE correctly at phone width while
+   initEnvironment() overwrote it back to HIGH, so the site had two answers to
+   one question. One path is enough, and the thorough one is the one that was
+   already wired in. */
 export const state = {
   booted: false,
   introDone: false,
@@ -41,7 +49,7 @@ export const state = {
   /* environment */
   mode: 'EARTH',              // EARTH | MOON | MARS | MICROGRAVITY
   source: 'SIMULATION',       // SIMULATION | LIVE_SENSOR | REPLAY
-  quality: 'HIGH',
+  quality: 'HIGH',            // replaced at boot by detectQuality()
   qualityLocked: false,
   reducedMotion: false,
   sound: false,

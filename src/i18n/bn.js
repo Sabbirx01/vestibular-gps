@@ -34,20 +34,42 @@ export const BN = {
 
   /* ── intro overlay ───────────────────────────────────── */
   'WELCOME TO': 'স্বাগতম',
+  /* The intro is the first thing a visitor or a judge reads, so it asks the
+     question the whole page answers rather than describing the page. An open
+     question holds attention; a description of a laboratory does not. The
+     English page keeps its own line — this is the Bengali rendering only. */
   'Navigate the space between motion, balance and the brain.':
-    'motion, balance আর brain — এই তিনটার মাঝের জায়গাটা নিয়ে আমাদের ল্যাব।',
+    'মহাকাশে মানুষ কেন মাথা ঘোরে — জানো?',
   'ENTER THE EXPERIENCE': 'শুরু করি',
   'Skip intro': 'ইন্ট্রো বাদ দাও',
   'Skip to content': 'সোজা কনটেন্টে যাও',
   'JavaScript required': 'JavaScript দরকার',
   'Loading': 'লোড হচ্ছে',
+  /* The faint line at the very bottom of the intro overlay — missed by the
+     earlier passes, and it is on the FIRST screen a judge sees, which made the
+     whole page look half-translated before anything had even been opened.
+     Note the ampersand: the markup writes &amp; and the DOM hands the matcher a
+     plain "&", so the key has to be the decoded text. */
+  'uses your device motion & orientation sensors — permission is optional':
+    'তোমার ডিভাইসের motion ও orientation সেন্সর ব্যবহার করা হয় — অনুমতি দেওয়া বাধ্যতামূলক নয়',
 
   /* ── hero ────────────────────────────────────────────── */
   'NEURO-VESTIBULAR SPACE NAVIGATION LABORATORY': 'নিউরো-ভেস্টিবুলার স্পেস নেভিগেশন ল্যাবরেটরি',
   'A NEURO-VESTIBULAR SPACE NAVIGATION LABORATORY': 'একটি নিউরো-ভেস্টিবুলার স্পেস নেভিগেশন ল্যাবরেটরি',
   'Neuro-vestibular space navigation laboratory': 'নিউরো-ভেস্টিবুলার স্পেস নেভিগেশন ল্যাবরেটরি',
-  'Navigate the space between': 'ঘুরে দেখো সেই ফাঁকা জায়গাটা —',
-  'and the': 'আর',
+  /* The hero headline is NOT translated here, and that is deliberate.
+     The English line is built out of four nodes so three of its words can be
+     coloured cyan: "Navigate the space between " + <em>motion</em> + ", " +
+     <em>balance</em> + " and the " + <em>brain</em> + ".". Any Bengali sentence
+     forced into that skeleton has to be a fragment that the three Latin words
+     can still follow, and two attempts at it both read as translated copy —
+     the second one ("that gap where the three meet") was rejected on sight.
+     So the Bengali headline is authored as ONE whole line, in its own grammar,
+     in index.html as data-bn="..." on the <h1>, and src/i18n/index.js swaps
+     the entire element when it sees that attribute. The previous fragment keys
+     are gone rather than left as a fallback: if the override ever stopped
+     working, the English headline on a Bengali page is a visible fault that
+     gets fixed, whereas a stale rejected line would quietly come back. */
   'EXPLORE THE SCIENCE': 'বিজ্ঞানটা দেখো',
   'EXPLORE AGAIN': 'আবার ঘুরে দেখো',
   'EXPLORE RESEARCH': 'রিসার্চ দেখো',

@@ -74,6 +74,23 @@ export function translateTree(node, dict = BN) {
       return;
     }
     if (n.nodeType !== 1) return;
+
+    /* Whole-element override, authored in the markup as data-bn="...".
+       Node-by-node matching cannot serve copy whose STRUCTURE has to differ
+       between languages, and the hero headline is exactly that: the English
+       line splits across four nodes so three words can be coloured cyan, and
+       any Bengali sentence forced into that skeleton reads like a translation
+       of someone else's grammar. Here the whole line — including its own <em>
+       highlights — is authored once, in the markup, and the English page never
+       sees it. Marked so the observer's later passes leave it alone. */
+    const whole = n.getAttribute && n.getAttribute('data-bn');
+    if (whole && isBn && !n.__bnApplied) {
+      n.__bnApplied = true;
+      n.innerHTML = whole;
+      hits++;
+      return;
+    }
+
     for (const a of ATTRS) {
       const v = n.getAttribute && n.getAttribute(a);
       if (v && dict[v] && dict[v] !== v) { n.setAttribute(a, dict[v]); hits++; }
@@ -96,11 +113,26 @@ export function installTranslator({ root = document.body, dict = BN } = {}) {
   const hits = translateTree(root, dict);
   let nodes = 0;
 
+  /* Batched, not per-mutation. The earlier version walked the subtree inside
+     the observer callback, and this page rewrites numbers every frame — the
+     HUD, the camera rows at ~18 Hz, the console — so on the Bengali page every
+     one of those writes triggered a synchronous walk. That is exactly the kind
+     of cost that shows up on a low-end device and nowhere else. Collect the
+     dirty nodes and sweep once per frame instead; a Set also collapses a node
+     that changed several times in the same frame. */
+  const pending = new Set();
+  let scheduled = false;
+  const flush = () => {
+    scheduled = false;
+    for (const n of pending) nodes += translateTree(n, dict);
+    pending.clear();
+  };
   const observer = new MutationObserver((muts) => {
     for (const m of muts) {
-      if (m.type === 'characterData') { nodes += translateTree(m.target, dict); continue; }
-      for (const n of m.addedNodes) nodes += translateTree(n, dict);
+      if (m.type === 'characterData') pending.add(m.target);
+      else for (const n of m.addedNodes) pending.add(n);
     }
+    if (!scheduled && pending.size) { scheduled = true; requestAnimationFrame(flush); }
   });
   observer.observe(root, { childList: true, subtree: true, characterData: true });
 
