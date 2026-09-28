@@ -17,7 +17,7 @@ import { damp, clamp } from '../core/util.js';
 
 /* ── Section → camera framing ───────────────────────────── */
 const FRAMING = {
-  'sec-hero':       { focus: 'wide',     dist: 12.5, height: 1.0, look: 0.6, offset: [0.35, -0.15], env: 1.0 },
+  'sec-hero':       { focus: 'wide',     dist: 12.5, height: 1.0, look: 1.0, offset: [0.0, 0.0], env: 1.0 },
   /* offset shifts the look-at target so the subject lands in the open right-hand
      column instead of centred behind the panel grid */
   'sec-body':       { focus: 'subject',  dist: 4.6,  height: 1.55, look: 1.15, offset: [-1.75, 0.15], env: 0.42 },
@@ -38,7 +38,9 @@ const FRAMING = {
   /* Earth reference sits below the astronaut in the hero composition. The
      active planet is a gravity reference, not a floating bubble beside the
      helmet. */
-const SOLAR_POS = [1.55, -2.05, 0.15];
+/* Distant background reference: the planet should sit behind the astronaut,
+   never become a foreground globe competing with the hero subject. */
+const SOLAR_POS = [1.55, -1.35, -8.8];
 
 /* Which 3D layers are drawn in which section. Solar bodies are hidden on text-heavy
    sections so a planet can never end up sitting on top of a paragraph. */
@@ -294,7 +296,9 @@ export class SceneManager {
     /* ── camera framing per section ── */
     const f = this.framing || FRAMING['sec-hero'];
     const mobile = innerWidth <= 720;
-    const mobilePlanet = mobile && (this._section === 'sec-hero' || this._section === 'sec-space');
+    /* Mobile keeps the same subject-first composition; it must not retarget
+       the camera to the distant planet and push the astronaut off-screen. */
+    const mobilePlanet = false;
     const k = this.framingInstant ? 40 : 2.0;
     this.framingInstant = false;
 

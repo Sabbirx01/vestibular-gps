@@ -51,9 +51,9 @@ export class SolarSystem {
       mat.emissive = new THREE.Color(0xffffff);
       mat.emissiveIntensity = 0.42;
     }
-    /* Foreground showcase body: the planet must read as a real object in front
-       of the starfield, not as a faint background dot. */
-    const showcaseRadius = spec.radius * 1.55;
+    /* Background reference body: keep the procedural texture and atmosphere,
+       but do not let the planet dominate the astronaut composition. */
+    const showcaseRadius = spec.radius * 0.82;
     const surface = new THREE.Mesh(new THREE.SphereGeometry(showcaseRadius, seg, seg / 2), mat);
     surface.rotation.z = spec.tilt;
     grp.add(surface);

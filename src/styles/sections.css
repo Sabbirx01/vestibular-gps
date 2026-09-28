@@ -205,7 +205,8 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
   .nav.is-open a { padding: 12px 14px; font-size: var(--fs-xs); }
   .hud { display: none; }
   .sec-hero { grid-template-columns: minmax(0,1fr); min-height: auto; }
-  /* Keep the foreground 3D planet visible below the hero copy on tablets. */
+  /* Preserve a visible 3D hero subject on tablets without promoting the
+     distant planet into the foreground. */
   .sec-hero .hero-stage { min-height: 330px; }
   .hero-specs { grid-template-columns: repeat(2, 1fr); }
   .footer { padding-inline: var(--sp-4); }
