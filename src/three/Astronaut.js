@@ -200,6 +200,11 @@ export class FloatingAstronaut {
       dressMaterials(model);
 
       const carrier = normalizeModel(model, { targetSize: 1.86, dropToFloor: false });
+      /* The downloaded GLB node carries a +90° X correction from its Blender
+         export. It is already baked into the cloned model; applying it again
+         at the carrier level is what made the suit appear upside-down. Keep
+         the model's vertical axis and only correct its measured front yaw. */
+      carrier.rotation.set(0, 0, 0);
       carrier.position.y = 0.02;
 
       this.body.visible = false;
@@ -217,6 +222,7 @@ export class FloatingAstronaut {
       carrier.rotation.y = this.assetFront < 0 ? Math.PI : 0;
       carrier.rotation.x = 0;
       carrier.rotation.z = 0;
+      carrier.updateMatrixWorld(true);
 
       /* Three-point rig. The earlier single dim point light left the lower
          legs and boots merging into the starfield. */
@@ -539,6 +545,9 @@ export class MeasurementSubject {
       dressMaterials(model);
 
       const carrier = normalizeModel(model, { targetSize: 2.0, dropToFloor: true });
+      /* Preserve the asset's authored upright axis; apply only the measured
+         front correction below. Never rotate the suit around X/Z here. */
+      carrier.rotation.set(0, 0, 0);
 
       this.body.visible = false;
       this.realBody = carrier;
@@ -548,6 +557,7 @@ export class MeasurementSubject {
          the camera. Apply the correction once here; update() must never add a
          second yaw that can turn the suit sideways or upside down. */
       carrier.rotation.set(0, this.suitDetail.front < 0 ? Math.PI : 0, 0);
+      carrier.updateMatrixWorld(true);
 
       const b = boundsOf(carrier);
       this.realMetrics = {

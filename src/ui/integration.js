@@ -257,8 +257,11 @@ export function mountIntegrationSection({ camera } = {}) {
       ),
     );
 
-    const cv = el('canvas', { class: 'cam-preview', width: '240', height: '180' });
-    const video = el('video', { class: 'cam-video', autoplay: true, muted: true, playsinline: true });
+    /* The video is the full-resolution user preview. The separate canvas is
+       explicitly marked as the low-resolution analysis buffer so it is never
+       mistaken for the camera image. */
+    const cv = el('canvas', { class: 'cam-preview', width: '320', height: '240', 'aria-label': 'Low-resolution analysis buffer' });
+    const video = el('video', { class: 'cam-video', autoplay: true, muted: true, playsinline: true, 'aria-label': 'Live camera preview' });
 
     const calState = !c ? 'NOT STARTED' : c.calibrating ? `CALIBRATING ${Math.round((c.calProgress || 0) * 100)}%` : c.calibrated ? 'CALIBRATED' : 'NOT CALIBRATED — HOLD-STILL FLOOR NOT MEASURED';
     const calColour = !c ? 'info' : c.calibrating ? 'warn' : c.calibrated ? 'ok' : 'warn';
@@ -269,7 +272,7 @@ export function mountIntegrationSection({ camera } = {}) {
         row('STATUS', c ? String(c.status).toUpperCase() : 'NOT STARTED'),
         row('SECURE CONTEXT', window.isSecureContext ? 'YES' : 'NO — CAMERA BLOCKED'),
         row('SAMPLES', c ? String(c.samples) : '0'),
-        row('ANALYSIS RATE', c ? `${c.hz?.avg ? c.hz.avg.toFixed(1) : '—'} Hz` : '—'),
+        row('ANALYSIS RATE', c ? `${c.hz?.mean ? c.hz.mean().toFixed(1) : '—'} Hz` : '—'),
         row('MOTION ENERGY (ABOVE FLOOR)', c ? Math.max(0, c.motionEnergy - (c.noiseFloor?.energy ?? 0)).toFixed(4) : '—'),
         row('JITTER (ABOVE FLOOR)', c ? Math.max(0, c.jitter - (c.noiseFloor?.jitter ?? 0)).toFixed(4) : '—'),
       ),
@@ -288,6 +291,9 @@ export function mountIntegrationSection({ camera } = {}) {
             e.target.textContent = ok ? 'CAMERA RUNNING' : 'RETRY CAMERA SCAN';
             if (ok) S.camera.attachPreview(video);
             render();
+            /* render() creates the current video element; attach once more after
+               the DOM replacement rather than retaining the discarded node. */
+            queueMicrotask(() => S.camera?.attachPreview(root.querySelector('.cam-video')));
           },
         }),
         el('button', {
@@ -301,6 +307,7 @@ export function mountIntegrationSection({ camera } = {}) {
             e.target.disabled = false;
             toast('CALIBRATED', 'This camera\'s idle noise floor is now subtracted from every reading, so what reaches the index is motion above the device\'s own noise.', 'ok', 6000);
             render();
+            queueMicrotask(() => S.camera?.attachPreview(root.querySelector('.cam-video')));
           },
         }),
         el('button', {
@@ -313,23 +320,36 @@ export function mountIntegrationSection({ camera } = {}) {
       el('p', { class: 'caption', text: 'Why not a landmark model: MediaPipe Face Mesh is roughly 3 MB of model plus WASM from a CDN, which would break the offline guarantee this project is built on. A landmark model is a documented upgrade path — the provider interface accepts one unchanged.' }),
     );
 
+    /* Re-rendering this panel must not detach a live stream from the new video
+       element. The old implementation attached once, then replaceChildren()
+       discarded that element; the following render showed an empty/poor view. */
+    if (c?.stream) {
+      c.attachPreview(video);
+      video.play?.().catch(() => {});
+    }
+
     /* draw the live processing view so the pipeline is visible, not asserted */
     const g = cv.getContext('2d');
     const draw = () => {
       requestAnimationFrame(draw);
       if (!c || !c.running || !c.canvas) { return; }
-      g.clearRect(0, 0, 240, 180);
-      g.imageSmoothingEnabled = false;
-      /* the actual 64x48 buffer the estimator works on, magnified */
-      g.drawImage(c.canvas, 0, 0, 240, 180);
+      const pw = cv.width;
+      const ph = cv.height;
+      g.clearRect(0, 0, pw, ph);
+      /* The analysis view is intentionally smooth and labelled; pixelated
+         nearest-neighbour scaling made the whole camera panel look broken. */
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(c.canvas, 0, 0, pw, ph);
       g.strokeStyle = 'rgba(95,227,255,0.85)';
       g.lineWidth = 1;
-      const vx = 120 + c.dx * 6, vy = 90 + c.dy * 6;
-      g.beginPath(); g.moveTo(120, 90); g.lineTo(vx, vy); g.stroke();
-      g.beginPath(); g.arc(120, 90, 3, 0, Math.PI * 2); g.fillStyle = '#5fe3ff'; g.fill();
+      const cx = pw / 2, cy = ph / 2;
+      const vx = cx + c.dx * 6, vy = cy + c.dy * 6;
+      g.beginPath(); g.moveTo(cx, cy); g.lineTo(vx, vy); g.stroke();
+      g.beginPath(); g.arc(cx, cy, 3, 0, Math.PI * 2); g.fillStyle = '#5fe3ff'; g.fill();
       g.fillStyle = 'rgba(95,227,255,0.9)';
       g.font = '10px ui-monospace, monospace';
-      g.fillText(`dx ${c.dx}  dy ${c.dy}`, 8, 172);
+      g.fillText(`ANALYSIS BUFFER · ${c.canvas.width}×${c.canvas.height} · dx ${c.dx} dy ${c.dy}`, 8, ph - 8);
     };
     draw();
 

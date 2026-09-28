@@ -291,7 +291,11 @@ export class SceneManager {
     const k = this.framingInstant ? 40 : 2.0;
     this.framingInstant = false;
 
-    const orbit = s.reducedMotion ? 0 : Math.sin(this.t * 0.075) * 0.5;
+    /* Keep the astronaut upright relative to the viewport. The previous
+       autonomous camera orbit made the suit appear to turn toward Earth even
+       when the user had not interacted. Any intentional motion now comes from
+       pointer/sensor input, not a hidden cinematic orbit. */
+    const orbit = 0;
     const targetDist = f.dist;
     const targetHeight = f.height;
 

@@ -302,8 +302,10 @@
   object-fit: cover;
   display: block;
 }
-.cam-video { transform: scaleX(-1); opacity: 0.42; }
-.cam-preview { image-rendering: pixelated; }
+.cam-video { transform: scaleX(-1); opacity: 0.96; background: #050b18; }
+/* The preview must look like a normal camera, not a magnified processing
+   buffer. The analysis canvas remains a separate, softly upscaled diagnostic. */
+.cam-preview { image-rendering: auto; opacity: 0.82; }
 
 .cam-rows { display: grid; gap: 1px; margin-top: var(--sp-3); background: var(--line); border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
 .cam-row { display: flex; justify-content: space-between; gap: 14px; padding: 10px 14px; background: var(--panel-solid); font-size: var(--fs-sm); }

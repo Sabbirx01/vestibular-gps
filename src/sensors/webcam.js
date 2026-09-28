@@ -158,7 +158,14 @@ export class CameraProvider extends SensorProvider {
 
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
+        /* Request a real preview resolution. The estimator still downsamples
+           internally, but the user-facing preview must not be a 64x48 mosaic. */
+        video: {
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 360 },
+          frameRate: { ideal: 30, max: 30 },
+          facingMode: 'user',
+        },
         audio: false,
       });
     } catch (err) {
@@ -227,8 +234,18 @@ export class CameraProvider extends SensorProvider {
   attachPreview(videoEl) {
     this.previewEl = videoEl;
     if (this.stream && videoEl) {
-      videoEl.srcObject = this.stream;
+      /* Re-rendering the integration panel replaces the old <video>. Always
+         reattach the live stream, wait for metadata, then explicitly play so
+         the preview cannot remain HAVE_NOTHING with a null srcObject. */
+      if (videoEl.srcObject !== this.stream) videoEl.srcObject = this.stream;
+      videoEl.autoplay = true;
+      videoEl.muted = true;
+      videoEl.playsInline = true;
       videoEl.classList.add('is-on');
+      const play = () => videoEl.play?.().catch(() => {});
+      if (videoEl.readyState >= 1) play();
+      else videoEl.addEventListener('loadedmetadata', play, { once: true });
+      queueMicrotask(play);
     }
   }
 
@@ -355,7 +372,7 @@ export class CameraProvider extends SensorProvider {
       eyeHead: +(4.5 - jitterClean * 1.6 + travelDeg * 0.35).toFixed(2),
       lateral: +((this.centroidX - 0.5) * 40).toFixed(2),
       vertical: +((this.centroidY - 0.5) * 40).toFixed(2),
-      rateHz: +this.hz.avg.toFixed(1),
+      rateHz: +this.hz.mean().toFixed(1),
       /* Quality reflects both sample maturity and calibration state: an
          uncalibrated stream is reporting against the conservative default
          floor, not this device's actual noise, so it is marked down. */
