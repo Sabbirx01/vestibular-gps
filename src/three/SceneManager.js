@@ -9,14 +9,11 @@ import * as THREE from '../../vendor/three.module.js';
 import { SpaceEnvironment } from './SpaceEnvironment.js';
 import { FloatingAstronaut, MeasurementSubject } from './Astronaut.js';
 import { SolarSystem } from './SolarSystem.js';
-import { InnerEar } from './InnerEar.js';
-import { BrainModel } from './BrainModel.js';
-import { PAL } from './materials.js';
 import { applyStudioLighting } from './environment.js';
 import {
   state, set, bus, showError, QUALITY_PRESETS, stepQuality, toast,
 } from '../core/store.js';
-import { damp, clamp, lerp, TAU } from '../core/util.js';
+import { damp, clamp } from '../core/util.js';
 
 /* ── Section → camera framing ───────────────────────────── */
 const FRAMING = {
@@ -164,11 +161,13 @@ export class SceneManager {
          under the boots, so it is dropped to balance the composition. */
       this.astronaut.root.position.set(2.05, -0.5, 2.05);
       this.astronaut.root.scale.setScalar(2.75);
-      this.astronaut.root.rotation.z = 0.22;
+      /* Straight-on entrance pose. The astronaut may respond to pointer input
+         after its own settle window, but it must not arrive tilted. */
+      this.astronaut.root.rotation.set(0, 0, 0);
       this.scene.add(this.astronaut.root);
-      /* Swap in the real NASA asset asynchronously. The procedural figure
-         renders immediately and is replaced the moment the GLB is parsed, so
-         a slow or failed download can never leave an empty scene. */
+       /* Swap in the real NASA asset asynchronously. The fallback is now a
+          straight-on EVA suit with no bubble and no autonomous spin, so a slow
+          GLB parse never exposes a sideways cartoon to a judge. */
       this.astronaut.loadReal().then((ok) => {
         if (ok) console.info('[SceneManager] NASA suit asset active', this.astronaut.realMetrics);
       });

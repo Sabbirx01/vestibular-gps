@@ -50,9 +50,41 @@ class NoStoreHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         self.send_header("Pragma", "no-cache")
         self.send_header("Expires", "0")
+        # Never let a browser guess a type from content when the extension is
+        # ambiguous; a .js served as text/html is a scripting vector.
+        self.send_header("X-Content-Type-Options", "nosniff")
         # Needed if you ever want to expose device sensors over a LAN address.
         self.send_header("Permissions-Policy", "accelerometer=(self), gyroscope=(self), magnetometer=(self), geolocation=(self)")
         super().end_headers()
+
+    # ── What is NOT served ────────────────────────────────────────────────
+    # `python serve.py <port> 0.0.0.0` is documented for phone testing, which
+    # puts this whole folder on the local network. Without the two guards below
+    # that also published .git/ (full history), tests/, .env.example and the
+    # scratch *_chk.txt files. None of them are needed to run the page, so they
+    # are refused outright. Consequence: docs/_source-check.txt is a `_` file
+    # and is therefore not reachable over HTTP either — it is a local artefact.
+    BLOCKED_DIRS = ("tests",)
+
+    def _is_blocked(self, path: str) -> bool:
+        rel = os.path.relpath(path, ROOT).replace("\\", "/")
+        if rel in (".", ""):
+            return False
+        parts = [p for p in rel.split("/") if p]
+        if parts and parts[0] in self.BLOCKED_DIRS:
+            return True
+        return any(p.startswith(".") or p.startswith("_") for p in parts)
+
+    def send_head(self):
+        if self._is_blocked(self.translate_path(self.path)):
+            self.send_error(403, "Not served by the development server")
+            return None
+        return super().send_head()
+
+    def list_directory(self, path):
+        # A directory listing turns one guessed URL into the whole file tree.
+        self.send_error(403, "Directory listing is disabled")
+        return None
 
     def log_message(self, fmt, *args):
         # Quieter logging: only report non-200 responses.

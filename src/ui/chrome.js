@@ -63,10 +63,9 @@ export function mountCursor() {
   const cursor = $('#cursor');
   const label = $('#cursorLabel');
   if (!cursor) return;
+  /* Touch devices keep their native cursor; the custom one only makes sense
+     with a pointer. (This check used to appear twice.) */
   if (matchMedia('(pointer: coarse)').matches) return;
-
-  const isTouch = matchMedia('(pointer: coarse)').matches;
-  if (isTouch) return;
 
   document.body.classList.add('vg-custom-cursor');
   cursor.classList.add('is-on');
@@ -79,8 +78,12 @@ export function mountCursor() {
   on(window, 'pointerup', () => { down = false; cursor.classList.remove('is-click'); });
 
   on(document, 'pointerover', (e) => {
-    const t = e.target.closest('a, button, [data-cursor], input, summary');
-    const target = e.target.closest('[data-cursor-target]');
+    /* PointerEvent targets can be non-Element nodes in synthetic events. A
+       failed `.closest()` here used to stop cursor state updates and made the
+       native hit target feel offset/unreliable. */
+    const node = e.target instanceof Element ? e.target : null;
+    const t = node?.closest('a, button, [data-cursor], input, summary');
+    const target = node?.closest('[data-cursor-target]');
     cursor.classList.toggle('is-hover', !!t);
     cursor.classList.toggle('is-target', !!target);
     label.textContent = target?.dataset.cursorTarget || (t?.dataset.cursor || '');
@@ -90,6 +93,8 @@ export function mountCursor() {
     requestAnimationFrame(tick);
     pos.x = damp(pos.x, pos.tx, 15, 1 / 60);
     pos.y = damp(pos.y, pos.ty, 15, 1 / 60);
+    /* The overlay is visual only (`pointer-events:none`); keep its centre on
+       the actual pointer so the glow never suggests a different click point. */
     cursor.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`;
   };
   tick();
@@ -429,7 +434,11 @@ export function mountDebug({ hub }) {
 export function mountQualityControl() {
   /* Keyboard escape hatch for constrained devices: Q cycles quality. */
   on(window, 'keydown', (e) => {
-    if (e.target.matches('input, textarea')) return;
+    /* e.target is not guaranteed to be an Element: a keydown delivered to
+       window or document has no .matches(), and calling it threw a
+       TypeError that aborted the handler before the Q shortcut ran. */
+    const t = e.target;
+    if (t && typeof t.matches === 'function' && t.matches('input, textarea')) return;
     if (e.key === 'q' || e.key === 'Q') {
       const order = ['MOBILE', 'LOW', 'MEDIUM', 'HIGH', 'ULTRA'];
       const i = order.indexOf(state.quality);

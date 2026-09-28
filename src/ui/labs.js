@@ -98,7 +98,14 @@ export function mountSubjectSection() {
    ═══════════════════════════════════════════════════════════ */
 export function mountEarSection() {
   const stage = new MiniStage($('#earCanvas'), {
-    distance: 3.2,
+    /* The previous 3.2 distance left the anatomy occupying only a small island
+       in the canvas. This viewport is the explanatory hero: bring the organ
+       forward while leaving enough air for labels and orbit. */
+    distance: 2.55,
+    minDist: 1.75,
+    maxDist: 4.5,
+    targetY: -0.08,
+    minY: -0.35,
     build: () => new InnerEar({
       quality: { particles: 900, astronautDetail: 'high' },
       onSelect: (id) => { if (id) showStructure(id); },
@@ -236,10 +243,33 @@ export function mountBrainSection() {
   });
   stage.current = stage.content;
 
-  /* Replace the stylised hemispheres with the real NIH 3D brain mesh. */
-  stage.current?.loadReal?.().then((ok) => {
-    if (ok && badge) badge.textContent = 'NIH 3D BRAIN ASSET · SELECT A PATHWAY';
-  });
+  /* PERFORMANCE: the NIH brain asset is a 12.8 MB GLB — by far the heaviest
+     download on the whole site. Fetching it during boot (as the previous
+     version did) meant every visitor paid that cost immediately, even if
+     they never scrolled to the Brain section. Instead, load it only once
+     the section is actually approaching the viewport: rootMargin gives it
+     a head start so the swap is ready by the time it is fully visible,
+     without blocking first paint or the boot sequence. On any failure the
+     stylised procedural hemispheres simply stay — never a blank viewport. */
+  let brainLoadStarted = false;
+  const startBrainLoad = () => {
+    if (brainLoadStarted) return;
+    brainLoadStarted = true;
+    stage.current?.loadReal?.().then((ok) => {
+      if (ok && badge) badge.textContent = 'NIH 3D BRAIN ASSET · SELECT A PATHWAY';
+    });
+  };
+  const brainSection = document.getElementById('sec-brain');
+  if (brainSection && typeof IntersectionObserver !== 'undefined') {
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { startBrainLoad(); io.disconnect(); }
+    }, { rootMargin: '600px 0px' });
+    io.observe(brainSection);
+  } else {
+    /* No IntersectionObserver support — fall back to the old eager behaviour
+       rather than never loading the real asset at all. */
+    startBrainLoad();
+  }
 
   const list = $('#brainList');
   const kv = $('#brainKv');
@@ -350,13 +380,49 @@ export function mountVorSection() {
     /* redraw the reflex diagram */
     const { ctx, w: cw, h: ch } = fitCanvas(canvas, { maxDpr: 2 });
     ctx.clearRect(0, 0, cw, ch);
-    const cx = cw * 0.34, cy = ch * 0.52, R = Math.min(cw, ch) * 0.19;
+    const cx = cw * 0.33, cy = ch * 0.53, R = Math.min(cw, ch) * 0.205;
     const reduced = state.reducedMotion;
 
     const accent = cssVar('--cyan') || '#5fe3ff';
     const faint = cssVar('--faint') || '#647a99';
     const muted = cssVar('--muted') || '#8ba0c0';
+    const violet = cssVar('--violet') || '#a877ff';
+    const green = cssVar('--green') || '#4ade80';
+    const amber = cssVar('--amber') || '#ffb547';
     const hair = (headAngle * Math.PI) / 180;
+
+    /* Instrument glass: layered vignette, scanline and a calibrated reticle
+       establish depth before the anatomy is drawn. This keeps the canvas from
+       looking like a flat illustration on an empty navy rectangle. */
+    const bg = ctx.createRadialGradient(cw * 0.34, ch * 0.46, 0, cw * 0.34, ch * 0.46, Math.max(cw, ch) * 0.72);
+    bg.addColorStop(0, 'rgba(33,67,111,0.30)');
+    bg.addColorStop(0.48, 'rgba(9,22,44,0.16)');
+    bg.addColorStop(1, 'rgba(2,6,15,0.88)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, cw, ch);
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(116,168,224,0.055)';
+    ctx.lineWidth = 1;
+    const gridStep = Math.max(26, Math.round(cw / 22));
+    for (let x = 0; x <= cw; x += gridStep) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ch); ctx.stroke(); }
+    for (let y = 0; y <= ch; y += gridStep) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(95,227,255,0.028)';
+    for (let y = 0; y < ch; y += 4) ctx.fillRect(0, y, cw, 1);
+    ctx.restore();
+
+    /* Scope frame and corner brackets. */
+    ctx.save();
+    ctx.strokeStyle = 'rgba(137,184,230,0.22)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(12, 12, cw - 24, ch - 24);
+    const bracket = 16;
+    ctx.strokeStyle = 'rgba(95,227,255,0.65)';
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+      const x = sx < 0 ? 12 : cw - 12, y = sy < 0 ? 12 : ch - 12;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - sx * bracket, y); ctx.moveTo(x, y); ctx.lineTo(x, y - sy * bracket); ctx.stroke();
+    }
+    ctx.restore();
     const headYaw = reduced ? 0 : hair * 0.42;
 
     /* World-fixed target. Kept inside the field and on the gaze ray, clear of
@@ -403,18 +469,33 @@ export function mountVorSection() {
     ctx.translate(cx, cy);
     ctx.rotate(headYaw);
 
+    /* Soft volumetric cranial shadow: the layered edge and specular crescent
+       make the skull read as a translucent anatomical subject, not a flat
+       oval. */
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.72)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 9;
+    ctx.beginPath(); ctx.ellipse(0, 0, R * 1.16, R, 0, 0, TAU); ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fill();
+    ctx.restore();
+
     /* cranium: slightly egg-shaped, wider at the back, tapering to the nose */
-    const grad = ctx.createLinearGradient(-R * 1.2, -R, R * 1.2, R);
-    grad.addColorStop(0, 'rgba(150,180,220,0.20)');
-    grad.addColorStop(0.55, 'rgba(120,150,190,0.10)');
-    grad.addColorStop(1, 'rgba(90,120,165,0.16)');
+    const grad = ctx.createRadialGradient(-R * 0.28, -R * 0.34, R * 0.12, 0, 0, R * 1.35);
+    grad.addColorStop(0, 'rgba(203,228,252,0.36)');
+    grad.addColorStop(0.36, 'rgba(113,160,208,0.19)');
+    grad.addColorStop(0.76, 'rgba(38,70,117,0.20)');
+    grad.addColorStop(1, 'rgba(8,20,40,0.62)');
     ctx.fillStyle = grad;
-    ctx.strokeStyle = cssVar('--line-strong') || 'rgba(122,170,220,.3)';
-    ctx.lineWidth = 1.3;
+    ctx.strokeStyle = 'rgba(154,201,244,0.62)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.ellipse(0, 0, R * 1.16, R, 0, 0, TAU); ctx.fill(); ctx.stroke();
 
+    /* Specular cranial crescent and a second contour line. */
+    ctx.beginPath(); ctx.ellipse(-R * 0.2, -R * 0.2, R * 0.87, R * 0.72, -0.35, Math.PI * 1.06, Math.PI * 1.75); ctx.strokeStyle = 'rgba(224,244,255,0.42)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, 0, R * 1.05, R * 0.9, 0, 0, TAU); ctx.strokeStyle = 'rgba(110,167,222,0.22)'; ctx.lineWidth = 1; ctx.stroke();
+
     /* posterior skull emphasis — a small occipital bulge */
-    ctx.beginPath(); ctx.ellipse(-R * 0.72, 0, R * 0.42, R * 0.72, 0, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-R * 0.72, 0, R * 0.42, R * 0.72, 0, 0, TAU); ctx.strokeStyle = 'rgba(129,180,229,0.44)'; ctx.lineWidth = 1; ctx.stroke();
 
     /* Mid-sagittal axis — runs front-to-back, straight through the nose. */
     ctx.strokeStyle = 'rgba(232,240,255,0.26)';
@@ -456,6 +537,16 @@ export function mountVorSection() {
 
     /* ── eyes: sclera, iris, pupil, corneal catch-light, gaze vector ── */
     const eyeOffset = reduced ? 0 : -hair * 0.42 * ctl.gain;
+    /* eye-line and gaze cone: a subtle field of view makes the eye/head
+       relationship legible before the tiny iris details are inspected. */
+    ctx.save();
+    ctx.strokeStyle = `rgba(95,227,255,${clamp(0.10 + ctl.gain * 0.12, 0.1, 0.24)})`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 5]);
+    ctx.beginPath(); ctx.moveTo(R * 0.38, -R * 0.46); ctx.lineTo(ttx - cx, tty - cy - R * 0.12); ctx.moveTo(R * 0.38, R * 0.46); ctx.lineTo(ttx - cx, tty - cy + R * 0.12); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
     for (const s of [-1, 1]) {
       ctx.save();
       ctx.translate(R * 0.42, s * R * 0.44);
@@ -537,12 +628,23 @@ export function mountVorSection() {
 
     /* ── world-fixed target: concentric reticle that reacts to slip ── */
     const ringPulse = 1 + Math.sin(t * 6) * 0.06;
-    ctx.strokeStyle = slip > 0.4
-      ? `rgba(255,95,109,${clamp(0.5 + slip * 0.5, 0.5, 1)})`
-      : 'rgba(74,222,128,0.75)';
-    ctx.lineWidth = 1.1;
-    ctx.beginPath(); ctx.arc(ttx, tty, 15 * ringPulse, 0, TAU); ctx.stroke();
-    ctx.beginPath(); ctx.arc(ttx, tty, 5.5, 0, TAU); ctx.stroke();
+    const targetGood = slip < 0.15;
+    const targetCol = targetGood ? green : slip < 0.4 ? amber : '#ff5f6d';
+    /* target glow */
+    ctx.save();
+    ctx.shadowColor = targetCol;
+    ctx.shadowBlur = targetGood ? 18 : 10;
+    ctx.strokeStyle = targetCol;
+    ctx.globalAlpha = 0.26;
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(ttx, tty, 17 * ringPulse, 0, TAU); ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = targetCol;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(ttx, tty, 17 * ringPulse, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ttx, tty, 6.5, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ttx, tty, 28, 0.2, 1.15); ctx.strokeStyle = 'rgba(154,201,244,0.55)'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(ttx, tty, 28, Math.PI + 0.2, Math.PI + 1.15); ctx.stroke();
 
     ctx.strokeStyle = cssVar('--faint') || '#647a99';
     ctx.beginPath();
@@ -567,22 +669,27 @@ export function mountVorSection() {
     ctx.fillStyle = faint;
     ctx.font = '11px ui-monospace, monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('HEAD + EYES — PLAN VIEW', 12, 16);
+    ctx.fillText('VESTIBULO-OCULAR REFLEX / LIVE TRACK', 28, 32);
     ctx.fillStyle = muted;
-    ctx.fillText('HEAD YAW', 12, 30);
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.fillText('SUPERIOR AXIAL VIEW  ·  CALIBRATED FIELD', 28, 48);
     ctx.fillStyle = accent;
     ctx.font = '13px ui-monospace, monospace';
-    ctx.fillText(`${headAngle.toFixed(1)}°`, 12, 46);
+    ctx.fillText(`HEAD YAW  ${headAngle.toFixed(1)}°`, 28, 68);
+    ctx.fillStyle = targetCol;
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.fillText(targetGood ? 'LOCK  /  STABLE' : slip < 0.4 ? 'LOCK  /  DEGRADED' : 'LOCK  /  LOST', ttx - 34, tty + 45);
 
     ctx.textAlign = 'right';
     ctx.font = '11px ui-monospace, monospace';
     ctx.fillStyle = faint;
-    ctx.fillText('WORLD-FIXED TARGET', cw - 12, 16);
+    ctx.fillText('WORLD-FIXED TARGET', cw - 28, 32);
     ctx.fillStyle = muted;
-    ctx.fillText('GAZE ERROR', cw - 12, 30);
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.fillText('GAZE ERROR / RETINAL SLIP', cw - 28, 48);
     ctx.font = '13px ui-monospace, monospace';
     ctx.fillStyle = slip > 0.4 ? 'rgba(255,95,109,0.95)' : accent;
-    ctx.fillText(`${gazeError.toFixed(2)}°`, cw - 12, 46);
+    ctx.fillText(`${gazeError.toFixed(2)}°  /  ${(slip * 100).toFixed(0)}%`, cw - 28, 68);
 
     ctx.font = '11px ui-monospace, monospace';
     ctx.fillStyle = faint;
@@ -594,8 +701,15 @@ export function mountVorSection() {
       ctx.fillStyle = `rgba(255,95,109,${clamp(slip, 0, 0.9)})`;
       ctx.textAlign = 'center';
       ctx.font = '10px ui-monospace, monospace';
-      ctx.fillText('RETINAL SLIP — IMAGE WOULD SMEAR', cx, ch - 14);
+      ctx.fillText('RETINAL SLIP — IMAGE WOULD SMEAR', cx, ch - 18);
     }
+
+    /* tiny calibration legend, kept separate from the anatomy */
+    ctx.textAlign = 'left';
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.fillStyle = accent; ctx.fillRect(28, ch - 42, 18, 2); ctx.fillText('HEAD VELOCITY', 54, ch - 38);
+    ctx.fillStyle = violet; ctx.fillRect(166, ch - 42, 18, 2); ctx.fillText('EYE VELOCITY', 192, ch - 38);
+    ctx.fillStyle = targetCol; ctx.fillRect(294, ch - 42, 18, 2); ctx.fillText('TARGET LOCK', 320, ch - 38);
 
     /* metrics */
     if (badge) badge.textContent = `GAIN ${ctl.gain.toFixed(2)}`;
@@ -661,6 +775,10 @@ export function mountLabSection() {
   let running = false;
   let test = null;
   const rng = mulberry32(1337);
+  /* Reaction time from lab test 04, surfaced so the Mission Console can score
+     its task-performance domain. Stays null until the test records a trial,
+     and the console then reports the domain as unavailable rather than 0. */
+  let lastReactionMs = null;
   const ctx2d = () => fitCanvas(canvas, { maxDpr: 2 });
 
   const cards = new Map();
@@ -733,7 +851,10 @@ export function mountLabSection() {
   });
 
   select('orientation');
-  return { select };
+  /* getReactionMs is consumed by the Mission Console (see main.js) to score
+     its task-performance domain. It was advertised but never exported, so
+     that domain reported "no signal" on every run. */
+  return { select, getReactionMs: () => lastReactionMs };
 
   /* ── test factories ─────────────────────────────────── */
   function makeTest(id) {
@@ -950,12 +1071,17 @@ export function mountLabSection() {
         if (!awaiting || !keys[e.key]) return;
         e.preventDefault();
         const ok = keys[e.key] === current.dir;
+        /* Read the direction BEFORE clearing `current` — the toast used to
+           test `current?.dir` after the assignment below, so it always fell
+           back to the word "different" and never named the actual cue. */
+        const cue = current.dir;
         const rt = performance.now() - startedAt;
         rts.push(rt);
-        trials.push({ dir: current.dir, said: keys[e.key], ok, rt });
+        lastReactionMs = rt;
+        trials.push({ dir: cue, said: keys[e.key], ok, rt });
         awaiting = false;
         current = null;
-        toast(ok ? 'CORRECT' : 'INCORRECT', `${rt.toFixed(0)} ms response. ${ok ? '' : `The burst was ${dirs.includes(current?.dir) ? current.dir : 'different'}.`}`, ok ? 'ok' : 'warn', 1800);
+        toast(ok ? 'CORRECT' : 'INCORRECT', `${rt.toFixed(0)} ms response. ${ok ? '' : `The burst was ${cue}.`}`, ok ? 'ok' : 'warn', 1800);
       });
 
       const spawn = () => {

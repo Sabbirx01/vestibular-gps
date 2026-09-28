@@ -270,9 +270,10 @@ export function mountSensorSection({ hub }) {
     btn.title = reason;
     on(btn, 'click', async () => {
       const p = hub.get(id);
-      let res;
-      if (id === 'geo') res = await p.requestPermission();
-      else res = await p.requestPermission();
+      /* One call for every provider — the old if/else had identical branches,
+         so it read as though geolocation were handled differently when it is
+         not. The difference is downstream, in which source is switched to. */
+      const res = await p.requestPermission();
       badgeState(st, res);
       if (res === 'granted') {
         toast('PERMISSION GRANTED', reason, 'ok', 3600);
@@ -611,17 +612,7 @@ export function mountSpaceSection({ scene, onMode }) {
   selectPhase('earth');
 }
 
-/* ═══════════════════════════════════════════════════════════
-   ATTITUDE — public re-draw hook for window resizes
-   ═══════════════════════════════════════════════════════════ */
-export function mountFramePump() {
-  let prev = performance.now();
-  const raf = () => {
-    requestAnimationFrame(raf);
-    const now = performance.now();
-    const dt = Math.min(0.05, (now - prev) / 1000);
-    prev = now;
-    bus.emit('frame', dt);
-  };
-  raf();
-}
+/* mountFramePump() used to live here: a second requestAnimationFrame loop
+   that also emitted `frame`. main.js already owns the one and only frame
+   loop, and nothing ever imported this, so it was dead — and had it ever
+   been imported it would have double-driven every frame subscriber. */

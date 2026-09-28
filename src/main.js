@@ -7,7 +7,7 @@
 import { $, el, on, clamp, damp } from './core/util.js';
 import {
   state, set, bus, subscribe, toast, showError,
-  initEnvironment, startLinkWatchdog, startClock, QUALITY_PRESETS,
+  initEnvironment, startLinkWatchdog, startClock,
 } from './core/store.js';
 import { SensorHub } from './sensors/providers.js';
 import { SceneManager } from './three/SceneManager.js';

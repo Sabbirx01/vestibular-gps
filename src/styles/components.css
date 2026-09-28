@@ -122,6 +122,9 @@
 /* ── Stage (3D viewport inside a section) ───────────────── */
 .stage { padding: 0; overflow: hidden; }
 .stage-canvas { width: 100%; aspect-ratio: 16 / 10; min-height: 300px; display: block; touch-action: none; }
+.stage-vor { background: radial-gradient(90% 120% at 34% 48%, rgba(43,78,128,.22), transparent 58%), linear-gradient(135deg, rgba(7,15,31,.94), rgba(3,7,17,.98)); }
+.stage-vor .stage-canvas { aspect-ratio: 16 / 9; min-height: 340px; }
+.stage-vor .stage-tools { background: linear-gradient(180deg, rgba(13,25,47,.7), rgba(5,10,21,.9)); }
 .stage-tools {
   display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
   padding: var(--sp-4) var(--sp-5);

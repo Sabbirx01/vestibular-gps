@@ -24,6 +24,24 @@
      model is a documented upgrade path (see docs/SENSOR_API.md); when one
      is present the same provider interface accepts it unchanged.
 
+   CALIBRATION — why it exists and what it actually removes.
+     Every webcam has a different sensor-noise floor: exposure, gain,
+     compression artefacts, and ambient flicker all produce a small amount
+     of pixel-difference "motion" even when the subject sits perfectly
+     still. Before calibration, that noise floor gets reported as head
+     motion indistinguishably from a real small movement, which is exactly
+     what made the raw numbers unconvincing.
+
+     calibrate() asks the subject to hold still for CAL_MS milliseconds,
+     samples the estimator's own outputs during that window, and stores the
+     95th-percentile of motionEnergy/jitter/travel as this camera's noise
+     floor. Every live sample after that has the floor subtracted (and
+     clamped at zero) before it is published, so what reaches the OSI
+     engine is motion ABOVE the device's own noise, not the device's own
+     noise reported as if it were the subject. Uncalibrated operation still
+     works — it just reports the same conservative built-in floor everyone
+     starts with, and the UI states plainly whether that run is calibrated.
+
    Everything runs locally. No frame is ever uploaded.
    ═══════════════════════════════════════════════════════════ */
 
@@ -35,6 +53,14 @@ const PROC_W = 64;          // processing width  (px)
 const PROC_H = 48;          // processing height (px)
 const SEARCH = 6;           // global-motion search radius (px)
 const TARGET_HZ = 18;       // analysis rate — deliberately below the frame rate
+const CAL_MS = 2200;        // hold-still window for calibrate()
+
+/** 95th percentile of a numeric array — robust to one motion spike during calibration. */
+function p95(arr) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.floor(s.length * 0.95))];
+}
 
 export class CameraProvider extends SensorProvider {
   constructor() {
@@ -57,6 +83,52 @@ export class CameraProvider extends SensorProvider {
     this.centroidY = 0.5;
     this.samples = 0;
     this.reason = '';
+
+    /* calibration state — conservative built-in floor until calibrate() runs */
+    this.calibrated = false;
+    this.calibrating = false;
+    this.calProgress = 0;      // 0..1, for the UI
+    this.noiseFloor = { energy: 0.03, jitter: 0.02, travel: 0.4 };
+  }
+
+  /**
+   * Sample the estimator's own output while the subject holds still, and use
+   * the 95th percentile as this device's noise floor. Resolves false if the
+   * camera is not running yet.
+   */
+  async calibrate() {
+    if (!this.running) return false;
+    this.calibrating = true;
+    this.calProgress = 0;
+    bus.emit('sensor', { id: this.id, status: 'calibrating' });
+
+    const energy = [], jitter = [], travel = [];
+    const t0 = performance.now();
+    await new Promise((resolve) => {
+      const tick = () => {
+        const t = performance.now() - t0;
+        this.calProgress = Math.min(1, t / CAL_MS);
+        energy.push(this.motionEnergy);
+        jitter.push(this.jitter);
+        travel.push(Math.hypot(this.dx, this.dy));
+        if (t >= CAL_MS) { resolve(); return; }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+
+    /* A small margin above the measured p95 keeps genuine micro-tremor from
+       being reported as zero motion, which would look like a dead sensor. */
+    this.noiseFloor = {
+      energy: p95(energy) * 1.15,
+      jitter: p95(jitter) * 1.15,
+      travel: p95(travel) * 1.15,
+    };
+    this.calibrated = true;
+    this.calibrating = false;
+    this.calProgress = 1;
+    bus.emit('sensor', { id: this.id, status: this.status, calibrated: true, noiseFloor: this.noiseFloor });
+    return true;
   }
 
   get supported() {
@@ -145,6 +217,10 @@ export class CameraProvider extends SensorProvider {
     this.running = false;
     this.status = 'idle';
     this.prev = null;
+    /* A stopped-then-restarted stream may come from a different camera or a
+       different room, so the old noise floor is no longer trustworthy. */
+    this.calibrated = false;
+    this.calProgress = 0;
     bus.emit('sensor', { id: this.id, status: this.status });
   }
 
@@ -256,22 +332,37 @@ export class CameraProvider extends SensorProvider {
   }
 
   _publish() {
-    const jitterDeg = this.jitter * 18;                 // deg-equivalent scale
-    const travelDeg = Math.hypot(this.dx, this.dy) * 1.1;
+    /* Subtract this device's own measured noise floor before anything
+       downstream sees the numbers. Without this, holding perfectly still
+       still read as several degrees/second of "head motion" on a noisy
+       webcam, which is what made the raw signal unconvincing as a
+       measurement rather than a decoration. */
+    const nf = this.noiseFloor;
+    const energyClean = Math.max(0, this.motionEnergy - nf.energy);
+    const jitterClean = Math.max(0, this.jitter - nf.jitter);
+    const travelPx = Math.hypot(this.dx, this.dy);
+    const travelClean = Math.max(0, travelPx - nf.travel);
+
+    const jitterDeg = jitterClean * 18;                 // deg-equivalent scale
+    const travelDeg = travelClean * 1.1;
 
     bus.emit('sample', {
       source: 'camera',
       t: performance.now(),
+      calibrated: this.calibrated,
       /* head-motion channels, on the same scale the simulator uses */
       headMotion: +(6 + travelDeg * 3 + jitterDeg * 0.7).toFixed(2),
-      eyeHead: +(4.5 - this.jitter * 1.6 + travelDeg * 0.35).toFixed(2),
+      eyeHead: +(4.5 - jitterClean * 1.6 + travelDeg * 0.35).toFixed(2),
       lateral: +((this.centroidX - 0.5) * 40).toFixed(2),
       vertical: +((this.centroidY - 0.5) * 40).toFixed(2),
       rateHz: +this.hz.avg.toFixed(1),
-      quality: this.samples < 12 ? 0.35 : 1 - Math.min(0.6, this.jitter),
+      /* Quality reflects both sample maturity and calibration state: an
+         uncalibrated stream is reporting against the conservative default
+         floor, not this device's actual noise, so it is marked down. */
+      quality: this.samples < 12 ? 0.35 : (this.calibrated ? 1 : 0.7) - Math.min(0.6, jitterClean),
       raw: {
-        motionEnergy: +this.motionEnergy.toFixed(4),
-        jitter: +this.jitter.toFixed(4),
+        motionEnergy: +energyClean.toFixed(4),
+        jitter: +jitterClean.toFixed(4),
         dx: this.dx,
         dy: this.dy,
       },

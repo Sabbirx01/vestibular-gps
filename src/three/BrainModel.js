@@ -6,10 +6,12 @@
    ═══════════════════════════════════════════════════════════ */
 
 import * as THREE from '../../vendor/three.module.js';
-import { PAL, energyMaterial, tissueMaterial, glowLine, labelSprite, disposeTree } from './materials.js';
+/* tissueMaterial() builds the translucent tissue shells (cortex, cerebellum)
+   and IS used below — do not drop it from this list. energyMaterial is not
+   used here and was removed. */
+import { PAL, tissueMaterial, glowLine, labelSprite, disposeTree } from './materials.js';
 import { loadModel, dressTissue, normalizeModel, trianglesOf } from './ModelLibrary.js';
 import { clamp, damp, TAU } from '../core/util.js';
-import { BRAIN_STAGES } from '../science/content.js';
 
 export class BrainModel {
   constructor({ quality = 'HIGH', onSelect = () => {}, reducedMotion = false } = {}) {

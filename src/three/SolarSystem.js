@@ -7,13 +7,16 @@
    ═══════════════════════════════════════════════════════════ */
 
 import * as THREE from '../../vendor/three.module.js';
-import { PAL, fresnelMaterial, labelSprite, disposeTree } from './materials.js';
+import { PAL, fresnelMaterial, atmosphereMaterial, labelSprite, disposeTree } from './materials.js';
 import { damp, TAU, clamp } from '../core/util.js';
 import { GRAVITIES } from '../science/content.js';
 import { BODIES, buildPlanetTextures } from './planetTextures.js';
 
 export class SolarSystem {
-  constructor({ quality = 'HIGH', reducedMotion = false, textureSize = 512 } = {}) {
+  /* 768 rather than 512. Below roughly 700 the noise octaves that give
+     coastlines and maria their shape start collapsing into visible blobs once
+     the camera moves in, which is exactly what the space section does. */
+  constructor({ quality = 'HIGH', reducedMotion = false, textureSize = 768 } = {}) {
     this.reduced = reducedMotion;
     this.quality = quality;
     this.textureSize = textureSize;
@@ -23,6 +26,7 @@ export class SolarSystem {
     this.labels = [];
     this.t = 0;
     this.activeId = 'EARTH';
+    this.transitionSpeed = 10.5;
     this.build();
   }
 
@@ -70,16 +74,25 @@ export class SolarSystem {
       grp.add(clouds);
     }
 
-    /* Atmosphere: fresnel rim shell */
+    /* Atmosphere: sun-facing rim shell.
+       The light direction matches the key light defined below, so the glow
+       peaks on the dayside limb and fades across the terminator instead of
+       ringing the whole planet evenly. */
     const atmo = new THREE.Mesh(
-      new THREE.SphereGeometry(spec.radius * 1.10, 48, 32),
-      fresnelMaterial(spec.atmo, { power: spec.atmoPower, intensity: spec.atmoIntensity, side: THREE.BackSide }),
+      new THREE.SphereGeometry(spec.radius * 1.10, 56, 36),
+      atmosphereMaterial(spec.atmo, {
+        power: spec.atmoPower,
+        intensity: spec.atmoIntensity,
+        lightDir: new THREE.Vector3(4.2, 1.8, 4.2).normalize(),
+        /* a wider, softer terminator so the nightside fade is gradual */
+        terminator: 0.95,
+      }),
     );
     grp.add(atmo);
 
     /* A thin forward-scatter shell for the sunlit limb */
     const limb = new THREE.Mesh(
-      new THREE.SphereGeometry(spec.radius * 1.055, 48, 32),
+      new THREE.SphereGeometry(spec.radius * 1.055, 56, 36),
       fresnelMaterial(0xffffff, { power: 5.5, intensity: 0.5, side: THREE.FrontSide }),
     );
     grp.add(limb);
@@ -146,6 +159,10 @@ export class SolarSystem {
       b.userData.opacity = instant ? (on ? 1 : 0) : (b.userData.opacity ?? (on ? 1 : 0));
       if (instant && !on) b.visible = false;
     }
+    /* Prebuilt planets crossfade quickly; no texture generation happens on a
+       click. The previous 2.6 damp factor made Moon/Mars appear to lag for a
+       full second, which felt like a stuck interaction. */
+    this.transitionSpeed = instant ? 20 : 10.5;
     const g = GRAVITIES.find((x) => x.id === id) || GRAVITIES[0];
     this.floatAmount = g.float;
     this.otolithLoad = g.otolith;
@@ -159,7 +176,7 @@ export class SolarSystem {
     for (const [k, b] of Object.entries(this.bodies)) {
       const on = k === this.activeId;
       const target = on ? 1 : 0;
-      b.userData.opacity = damp(b.userData.opacity ?? target, target, 2.6, dt);
+      b.userData.opacity = damp(b.userData.opacity ?? target, target, this.transitionSpeed, dt);
       b.visible = b.userData.opacity > 0.012;
       if (!b.visible) continue;
 
@@ -170,7 +187,9 @@ export class SolarSystem {
       if (b.userData.clouds) b.userData.clouds.rotation.y += dt * (spec.spin * 1.35) * q;
       b.position.y = Math.sin(t * 0.24 + k.length) * 0.13 * q;
 
-      b.scale.setScalar(0.82 + o * 0.18);
+      /* Scale in with the same fast crossfade so the new planet feels like a
+         deliberate animated mode transition rather than a delayed pop. */
+      b.scale.setScalar(0.88 + o * 0.12);
       /* fresnelMaterial exposes uIntensity / uTime — there is no uOpacity.
          Guarded so a future uniform rename can never kill the render loop. */
       const au = b.userData.atmo.material.uniforms;
@@ -182,7 +201,7 @@ export class SolarSystem {
 
       /* city lights intensify as the terminator crosses */
       if (b.userData.surface.material.emissiveIntensity !== undefined) {
-        b.userData.surface.material.emissiveIntensity = 0.30 + o * 0.25 + (state.mode === 'MICROGRAVITY' ? 0 : 0);
+        b.userData.surface.material.emissiveIntensity = 0.30 + o * 0.25;
       }
     }
 

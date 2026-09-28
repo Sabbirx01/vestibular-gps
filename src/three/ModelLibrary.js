@@ -144,27 +144,27 @@ const SUIT_RULES = [
   { key: 'aceshelme.009', roughness: 0.02, metalness: 0.06, env: 2.4, glass: true },
   /* helmet shell — the white outer dome, glossy composite, faint tooling marks */
   { key: 'aceshelme.007', roughness: 0.22, metalness: 0.06, env: 1.5, clearcoat: 0.65, surface: 'metal', repeat: 2, normalScale: 0.14 },
-  /* near-white outer shell */
-  { key: 'lambert4S', roughness: 0.3, metalness: 0.08, env: 1.3, surface: 'metal', repeat: 2, normalScale: 0.12 },
+  /* near-white outer shell — the target look is a clean white EVA suit,
+     not the source asset's warm room-show palette. */
+  { key: 'lambert4S', tint: 0xf5f7fa, roughness: 0.3, metalness: 0.08, env: 1.3, surface: 'metal', repeat: 2, normalScale: 0.12 },
   /* dark interior / dark fittings — rubberised */
-  { key: 'lambert6S', roughness: 0.72, metalness: 0.05, env: 0.9, surface: 'rubber', repeat: 4, normalScale: 0.5 },
+  { key: 'lambert6S', tint: 0x101722, roughness: 0.72, metalness: 0.05, env: 0.9, surface: 'rubber', repeat: 4, normalScale: 0.5 },
   /* grey metal hardware — brushed */
-  { key: 'blinn1SG', roughness: 0.3, metalness: 0.85, env: 1.6, surface: 'metal', repeat: 3, normalScale: 0.35 },
-  { key: 'blinn2SG', roughness: 0.34, metalness: 0.14, env: 1.3, surface: 'metal', repeat: 3, normalScale: 0.18 },
-  /* fabric body of the suit — the orange one is blinn3SG (0.69, 0.25, 0.11) */
-  /* Repeat is deliberately LOW. At repeat 5 the 512 px weave tile was tiled so
-     finely on a 2 m figure that it became sub-pixel dither and vanished at
-     normal viewing distance — the suit read as perfectly smooth plastic. ~2.2
-     puts the weave at a scale the eye can actually resolve. */
-  { key: 'anisotrop', roughness: 0.86, metalness: 0.0, env: 0.8, aniso: 0.7, surface: 'fabric', repeat: 2.4, normalScale: 1.35 },
-  { key: 'blinn3SG', roughness: 0.72, metalness: 0.02, env: 0.85, surface: 'fabric', repeat: 2.2, normalScale: 1.25 },
-  { key: 'lambert3S', roughness: 0.72, metalness: 0.02, env: 0.85, surface: 'fabric', repeat: 2.2, normalScale: 1.25 },
-  /* red and blue accent patches — same woven shell fabric */
-  { key: 'lambert8S', roughness: 0.7, metalness: 0.03, env: 0.85, surface: 'fabric', repeat: 5, normalScale: 0.5 },
-  { key: 'lambert5S', roughness: 0.7, metalness: 0.03, env: 0.85, surface: 'fabric', repeat: 5, normalScale: 0.5 },
-  /* boots — coarse rubber */
-  { key: 'shoe_lamb.004', roughness: 0.82, metalness: 0.06, env: 0.8, surface: 'rubber', repeat: 5, normalScale: 0.7 },
-  { key: 'shoe_lamb.005', roughness: 0.6, metalness: 0.08, env: 1.0, surface: 'rubber', repeat: 5, normalScale: 0.45 },
+  { key: 'blinn1SG', tint: 0x44515f, roughness: 0.3, metalness: 0.85, env: 1.6, surface: 'metal', repeat: 3, normalScale: 0.35 },
+  { key: 'blinn2SG', tint: 0xe4e9ef, roughness: 0.34, metalness: 0.14, env: 1.3, surface: 'metal', repeat: 3, normalScale: 0.18 },
+  /* Main fabric body — the source GLB labels this material blinn3SG and
+     ships it orange. Recolour it to the white pressure-garment fabric while
+     preserving geometry, seams and generated weave detail. */
+  { key: 'anisotrop', tint: 0xd9e0e8, roughness: 0.86, metalness: 0.0, env: 0.8, aniso: 0.7, surface: 'fabric', repeat: 2.4, normalScale: 1.35 },
+  { key: 'blinn3SG', tint: 0xe9eef4, roughness: 0.72, metalness: 0.02, env: 0.85, surface: 'fabric', repeat: 2.2, normalScale: 1.25 },
+  /* orange safety bands and high-visibility hardware */
+  { key: 'lambert3S', tint: 0xf27a22, roughness: 0.72, metalness: 0.02, env: 0.85, surface: 'fabric', repeat: 2.2, normalScale: 1.25 },
+  { key: 'lambert8S', tint: 0xf27a22, roughness: 0.7, metalness: 0.03, env: 0.85, surface: 'fabric', repeat: 5, normalScale: 0.5 },
+  /* navy mission patches and wrist/neck restraint panels */
+  { key: 'lambert5S', tint: 0x173b61, roughness: 0.7, metalness: 0.03, env: 0.85, surface: 'fabric', repeat: 5, normalScale: 0.5 },
+  /* boots — white upper with coarse dark sole response */
+  { key: 'shoe_lamb.004', tint: 0x17212e, roughness: 0.82, metalness: 0.06, env: 0.8, surface: 'rubber', repeat: 5, normalScale: 0.7 },
+  { key: 'shoe_lamb.005', tint: 0xdce3eb, roughness: 0.6, metalness: 0.08, env: 1.0, surface: 'rubber', repeat: 5, normalScale: 0.45 },
 ];
 
 const DEFAULT_RULE = { roughness: 0.55, metalness: 0.12, env: 1.0, surface: 'fabric', repeat: 4, normalScale: 0.35 };
@@ -182,6 +182,11 @@ function applyRule(m, rule) {
 
   m.side = THREE.FrontSide;
   m.envMapIntensity = rule.env ?? 1.0;
+
+  /* The NASA asset's geometry is valuable, but its room-show export uses an
+     orange suit palette. A rule may retint only the base colour; maps and
+     geometry remain untouched, so the result stays physically detailed. */
+  if (rule.tint !== undefined && m.color) m.color.set(rule.tint);
 
   if ('roughness' in m && rule.roughness !== undefined) m.roughness = rule.roughness;
   if ('metalness' in m && rule.metalness !== undefined) m.metalness = rule.metalness;
@@ -286,6 +291,277 @@ export function dressTissue(root, { tone = 0xe4c4ba } = {}) {
     o.userData.pickId = 'cortex';
   });
   return root;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Suit decoration.
+
+   The NASA asset is a single mesh with 14 material groups — there is no
+   separate "helmet" object to select. So the iconic elements are added as
+   new geometry, placed by measuring the material groups the asset already
+   has rather than by guessing coordinates.
+
+   The gold visor in particular is the single most recognisable thing about
+   a spacesuit, and the asset's own visor material renders as a dark recess.
+   A mirrored lens over it is what makes the figure read as an astronaut at
+   a glance instead of as a white domed mannequin.
+   ═══════════════════════════════════════════════════════════ */
+
+/**
+ * Bounds of the geometry a given material covers, expressed in `space`'s
+ * local frame.
+ *
+ * Geometry positions are in the mesh's own local space, but everything else
+ * here is measured in the carrier's frame. If the glTF node carries any
+ * transform at all, comparing the two without mapping would silently place
+ * the visor in the wrong spot, so every point is transformed explicitly.
+ */
+function groupBounds(mesh, pattern, space) {
+  const geo = mesh.geometry;
+  const pos = geo?.attributes?.position;
+  if (!pos) return null;
+
+  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  const groups = geo.groups && geo.groups.length
+    ? geo.groups
+    : [{ start: 0, count: geo.index ? geo.index.count : pos.count, materialIndex: 0 }];
+
+  mesh.updateWorldMatrix(true, false);
+  space.updateWorldMatrix(true, false);
+  const toSpace = new THREE.Matrix4()
+    .copy(space.matrixWorld)
+    .invert()
+    .multiply(mesh.matrixWorld);
+
+  const box = new THREE.Box3();
+  const v = new THREE.Vector3();
+  let hit = false;
+
+  for (const g of groups) {
+    const m = mats[g.materialIndex];
+    if (!m || !pattern.test(m.name || '')) continue;
+    for (let i = g.start; i < g.start + g.count; i++) {
+      const idx = geo.index ? geo.index.getX(i) : i;
+      v.fromBufferAttribute(pos, idx).applyMatrix4(toSpace);
+      box.expandByPoint(v);
+      hit = true;
+    }
+  }
+  return hit ? box : null;
+}
+
+/**
+ * Add the details that make the suit read as a real suit:
+ * a mirrored visor, helmet work lights, a chest status cluster and a
+ * grounding rim so the figure separates from the starfield.
+ *
+ * @returns {{visor:boolean, front:number, tris:number}}
+ */
+export function decorateSuit(carrier, {
+   visorColour = 0xffbd57,
+   visorTint = 0x2a1a06,
+   lampColour = 0xbfe9ff,
+   accentColour = 0x5fe3ff,
+ } = {}) {
+  const meshes = [];
+  carrier.traverse((o) => { if (o.isMesh) meshes.push(o); });
+  if (!meshes.length) return { visor: false, front: 1, tris: 0 };
+
+  /* The whole figure, measured in the carrier's own frame. */
+  carrier.updateWorldMatrix(true, true);
+  const toCarrier = new THREE.Matrix4().copy(carrier.matrixWorld).invert();
+  const bodyBox = new THREE.Box3();
+  const corner = new THREE.Vector3();
+  for (const m of meshes) {
+    const bb = new THREE.Box3().setFromObject(m);
+    for (const sx of [bb.min.x, bb.max.x]) {
+      for (const sy of [bb.min.y, bb.max.y]) {
+        for (const sz of [bb.min.z, bb.max.z]) {
+          corner.set(sx, sy, sz).applyMatrix4(toCarrier);
+          bodyBox.expandByPoint(corner);
+        }
+      }
+    }
+  }
+  const bodySize = new THREE.Vector3();
+  const bodyCentre = new THREE.Vector3();
+  bodyBox.getSize(bodySize);
+  bodyBox.getCenter(bodyCentre);
+
+  /* Find the helmet groups. `.007` is the white shell, `.008`/`.009` the dark
+     visor recess and its glass. Comparing their centres tells us which way the
+     figure faces — no hard-coded axis, so this survives a re-exported asset
+     with a different up or forward. */
+  let shellBox = null;
+  let visorBox = null;
+  for (const m of meshes) {
+    if (!shellBox) shellBox = groupBounds(m, /aceshelme\.007/i, carrier);
+    if (!visorBox) visorBox = groupBounds(m, /aceshelme\.00[89]/i, carrier);
+  }
+
+  const centre = new THREE.Vector3();
+  let front = 1;
+
+  if (shellBox && visorBox) {
+    const s = shellBox.getCenter(new THREE.Vector3());
+    const v = visorBox.getCenter(new THREE.Vector3());
+    /* the visor sits on the front of the head, so this offset IS "forward" */
+    front = Math.sign(v.z - s.z) || 1;
+  }
+
+  const detail = new THREE.Group();
+  detail.name = 'suit-detail';
+  carrier.add(detail);
+
+  /* ── Mirrored visor ───────────────────────────────────── */
+  let visorAdded = false;
+  if (visorBox) {
+    const vs = new THREE.Vector3();
+    visorBox.getSize(vs);
+    visorBox.getCenter(centre);
+
+    const lens = new THREE.Mesh(
+      new THREE.SphereGeometry(Math.max(vs.x, vs.y) * 0.62, 40, 28),
+      new THREE.MeshPhysicalMaterial({
+        /* For a METAL, the base colour IS the reflectance. Setting it dark and
+           tinting the specular instead produced a black glossy dome, because
+           at metalness 1.0 the environment reflection is multiplied by this
+           colour. A gold visor needs a gold albedo. */
+        color: new THREE.Color(visorColour),
+        metalness: 1.0,
+        roughness: 0.055,
+        envMapIntensity: 4.2,
+      }),
+    );
+    /* flatten into a lens and push it just proud of the recess */
+    lens.scale.set(0.92, 0.78, 0.45);
+    lens.position.copy(centre);
+    lens.position.z += front * vs.z * 0.42;
+    lens.renderOrder = 2;
+    detail.add(lens);
+    visorAdded = true;
+  }
+
+  /* ── Helmet work lights ───────────────────────────────── */
+  if (shellBox) {
+    const ss = new THREE.Vector3();
+    shellBox.getSize(ss);
+    shellBox.getCenter(centre);
+    /* Emissive-only material with a near-black base. A white base plus white
+       emissive produced two neutral dots that read as specular highlights on
+       the white shell — the lamps were rendering, but they were invisible as
+       lamps. A saturated colour on a dark base is unambiguous. */
+    /* WHY THE INTENSITY IS LOW AND THE COLOUR IS EXTREME
+       At emissiveIntensity 14 the output is roughly (10.5, 12.7, 14) before
+       tone mapping. ACES compresses all three channels toward 1, so the result
+       desaturates to pure white — measured as (255,255,255) across the whole
+       lamp. Keeping the RED channel at zero and the intensity near 4 means
+       red stays at zero through the tone map and the lamp renders as a vivid
+       cyan that cannot wash out. */
+    const lampMat = new THREE.MeshStandardMaterial({
+       color: 0x04121c,
+       emissive: new THREE.Color(lampColour),
+       emissiveIntensity: 4.2,
+       roughness: 0.2, metalness: 0.0,
+     });
+    const shellR = Math.max(ss.x, ss.y, ss.z) * 0.5;
+    for (const sx of [-1, 1]) {
+      /* Placed up and out, so they silhouette against open space rather than
+         sitting on top of the bright shell where they cannot be read. */
+      const dir = new THREE.Vector3(sx * 0.66, 0.66, front * 0.36).normalize();
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(shellR * 0.21, 16, 12), lampMat);
+      lamp.position.set(
+        centre.x + dir.x * shellR * 1.10,
+        centre.y + dir.y * shellR * 1.10,
+        centre.z + dir.z * shellR * 1.10,
+      );
+      detail.add(lamp);
+
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(shellR * 0.46, 14, 10),
+        new THREE.MeshBasicMaterial({
+          /* same reasoning as the lamp: a fully saturated colour at modest
+             opacity survives additive blending, white does not */
+          color: new THREE.Color(0x0088dd), transparent: true, opacity: 0.34,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+        }),
+      );
+      halo.position.copy(lamp.position);
+      detail.add(halo);
+    }
+  }
+
+  /* ── Chest status cluster ─────────────────────────────── */
+  {
+    const unit = bodySize.y;
+    const chestY = bodyBox.min.y + bodySize.y * 0.66;
+
+    /* Find the CHEST PLANE, not the whole-body front extent.
+       bodyBox.max.z is the boot toe or visor tip, not the chest, so anchoring
+       to it left the cluster hanging in front of the torso with a visible gap.
+       Sampling only the vertices inside a thin horizontal slice at chest
+       height gives the surface the pack actually sits against. */
+    const band = bodySize.y * 0.045;
+    const sliceBox = new THREE.Box3();
+    const sv = new THREE.Vector3();
+    for (const m of meshes) {
+      const pos = m.geometry?.attributes?.position;
+      if (!pos) continue;
+      m.updateWorldMatrix(true, false);
+      const toC = new THREE.Matrix4().copy(carrier.matrixWorld).invert().multiply(m.matrixWorld);
+      for (let i = 0; i < pos.count; i += 3) {      // stride: enough for a bbox
+        sv.fromBufferAttribute(pos, i).applyMatrix4(toC);
+        if (sv.y < chestY - band || sv.y > chestY + band) continue;
+        sliceBox.expandByPoint(sv);
+      }
+    }
+    const chestFrontZ = sliceBox.isEmpty()
+      ? (front > 0 ? bodyBox.max.z : bodyBox.min.z)
+      : (front > 0 ? sliceBox.max.z : sliceBox.min.z);
+    const chestZ = chestFrontZ + front * unit * 0.010;
+
+    const bar = new THREE.Mesh(
+      new THREE.BoxGeometry(unit * 0.058, unit * 0.012, unit * 0.006),
+      new THREE.MeshStandardMaterial({
+        color: 0x0a1420, emissive: new THREE.Color(accentColour), emissiveIntensity: 3.4,
+        roughness: 0.35, metalness: 0.2,
+      }),
+    );
+    bar.position.set(bodyCentre.x, chestY, chestZ);
+    detail.add(bar);
+
+    for (let i = 0; i < 3; i++) {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(unit * 0.009, 10, 8),
+        new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: new THREE.Color(i === 1 ? 0x4ade80 : accentColour),
+          emissiveIntensity: 5.0, roughness: 0.3, metalness: 0.1,
+        }),
+      );
+      dot.position.set(
+        bodyCentre.x + (i - 1) * unit * 0.026,
+        chestY + unit * 0.030,
+        chestZ,
+      );
+      detail.add(dot);
+    }
+  }
+
+  /* ── Grounding rim ────────────────────────────────────── */
+  {
+    const rim = new THREE.Mesh(
+      new THREE.CylinderGeometry(bodySize.x * 0.34, bodySize.x * 0.34, bodySize.y * 0.004, 40, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(accentColour), transparent: true, opacity: 0.20,
+        side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false,
+      }),
+    );
+    rim.position.set(bodyCentre.x, bodyBox.min.y + bodySize.y * 0.012, bodyCentre.z);
+    detail.add(rim);
+  }
+
+  return { visor: visorAdded, front, tris: trianglesOf(detail) };
 }
 
 /** Count triangles, for the debug overlay. */

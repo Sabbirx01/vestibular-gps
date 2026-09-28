@@ -46,6 +46,13 @@ export class SpaceEnvironment {
       this.group.add(this.nebulae);
     }
 
+    /* ── Galaxy band: structure in the far sky ──
+       Placed behind everything else so it reads as the backdrop rather than
+       as a ring around the scene. */
+    this.galaxyBand = this._galaxyBand(q.stars > 4000 ? 14000 : 6000);
+    this.galaxyBand.renderOrder = -20;
+    this.group.add(this.galaxyBand);
+
     /* ── Dust: slow drift field close to camera ── */
     this.dust = this._dust(q.dust);
     this.group.add(this.dust);
@@ -78,6 +85,7 @@ export class SpaceEnvironment {
     this.group.add(this.core);
 
     this.layers = [
+      { obj: this.galaxyBand, depth: 0.003 },
       { obj: this.starsFar, depth: 0.006 },
       { obj: this.starsNear, depth: 0.026 },
       { obj: this.dust, depth: 0.05 },
@@ -101,9 +109,15 @@ export class SpaceEnvironment {
       pos[i * 3] = s * Math.cos(phi) * r;
       pos[i * 3 + 1] = u * r;
       pos[i * 3 + 2] = s * Math.sin(phi) * r;
-      scale[i] = 0.28 + Math.pow(Math.random(), 3.2) * 1.5;
+      /* Long tail on brightness: a few unmistakable stars, a great many faint
+         ones. A uniform distribution reads as flat noise. */
+      scale[i] = 0.24 + Math.pow(Math.random(), 3.6) * 1.85;
       phase[i] = Math.random();
-      tint[i] = Math.random();
+      /* Stellar temperature, biased the way a real sky is: M and K dwarfs
+         dominate and hot blue stars are rare. pow() with an exponent above 1
+         produces exactly that skew, and the rare high values are what the
+         diffraction spikes in the star shader key off. */
+      tint[i] = Math.pow(Math.random(), 1.85);
     }
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('aScale', new THREE.BufferAttribute(scale, 1));
@@ -141,6 +155,72 @@ export class SpaceEnvironment {
     mat.uniforms.uPixelRatio.value = Math.min(devicePixelRatio || 1, 2);
     const pts = new THREE.Points(geo, mat);
     pts.frustumCulled = false;
+    return pts;
+  }
+
+  /**
+   * Galaxy band — a dense river of faint stars laid along a tilted great
+   * circle, with the glow coming from their density rather than from a picture.
+   *
+   * This is the cheapest single change that stops a star field looking like
+   * scattered dots. Real skies have structure: a bright milky sweep with a
+   * dark lane through it. Generating it from points rather than a texture keeps
+   * it procedural and lets the parallax still work.
+   */
+  _galaxyBand(count = 14000) {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const scale = new Float32Array(count);
+    const phase = new Float32Array(count);
+    const tint = new Float32Array(count);
+
+    const tiltX = 0.52;
+    const tiltZ = -0.34;
+
+    for (let i = 0; i < count; i++) {
+      /* A great circle: full sweep in longitude, tightly clustered in
+         latitude. The spread was 0.30 rad over a 245-unit radius, which
+         spread the points so thinly across that annulus that no band was
+         perceptible at all. 0.15 rad concentrates them into an actual lane. */
+      const lon = Math.random() * TAU;
+      const lat = (Math.random() + Math.random() + Math.random() - 1.5) * 0.15;
+      const r = 150 + Math.random() * 150;
+
+      const x0 = Math.cos(lat) * Math.cos(lon) * r;
+      const y0 = Math.sin(lat) * r;
+      const z0 = Math.cos(lat) * Math.sin(lon) * r;
+
+      const cy = Math.cos(tiltX), sy = Math.sin(tiltX);
+      const y1 = y0 * cy - z0 * sy;
+      const z1 = y0 * sy + z0 * cy;
+      const cz = Math.cos(tiltZ), sz = Math.sin(tiltZ);
+
+      pos[i * 3] = x0 * cz - y1 * sz;
+      pos[i * 3 + 1] = x0 * sz + y1 * cz;
+      pos[i * 3 + 2] = z1;
+
+      /* A wider brightness tail than before so the band has some grain
+         instead of reading as uniform dust. */
+      scale[i] = 0.20 + Math.pow(Math.random(), 2.0) * 1.05;
+      phase[i] = Math.random();
+      tint[i] = Math.pow(Math.random(), 1.9) * 0.9 + 0.03;
+    }
+
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aScale', new THREE.BufferAttribute(scale, 1));
+    geo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+    geo.setAttribute('aTint', new THREE.BufferAttribute(tint, 1));
+
+    const mat = starMaterial();
+    /* These sit further out than the main shells, so they need a larger base
+       size to survive the distance attenuation and read as a band at all. */
+    mat.uniforms.uSize.value = 20;
+    mat.uniforms.uOpacity.value = 0.85;
+    mat.uniforms.uSpike.value = 0.3;
+    mat.uniforms.uPixelRatio.value = Math.min(devicePixelRatio || 1, 2);
+    const pts = new THREE.Points(geo, mat);
+    pts.frustumCulled = false;
+    pts.name = 'galaxy-band';
     return pts;
   }
 

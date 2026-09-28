@@ -13,7 +13,7 @@
        measures and what it does not
    ═══════════════════════════════════════════════════════════ */
 
-import { $, el, on, clamp, download, fmt } from '../core/util.js';
+import { $, el, on, clamp, download } from '../core/util.js';
 import { state, bus, toast, set } from '../core/store.js';
 import { DOMAINS, buildBaseline, computeOSI } from '../core/osi.js';
 
@@ -172,9 +172,12 @@ export function mountIntegrationSection({ camera } = {}) {
   /* ── 2. Providers available right now ─────────────────── */
   function renderProviders() {
     const rows = [
-      { id: 'orientation', label: 'DeviceOrientation', state: state.sensors?.orientation || 'idle', kind: 'hardware' },
-      { id: 'motion', label: 'DeviceMotion', state: state.sensors?.motion || 'idle', kind: 'hardware' },
-      { id: 'geolocation', label: 'Geolocation (separate layer)', state: state.sensors?.geo || 'idle', kind: 'hardware' },
+      /* Permissions live on state.perms (see core/store.js). The old
+         state.sensors path never resolved, so this table reported every
+         hardware provider as IDLE even while it was streaming. */
+      { id: 'orientation', label: 'DeviceOrientation', state: state.perms?.orientation || 'idle', kind: 'hardware' },
+      { id: 'motion', label: 'DeviceMotion', state: state.perms?.motion || 'idle', kind: 'hardware' },
+      { id: 'geolocation', label: 'Geolocation (separate layer)', state: state.perms?.geo || 'idle', kind: 'hardware' },
       { id: 'camera', label: 'Front camera — head motion', state: S.camera?.status || 'idle', kind: 'vision' },
       { id: 'simulation', label: 'Simulation (always available)', state: 'available', kind: 'generated' },
       { id: 'replay', label: 'Replay (recorded session)', state: 'available', kind: 'stored' },
@@ -257,6 +260,9 @@ export function mountIntegrationSection({ camera } = {}) {
     const cv = el('canvas', { class: 'cam-preview', width: '240', height: '180' });
     const video = el('video', { class: 'cam-video', autoplay: true, muted: true, playsinline: true });
 
+    const calState = !c ? 'NOT STARTED' : c.calibrating ? `CALIBRATING ${Math.round((c.calProgress || 0) * 100)}%` : c.calibrated ? 'CALIBRATED' : 'NOT CALIBRATED — HOLD-STILL FLOOR NOT MEASURED';
+    const calColour = !c ? 'info' : c.calibrating ? 'warn' : c.calibrated ? 'ok' : 'warn';
+
     wrap.append(
       el('div', { class: 'cam-stage' }, video, cv),
       el('div', { class: 'cam-rows' },
@@ -264,8 +270,12 @@ export function mountIntegrationSection({ camera } = {}) {
         row('SECURE CONTEXT', window.isSecureContext ? 'YES' : 'NO — CAMERA BLOCKED'),
         row('SAMPLES', c ? String(c.samples) : '0'),
         row('ANALYSIS RATE', c ? `${c.hz?.avg ? c.hz.avg.toFixed(1) : '—'} Hz` : '—'),
-        row('MOTION ENERGY', c ? c.motionEnergy.toFixed(4) : '—'),
-        row('JITTER (oscillatory)', c ? c.jitter.toFixed(4) : '—'),
+        row('MOTION ENERGY (ABOVE FLOOR)', c ? Math.max(0, c.motionEnergy - (c.noiseFloor?.energy ?? 0)).toFixed(4) : '—'),
+        row('JITTER (ABOVE FLOOR)', c ? Math.max(0, c.jitter - (c.noiseFloor?.jitter ?? 0)).toFixed(4) : '—'),
+      ),
+      el('div', { class: 'cam-rows' },
+        el('div', { class: 'cam-row' }, el('span', { text: 'CALIBRATION' }),
+          el('span', { class: `tag tag-${calColour}`, text: calState })),
       ),
       el('div', { class: 'btn-row' },
         el('button', {
@@ -281,11 +291,25 @@ export function mountIntegrationSection({ camera } = {}) {
           },
         }),
         el('button', {
+          type: 'button', class: 'btn', text: 'CALIBRATE (HOLD STILL 2s)',
+          disabled: !c?.running,
+          onclick: async (e) => {
+            if (!S.camera?.running) { toast('START THE CAMERA FIRST', 'Calibration measures this device\'s own noise floor while the camera is running.', 'warn', 6000); return; }
+            e.target.disabled = true;
+            toast('CALIBRATING', 'Hold your head still for about two seconds.', 'info', 4000);
+            await S.camera.calibrate();
+            e.target.disabled = false;
+            toast('CALIBRATED', 'This camera\'s idle noise floor is now subtracted from every reading, so what reaches the index is motion above the device\'s own noise.', 'ok', 6000);
+            render();
+          },
+        }),
+        el('button', {
           type: 'button', class: 'btn', text: 'STOP',
           onclick: () => { S.camera?.stop(); render(); },
         }),
         el('span', { class: 'tag tag-info', text: 'MEASURES HEAD MOTION · NOT GAZE' }),
       ),
+      el('p', { class: 'caption', text: 'Why calibration matters: every webcam has its own sensor noise (exposure, gain, compression), which reads as a small amount of "motion" even when perfectly still. CALIBRATE measures that noise floor for this specific camera and subtracts it from every subsequent reading, so a genuinely still head reports as still — not as a few degrees per second of phantom motion.' }),
       el('p', { class: 'caption', text: 'Why not a landmark model: MediaPipe Face Mesh is roughly 3 MB of model plus WASM from a CDN, which would break the offline guarantee this project is built on. A landmark model is a documented upgrade path — the provider interface accepts one unchanged.' }),
     );
 

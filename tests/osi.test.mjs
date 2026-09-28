@@ -17,7 +17,12 @@ import {
   DOMAINS, buildBaseline, zScore, subScore, computeOSI,
   advisory, authorityMatrix, rankCountermeasures, recheckVerdict,
   syntheticTrajectory, toContract, NASA_TAU,
+  mulberry32 as osiPrng,
 } from '../src/core/osi.js';
+/* Imported only so the two PRNG copies can be proved identical. core/util.js
+   touches `document` solely inside default parameters and function bodies, so
+   importing it under Node is safe. */
+import { mulberry32 as utilPrng } from '../src/core/util.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -437,6 +442,79 @@ console.log('OSI v2.0 — engine tests\n');
   ok('contract serialises cleanly', (() => {
     try { JSON.parse(JSON.stringify(c)); return true; } catch { return false; }
   })());
+}
+
+/* ═══════════════════════════════════════════════════════════
+   14. Regressions — each of these failed before the fix it guards.
+   ═══════════════════════════════════════════════════════════ */
+
+/* 14a. A skipped domain must not shift the SEM of the others.
+   standardErrorOfMeasurement pushed into an array and then indexed it with the
+   DOMAINS position, so dropping one domain moved every later SEM onto the
+   wrong weight. SEM feeds MDC95, and MDC95 is the threshold every "this
+   improvement is real" claim is measured against — so the corruption was both
+   invisible and material. */
+{
+  const perDomain = Math.abs(100 * Math.exp(-1 / 4.48) - 100);   // ≈20.01
+  const mk = (i, over = {}) => ({
+    eye_head: 4 + (i - 1) * 0.25,
+    body_control: 9 + (i - 1) * 0.6,
+    task_perf: 320 + (i - 1) * 12,
+    symptoms: 1.4 + (i - 1) * 0.2,
+    head_motion: 26 + (i - 1) * 1.5,
+    drift: 0.02 * (i - 1),
+    ...over,
+  });
+
+  const fullOsi = computeOSI(mk(3), buildBaseline([mk(1), mk(2), mk(3)]));
+  const allPresent = perDomain * Math.sqrt(DOMAINS.reduce((a, d) => a + d.weight ** 2, 0));
+  ok('SEM is the weighted RSS of all six domains when all six are present',
+    Math.abs(fullOsi.sem - allPresent) < 0.05,
+    `sem=${fullOsi.sem} expected=${allPresent.toFixed(2)}`);
+
+  /* eye_head in one session only → raw.length 1 → skipped by the SEM loop. */
+  const ragged = buildBaseline([
+    mk(1, { eye_head: null }), mk(2, { eye_head: 4.1 }), mk(3, { eye_head: null }),
+  ]);
+  ok('the ragged baseline really does drop eye_head',
+    ragged.domains.eye_head.raw.length === 1, `n=${ragged.domains.eye_head.raw.length}`);
+
+  const remain = DOMAINS.filter((d) => d.id !== 'eye_head');
+  const expected = perDomain * Math.sqrt(remain.reduce((a, d) => a + d.weight ** 2, 0));
+  const raggedOsi = computeOSI(mk(3), ragged);
+  ok('a skipped domain leaves every other SEM on its own weight',
+    Math.abs(raggedOsi.sem - expected) < 0.05,
+    `sem=${raggedOsi.sem} expected=${expected.toFixed(2)} — the position-indexed version gave ≈8.90`);
+  ok('MDC95 follows the corrected SEM',
+    Math.abs(raggedOsi.mdc95 - 1.96 * Math.SQRT2 * expected) < 0.2, `mdc95=${raggedOsi.mdc95}`);
+}
+
+/* 14b. The two mulberry32 copies must stay identical. core/osi.js keeps its
+   own copy so the engine stays import-free and testable alone; the copies had
+   drifted into different mixings, so the same seed produced different streams
+   in the two files. */
+{
+  const seeds = [1, 7, 1337, 90210, 20260928];
+  let same = true;
+  for (const s of seeds) {
+    const a = osiPrng(s), b = utilPrng(s);
+    for (let i = 0; i < 50; i++) if (a() !== b()) { same = false; break; }
+    if (!same) break;
+  }
+  ok('osi.js and util.js mulberry32 produce identical sequences', same);
+}
+
+/* 14c. The seeded bootstrap is what makes the interval citable. */
+{
+  const mk = (i) => ({
+    eye_head: 4 + i * 0.2, body_control: 9 + i * 0.5, task_perf: 320 + i * 10,
+    symptoms: 1 + i * 0.1, head_motion: 26 + i, drift: 0.01 * i,
+  });
+  const b = buildBaseline([mk(1), mk(2), mk(3), mk(4)]);
+  const r1 = computeOSI(mk(3), b, { seed: 123 });
+  const r2 = computeOSI(mk(3), b, { seed: 123 });
+  ok('the same seed reproduces the same interval',
+    JSON.stringify(r1.ci95) === JSON.stringify(r2.ci95), `${JSON.stringify(r1.ci95)}`);
 }
 
 /* ═══════════════════════════════════════════════════════════ */

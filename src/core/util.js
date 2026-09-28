@@ -45,7 +45,13 @@ export function angDiff(a, b) {
   return d;
 }
 
-/** Deterministic PRNG so generated data is reproducible. */
+/**
+ * Deterministic PRNG so generated data is reproducible.
+ *
+ * MUST stay byte-identical to the private `mulberry32` in core/osi.js (which
+ * keeps its own copy so it stays import-free). The two had drifted; they are
+ * now the same function and tests/osi.test.mjs asserts they agree.
+ */
 export function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {

@@ -16,7 +16,20 @@ $targets = @(
     @{ path = '/vendor/libs/draco/gltf/draco_decoder.wasm';        label = 'draco decoder wasm' },
     @{ path = '/vendor/libs/draco/gltf/draco_wasm_wrapper.js';     label = 'draco wasm wrapper' },
     @{ path = '/assets/models/nasa-aces-suit.glb';                 label = 'NASA suit GLB' },
-    @{ path = '/assets/models/nih-brain.glb';                      label = 'NIH brain GLB' }
+    @{ path = '/assets/models/nih-brain.glb';                      label = 'NIH brain GLB' },
+    @{ path = '/src/core/osi.js';                                  label = 'OSI engine' },
+    @{ path = '/src/ui/console.js';                                label = 'Mission Console' },
+    @{ path = '/src/ui/integration.js';                            label = 'Integration' },
+    @{ path = '/src/sensors/webcam.js';                            label = 'CameraProvider' },
+    @{ path = '/src/three/environment.js';                         label = 'IBL environment' },
+    @{ path = '/src/three/surfaceDetail.js';                       label = 'Surface detail' },
+    @{ path = '/src/styles/console.css';                           label = 'console styles' },
+    @{ path = '/docs/ARCHITECTURE.md';                             label = 'docs/ARCHITECTURE' },
+    @{ path = '/docs/SOURCES.md';                                  label = 'docs/SOURCES' },
+    @{ path = '/docs/SENSOR_API.md';                               label = 'docs/SENSOR_API' },
+    @{ path = '/docs/TESTING.md';                                  label = 'docs/TESTING' },
+    @{ path = '/docs/DEPLOYMENT.md';                               label = 'docs/DEPLOYMENT' },
+    @{ path = '/docs/SCIENCE.md';                                  label = 'docs/SCIENCE' }
 )
 
 Write-Host ("checking " + $Base)

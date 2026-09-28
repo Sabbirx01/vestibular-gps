@@ -86,15 +86,19 @@ export function mountConsoleSection(ctx = {}) {
     const prov = {};
 
     const cam = camRoll.length >= 5;
-    const motion = state.sensors?.motion === 'granted';
-    const orientation = state.sensors?.orientation === 'granted';
+    /* store.js keeps permissions under `perms`. Reading `state.sensors` here
+       always produced undefined, so granted hardware was never detected and
+       both channels silently fell through to the simulation branch. */
+    const motion = state.perms?.motion === 'granted';
+    const orientation = state.perms?.orientation === 'granted';
     const sim = state.source === 'SIMULATION';
 
     /* eye–head coordination (deg of gaze error proxy) */
     if (cam) {
       const avg = camRoll.reduce((a, s) => a + s.eyeHead, 0) / camRoll.length;
       out.eye_head = +avg.toFixed(2);
-      prov.eye_head = 'camera';
+      const calibrated = camRoll[camRoll.length - 1]?.calibrated;
+      prov.eye_head = calibrated ? 'camera (calibrated)' : 'camera (uncalibrated — calibrate in section 10)';
     } else if (sim || orientation) {
       out.eye_head = +clamp(4.2 + (state.jerk || 0) * 0.02, 1, 18).toFixed(2);
       prov.eye_head = sim ? 'simulation' : 'orientation';
@@ -128,7 +132,8 @@ export function mountConsoleSection(ctx = {}) {
     if (cam) {
       const avg = camRoll.reduce((a, s) => a + s.headMotion, 0) / camRoll.length;
       out.head_motion = +avg.toFixed(2);
-      prov.head_motion = 'camera';
+      const calibrated = camRoll[camRoll.length - 1]?.calibrated;
+      prov.head_motion = calibrated ? 'camera (calibrated)' : 'camera (uncalibrated)';
     } else if (motion || orientation) {
       out.head_motion = +clamp(26 + (state.jerk || 0) * 0.8, 5, 120).toFixed(2);
       prov.head_motion = 'motion-sensor';
@@ -256,7 +261,11 @@ export function mountConsoleSection(ctx = {}) {
         el('div', { class: 'panel-head' },
           el('p', { class: 'eyebrow', text: 'ORIENTATION STABILITY INDEX' }),
           el('h3', { text: 'No index available yet' }),
-          el('p', { text: o?.reason || 'Capture at least three baseline sessions, then the index starts reporting.' }),
+          /* No index means no channel had a live source — not that the button
+             is broken and not that the baseline is too short (a short
+             baseline yields a provisional index, which is a different state).
+             The old copy blamed the wrong cause. */
+          el('p', { text: o?.reason || 'No channel has a live source yet. Start the sensor simulator in section 06 or the camera in section 10, then press CAPTURE BASELINE SESSION.' }),
         ),
         /* Explicit progress, because clicking capture and seeing nothing change
            is indistinguishable from a broken button. */

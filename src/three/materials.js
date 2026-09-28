@@ -20,7 +20,16 @@ export const PAL = {
   visor:  0x0d1b2e,
 };
 
-/* ── Star field: additive points with size + twinkle ────── */
+/* ── Star field ──────────────────────────────────────────
+   Upgraded from a two-colour mix to a real stellar temperature ramp, plus
+   diffraction spikes on the brightest stars.
+
+   Why it matters visually: a field of identical white dots reads as texture
+   noise. Real skies read as a field because a handful of stars are obviously
+   brighter and bluer or redder than the rest, and the brightest ones bloom
+   into a four-point cross. That contrast is what makes the background look
+   like space rather than like static.
+   ────────────────────────────────────────────────────────── */
 export function starMaterial() {
   return new THREE.ShaderMaterial({
     transparent: true,
@@ -31,8 +40,7 @@ export function starMaterial() {
       uPixelRatio: { value: 1 },
       uSize: { value: 9 },
       uOpacity: { value: 1 },
-      uColorA: { value: new THREE.Color(PAL.white) },
-      uColorB: { value: new THREE.Color(PAL.cyan) },
+      uSpike: { value: 0.85 },
     },
     vertexShader: /* glsl */`
       attribute float aScale;
@@ -43,30 +51,100 @@ export function starMaterial() {
       uniform float uSize;
       varying float vTint;
       varying float vTwinkle;
+      varying float vBright;
+      varying float vPointSize;
       void main() {
         vTint = aTint;
+        /* aScale runs ~0.15..2.0; normalise it into a brightness weight */
+        vBright = clamp((aScale - 0.15) / 1.85, 0.0, 1.0);
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         gl_Position = projectionMatrix * mv;
-        float tw = 0.62 + 0.38 * sin(uTime * 1.6 + aPhase * 6.2831);
+        /* brighter stars twinkle less, the way real bright stars do */
+        float amp = mix(0.42, 0.10, vBright);
+        float tw = (1.0 - amp) + amp * sin(uTime * 1.5 + aPhase * 6.2831);
         vTwinkle = tw;
-        gl_PointSize = uSize * aScale * uPixelRatio * (26.0 / -mv.z);
-        gl_PointSize = clamp(gl_PointSize, 0.6, 42.0);
+        /* Distance attenuation with a POWER of 0.75, not a linear inverse.
+           The star shells sit 150-300 units out, so a linear 26/ -z term was
+           resolving every star to roughly two pixels. At two pixels none of
+           the work in the fragment shader is visible at all — no temperature
+           colour, no spikes, no core-versus-halo — which is exactly why the
+           sky looked unchanged. A softer falloff keeps distant stars large
+           enough to actually render as stars. */
+        float atten = pow(60.0 / max(1.0, -mv.z), 0.75);
+        gl_PointSize = uSize * aScale * uPixelRatio * atten;
+        gl_PointSize = clamp(gl_PointSize, 1.2, 40.0);
+        /* The fragment shader needs the sprite's real size in pixels to draw
+           spikes at a constant width. exp2() inverts the perspective divide. */
+        vPointSize = gl_PointSize;
       }
     `,
     fragmentShader: /* glsl */`
-      uniform vec3 uColorA;
-      uniform vec3 uColorB;
       uniform float uOpacity;
+      uniform float uSpike;
       varying float vTint;
       varying float vTwinkle;
+      varying float vBright;
+      varying float vPointSize;
+
+      /* OBAFGKM-ish ramp: 0 = cool orange-red, 1 = hot blue-white.
+         Deliberately more saturated than a physical blackbody table — on a
+         dim, heavily tone-mapped sky a physically-correct ramp reads as
+         uniform grey, which is what the previous version produced. */
+      vec3 starColour(float t) {
+        vec3 m = vec3(1.00, 0.42, 0.22);   // M
+        vec3 k = vec3(1.00, 0.68, 0.38);   // K
+        vec3 g = vec3(1.00, 0.93, 0.74);   // G
+        vec3 a = vec3(0.93, 0.96, 1.00);   // A
+        vec3 b = vec3(0.55, 0.74, 1.00);   // B
+        vec3 o = vec3(0.40, 0.60, 1.00);   // O
+        if (t < 0.20) return mix(m, k, t / 0.20);
+        if (t < 0.42) return mix(k, g, (t - 0.20) / 0.22);
+        if (t < 0.62) return mix(g, a, (t - 0.42) / 0.20);
+        if (t < 0.84) return mix(a, b, (t - 0.62) / 0.22);
+        return mix(b, o, (t - 0.84) / 0.16);
+      }
+
       void main() {
         vec2 d = gl_PointCoord - vec2(0.5);
         float r = length(d);
         if (r > 0.5) discard;
-        float core = smoothstep(0.5, 0.0, r);
-        float glow = pow(core, 2.6);
-        vec3 col = mix(uColorA, uColorB, vTint);
-        gl_FragColor = vec4(col, glow * vTwinkle * uOpacity);
+
+        /* A TIGHTER halo than before. At power 3.2 the halo still had ~30% of
+           its brightness at r=0.35, which filled the sprite and buried the
+           spikes underneath it — the star measured as a clean round disc with
+           dark diagonals. Power 5.0 confines the halo near the core so the
+           arms have somewhere to show. */
+        float core = smoothstep(0.16, 0.0, r);
+        float halo = pow(smoothstep(0.5, 0.0, r), 5.0);
+
+        /* Four-point diffraction spikes.
+           The width is now expressed in PIXELS and converted into the
+           sprite's normalised space, because a fraction of the sprite shrinks
+           with it: at a 6 px point size the old fixed fraction worked out to
+           0.17 px and could never be seen. */
+        vec2 ad = abs(d);
+        float px = max(vPointSize, 1.0);
+        float spikeW = clamp(2.0 / px, 0.03, 0.20);   // ~2 px wide arms
+        /* Arms now reach the full sprite instead of stopping at half of it,
+           so they extend beyond the tightened halo. */
+        float reach = mix(0.34, 1.02, vBright);
+        float sh = smoothstep(spikeW, 0.0, ad.y) * smoothstep(reach, 0.0, ad.x);
+        float sv = smoothstep(spikeW, 0.0, ad.x) * smoothstep(reach, 0.0, ad.y);
+        float spikes = (sh + sv) * uSpike * pow(vBright, 0.9);
+
+        vec3 col = starColour(vTint);
+
+        /* The core used to be multiplied by 1.35 and blended 55% toward white
+           with a brightness-dependent mix, so every bright star saturated to
+           white and the temperature colour was lost. Both are dialled back so
+           the colour survives the core. */
+        vec3 hot = mix(col, vec3(1.0), 0.28 * vBright);
+        /* Spikes weighted heavily: they are thin, so they need a high
+           amplitude to survive next to a saturated core. */
+        vec3 rgb = col * halo * 1.15 + hot * core * 0.80 + col * spikes * 2.4;
+
+        float a = (halo * 0.85 + core * 0.92 + spikes * 1.0) * vTwinkle * uOpacity;
+        gl_FragColor = vec4(rgb, clamp(a, 0.0, 1.0));
       }
     `,
   });
@@ -124,7 +202,87 @@ export function nebulaMaterial(color, opacity = 0.5) {
   });
 }
 
-/* ── Fresnel shell: rim-lit atmosphere / membrane look ──── */
+/* ── Atmosphere shell ────────────────────────────────────
+   A plain fresnel rim glows equally all the way round, which makes a planet
+   look like a glowing ball. A real atmosphere is brightest where the sun
+   strikes it and fades to almost nothing on the night side, and that
+   asymmetry is most of what sells a planet as lit rather than emissive.
+
+   `uLightDir` is the world-space direction TO the sun. The rim term is
+   modulated by how much the shell's outward normal faces it, so the glow
+   peaks on the dayside limb and dies away across the terminator.
+   ──────────────────────────────────────────────────────── */
+export function atmosphereMaterial(color, {
+  power = 3.0,
+  intensity = 1.0,
+  lightDir = new THREE.Vector3(1, 0.35, 0.9).normalize(),
+  terminator = 0.85,
+} = {}) {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide,
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uPower: { value: power },
+      uIntensity: { value: intensity },
+      uTime: { value: 0 },
+      uLightDir: { value: lightDir.clone() },
+      uTerminator: { value: terminator },
+    },
+    vertexShader: /* glsl */`
+      varying vec3 vNormalW;
+      varying vec3 vViewDir;
+      varying vec3 vWorldPos;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPos = wp.xyz;
+        vNormalW = normalize(mat3(modelMatrix) * normal);
+        vViewDir = normalize(cameraPosition - wp.xyz);
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform vec3  uColor;
+      uniform float uPower;
+      uniform float uIntensity;
+      uniform float uTime;
+      uniform vec3  uLightDir;
+      uniform float uTerminator;
+      varying vec3 vNormalW;
+      varying vec3 vViewDir;
+      varying vec3 vWorldPos;
+
+      void main() {
+        vec3 n = normalize(vNormalW);
+
+        /* On a BackSide shell the outward direction is the negated normal. */
+        float rim = pow(1.0 - abs(dot(normalize(vViewDir), n)), uPower);
+
+        /* Sun-facing weight. On the far side of the shell the normal points
+           away from the camera, so flip it to get the outward hemisphere. */
+        vec3 outN = normalize(vWorldPos - vec3(0.0));
+        float sun = dot(outN, normalize(uLightDir));
+        float lit = smoothstep(-uTerminator, uTerminator, sun);
+
+        /* A thin brightening right at the limb where the atmosphere is
+           optically thickest — without it the glow looks like fog. Kept
+           modest: at 0.55 it combined with the additive blend to wash the
+           entire dayside hemisphere of the disc to near-white, which hid the
+           surface texture underneath it. */
+        float limbBoost = 1.0 + 0.28 * pow(1.0 - abs(dot(normalize(vViewDir), n)), 6.0);
+
+        float a = rim * lit * uIntensity * limbBoost;
+        /* Colour is no longer brightened by the lit term — that was the second
+           half of the washing-out problem. */
+        gl_FragColor = vec4(uColor, clamp(a, 0.0, 1.0));
+      }
+    `,
+  });
+}
+
+/* ── Fresnel shell: rim-lit membrane look ────────────────── */
 export function fresnelMaterial(color, { power = 2.6, intensity = 1.0, side = THREE.FrontSide } = {}) {
   return new THREE.ShaderMaterial({
     transparent: true,

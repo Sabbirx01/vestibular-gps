@@ -1,7 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
-   Astronaut — two procedural figures, no external models.
+   Astronaut — real NASA ACES suit first, procedural EVA fallback second.
    1. FloatingAstronaut : the site's visual narrator, drifting
-      in the background and reacting to pointer + microgravity.
    2. MeasurementSubject : a standing, arms-extended figure that
       rotates slowly inside an instrument frame, with body axis,
       head axis, centre-of-gravity marker and vestibular signal
@@ -13,7 +12,7 @@ import {
   SUIT, SUIT_PANEL, SUIT_DARK, VISOR, GOLD, PAL, glowLine,
 } from './materials.js';
 import {
-  loadModel, dressMaterials, normalizeModel, trianglesOf, boundsOf,
+  loadModel, dressMaterials, normalizeModel, trianglesOf, boundsOf, decorateSuit,
 } from './ModelLibrary.js';
 import { damp, TAU, clamp } from '../core/util.js';
 
@@ -157,13 +156,10 @@ export class FloatingAstronaut {
     l.position.set(0, 1.7, 0.35);
     this.root.add(l);
 
-    /* rim glow shell */
-    const rim = new THREE.Mesh(
-      new THREE.SphereGeometry(0.62, 20, 16),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(PAL.blue), transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false }),
-    );
-    rim.position.y = 1.35;
-    this.root.add(rim);
+    /* No enclosing glow sphere around the astronaut. The old translucent shell
+       read as a floating bubble in front of the helmet on first paint, then
+       disappeared when the GLB replaced the fallback. Keep the suit separated
+       with its real rim light instead; never render a bubble around the body. */
 
     this.tether = glowLine(
       [new THREE.Vector3(0, 0.4, 0), new THREE.Vector3(-0.7, -0.3, 0.6), new THREE.Vector3(-1.9, -1.4, 1.5)],
@@ -171,11 +167,16 @@ export class FloatingAstronaut {
     );
     this.root.add(this.tether);
 
-    this.t = Math.random() * 10;
+    /* Deterministic entrance pose: judges must never see a random side-facing
+       astronaut or a tilt on first paint. Interaction is enabled only after a
+       short settle window, then pointer motion can steer the figure. */
+    this.t = 0;
+    this.poseAge = 0;
     this.baseY = 0;
-    this.baseRot = Math.random() * TAU;
+    this.baseRot = 0;
     this.pointer = { x: 0, y: 0 };
     this.scale = 1;
+    this.assetFront = 1;
   }
 
   /**
@@ -205,6 +206,18 @@ export class FloatingAstronaut {
       this.realBody = carrier;
       this.root.add(carrier);
 
+      /* Mirrored visor, helmet work lights, chest status cluster and a
+         grounding rim, all placed by measuring the asset's own material
+         groups. Without these the suit reads as a white domed mannequin. */
+      this.suitDetail = decorateSuit(carrier);
+      /* The asset's visor bounds tell us which local direction is front. Keep
+         that front toward the camera immediately; never reveal a side profile
+         while the hero is settling. */
+      this.assetFront = this.suitDetail.front || 1;
+      carrier.rotation.y = this.assetFront < 0 ? Math.PI : 0;
+      carrier.rotation.x = 0;
+      carrier.rotation.z = 0;
+
       /* Three-point rig. The earlier single dim point light left the lower
          legs and boots merging into the starfield. */
       const key = new THREE.DirectionalLight(0xffffff, 3.2);
@@ -228,6 +241,8 @@ export class FloatingAstronaut {
         height: +(b.max.y - b.min.y).toFixed(3),
         width: +(b.max.x - b.min.x).toFixed(3),
         tris: trianglesOf(carrier),
+        visor: this.suitDetail.visor,
+        visorTris: this.suitDetail.tris,
       };
       this.usingRealModel = true;
       return true;
@@ -241,24 +256,36 @@ export class FloatingAstronaut {
 
   update(dt, state) {
     this.t += dt;
+    this.poseAge += dt;
     const t = this.t;
     const floatAmt = state.mode === 'MICROGRAVITY' ? 1.45 : 0.85;
     const q = state.reducedMotion || this.reduced ? 0 : 1;
+    /* First-paint lock: no idle spin, orbit, or roll while the GLB/fallback is
+       settling. After 1.6s only pointer-driven steering is allowed; the hero
+       never starts rotating by itself in front of a judge. */
+    const interactive = this.poseAge > 1.6 && q;
+    const steer = interactive ? this.pointer.x : 0;
+    const tilt = interactive ? this.pointer.y : 0;
 
-    this.root.position.y = this.baseY + Math.sin(t * 0.31) * 0.14 * floatAmt * q;
-    this.root.position.x = Math.sin(t * 0.19) * 0.09 * floatAmt * q;
-    this.root.position.z = Math.cos(t * 0.23) * 0.07 * floatAmt * q;
+    this.root.position.y = this.baseY + (interactive ? Math.sin(t * 0.31) * 0.04 * floatAmt : 0);
+    this.root.position.x = interactive ? Math.sin(t * 0.19) * 0.025 * floatAmt : 0;
+    this.root.position.z = interactive ? Math.cos(t * 0.23) * 0.02 * floatAmt : 0;
 
-    this.root.rotation.y = this.baseRot + t * 0.055 * q + this.pointer.x * 0.32;
-    this.root.rotation.x = damp(this.root.rotation.x, -this.pointer.y * 0.16, 3, dt);
-    this.root.rotation.z = Math.sin(t * 0.17) * 0.05 * floatAmt * q;
+    this.root.rotation.y = this.baseRot + steer * 0.28;
+    this.root.rotation.x = damp(this.root.rotation.x, -tilt * 0.08, 4, dt);
+    this.root.rotation.z = damp(this.root.rotation.z, interactive ? 0 : 0, 5, dt);
 
     /* The real suit is a single rigid mesh with no skeleton attached, so the
        microgravity drift is expressed by the whole figure instead of joints. */
     if (this.usingRealModel && this.realBody) {
-      this.realBody.rotation.z = Math.sin(t * 0.33) * 0.09 * floatAmt * q;
-      this.realBody.rotation.x = Math.cos(t * 0.27) * 0.055 * floatAmt * q;
-      this.realBody.position.y = 0.02 + Math.sin(t * 0.4) * 0.035 * floatAmt * q;
+      /* Root rotation owns the view direction. Do not rotate the carrier a
+         second time: that double transform was the source of the sideways
+         entrance pose. Keep the first frame perfectly level; later movement
+         is only a very small pointer/gravity response. */
+      this.realBody.rotation.y = 0;
+      this.realBody.rotation.z = interactive ? Math.sin(t * 0.33) * 0.008 * floatAmt : 0;
+      this.realBody.rotation.x = interactive ? Math.cos(t * 0.27) * 0.010 * floatAmt : 0;
+      this.realBody.position.y = 0.02 + (interactive ? Math.sin(t * 0.4) * 0.008 * floatAmt : 0);
       return;
     }
 
@@ -279,8 +306,10 @@ export class FloatingAstronaut {
 
     J.spine.rotation.y = Math.sin(t * 0.21) * 0.07 * q;
     J.chest.rotation.z = Math.sin(t * 0.26) * 0.05 * q;
-    J.head.rotation.y = Math.sin(t * 0.33) * 0.2 * q + this.pointer.x * 0.25;
-    J.head.rotation.x = -this.pointer.y * 0.18;
+    /* Fallback suit also stays front-facing on first paint. Once interactive,
+       only the helmet follows pointer input; there is no autonomous spin. */
+    J.head.rotation.y = interactive ? this.pointer.x * 0.08 : 0;
+    J.head.rotation.x = interactive ? -this.pointer.y * 0.06 : 0;
   }
 
   dispose() {
@@ -298,10 +327,31 @@ export class MeasurementSubject {
     this.root = new THREE.Group();
     this.root.name = 'measurement-subject';
 
-    const { group, joints } = buildBody({ detail: quality.astronautDetail, suit: false });
+    /* `bare` is retained as an explicit opt-in for science/debug views. The
+       production measurement subject passes bare:false, so its fallback is
+       still an astronaut rather than a skin-toned mannequin while the NASA
+       ACES GLB is loading. */
+    const { group, joints } = buildBody({ detail: quality.astronautDetail, suit: !bare });
     this.body = group;
     this.joints = joints;
     this.root.add(group);
+
+    if (!bare) {
+      /* Compact PLSS/backpack for the offline fallback. The real GLB has its
+         own pack; this keeps the loading/failure frame visually consistent. */
+      const pack = new THREE.Mesh(
+        new THREE.BoxGeometry(0.28, 0.34, 0.12),
+        SUIT_PANEL(),
+      );
+      pack.position.set(0, 0.02, -0.19);
+      joints.chest.add(pack);
+      const packBand = new THREE.Mesh(
+        new THREE.BoxGeometry(0.20, 0.035, 0.014),
+        GOLD(),
+      );
+      packBand.position.set(0, 0.12, -0.255);
+      joints.chest.add(packBand);
+    }
 
     /* ── Pose: arms fully extended, feet aligned, neutral ── */
     joints.armL.shoulder.rotation.z = 1.42;
@@ -311,15 +361,18 @@ export class MeasurementSubject {
     joints.legL.hip.rotation.z = 0.03;
     joints.legR.hip.rotation.z = -0.03;
 
-    /* eyes on the head so gaze direction reads */
-    const eyeGeo = new THREE.SphereGeometry(0.012, 10, 8);
-    const eyeMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff, emissive: new THREE.Color(PAL.cyan), emissiveIntensity: 0.7, roughness: 0.2,
-    });
-    for (const s of [-1, 1]) {
-      const e = new THREE.Mesh(eyeGeo, eyeMat);
-      e.position.set(s * 0.032, 0.028, 0.086);
-      joints.head.add(e);
+    /* Eyes are only added in an explicitly bare debug view. A suited fallback
+       must keep the visor opaque and never show floating eyes through it. */
+    if (bare) {
+      const eyeGeo = new THREE.SphereGeometry(0.012, 10, 8);
+      const eyeMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff, emissive: new THREE.Color(PAL.cyan), emissiveIntensity: 0.7, roughness: 0.2,
+      });
+      for (const s of [-1, 1]) {
+        const e = new THREE.Mesh(eyeGeo, eyeMat);
+        e.position.set(s * 0.032, 0.028, 0.086);
+        joints.head.add(e);
+      }
     }
 
     /* ── Vertical reference: height scale bars ── */
@@ -466,6 +519,7 @@ export class MeasurementSubject {
     this.root.add(disc);
 
     this.t = 0;
+    this.poseAge = 0;
     this.spinSpeed = 0.16;
     this.pointer = { x: 0, y: 0 };
   }
@@ -489,12 +543,18 @@ export class MeasurementSubject {
       this.body.visible = false;
       this.realBody = carrier;
       this.root.add(carrier);
+      this.suitDetail = decorateSuit(carrier);
+      /* The GLB's front is measured from the visor material, not guessed from
+         the camera. Apply the correction once here; update() must never add a
+         second yaw that can turn the suit sideways or upside down. */
+      carrier.rotation.set(0, this.suitDetail.front < 0 ? Math.PI : 0, 0);
 
       const b = boundsOf(carrier);
       this.realMetrics = {
         height: +(b.max.y - b.min.y).toFixed(3),
         width: +(b.max.x - b.min.x).toFixed(3),
         tris: trianglesOf(carrier),
+        visor: this.suitDetail.visor,
       };
       this.usingRealModel = true;
       return true;
@@ -508,32 +568,37 @@ export class MeasurementSubject {
 
   update(dt, state) {
     this.t += dt;
+    this.poseAge += dt;
     const t = this.t;
     const q = state.reducedMotion || this.reduced ? 0 : 1;
+    const interactive = this.poseAge > 1.6 && q;
+    const motion = interactive ? q : 0;
 
-    /* the subject rotates; slow breathing keeps it alive */
-    this.body.rotation.y = t * this.spinSpeed * q + this.pointer.x * 0.5;
-    this.body.rotation.x = Math.sin(t * 0.4) * 0.012 * q;
+    /* Entrance lock: the measurement subject is square to camera first. After
+       the short settle window it can rotate from pointer input, but never
+       starts in a side/back pose. */
+    this.body.rotation.y = interactive ? this.pointer.x * 0.5 : 0;
+    this.body.rotation.x = interactive ? Math.sin(t * 0.4) * 0.006 * q : 0;
     this.joints.chest.scale.y = 1 + Math.sin(t * 1.1) * 0.006 * q;
 
     /* When the real suit is in use it is a single rigid mesh, so it turns as a
        whole. The hidden procedural body below keeps running, which costs
        nothing and means the overlays always update on the same code path. */
     if (this.usingRealModel && this.realBody) {
-      this.realBody.rotation.y = t * this.spinSpeed * q + this.pointer.x * 0.5;
-      this.realBody.rotation.x = Math.sin(t * 0.4) * 0.012 * q;
+      this.realBody.rotation.y = interactive ? this.pointer.x * 0.5 : 0;
+      this.realBody.rotation.x = interactive ? Math.sin(t * 0.4) * 0.006 * q : 0;
     }
 
     /* arms settle into the extended pose with micro-drift */
     const J = this.joints;
-    J.armL.shoulder.rotation.z = 1.42 + Math.sin(t * 0.5) * 0.03 * q;
-    J.armR.shoulder.rotation.z = -1.42 - Math.sin(t * 0.5 + 0.4) * 0.03 * q;
-    J.armL.shoulder.rotation.x = damp(J.armL.shoulder.rotation.x, -this.pointer.y * 0.2, 3, dt);
-    J.armR.shoulder.rotation.x = damp(J.armR.shoulder.rotation.x, -this.pointer.y * 0.2, 3, dt);
-    J.legL.hip.rotation.x = Math.sin(t * 0.44) * 0.014 * q;
-    J.legR.hip.rotation.x = Math.sin(t * 0.44 + 1.2) * 0.014 * q;
-    J.head.rotation.y = Math.sin(t * 0.28) * 0.16 * q + this.pointer.x * 0.3;
-    J.head.rotation.x = -this.pointer.y * 0.2;
+    J.armL.shoulder.rotation.z = 1.42 + Math.sin(t * 0.5) * 0.03 * motion;
+    J.armR.shoulder.rotation.z = -1.42 - Math.sin(t * 0.5 + 0.4) * 0.03 * motion;
+    J.armL.shoulder.rotation.x = damp(J.armL.shoulder.rotation.x, interactive ? -this.pointer.y * 0.2 : 0, 3, dt);
+    J.armR.shoulder.rotation.x = damp(J.armR.shoulder.rotation.x, interactive ? -this.pointer.y * 0.2 : 0, 3, dt);
+    J.legL.hip.rotation.x = Math.sin(t * 0.44) * 0.014 * motion;
+    J.legR.hip.rotation.x = Math.sin(t * 0.44 + 1.2) * 0.014 * motion;
+    J.head.rotation.y = interactive ? this.pointer.x * 0.12 : 0;
+    J.head.rotation.x = interactive ? -this.pointer.y * 0.08 : 0;
 
     /* axes stay world-aligned while the body turns → shows the offset */
     this.headAxis.visible = true;

@@ -338,11 +338,11 @@
     </header>
 
     <div class="grid grid-aside">
-      <div class="glass stage reveal">
+      <div class="glass stage stage-vor reveal">
         <canvas id="vorCanvas" class="stage-canvas" aria-label="Vestibulo-ocular reflex simulation: a head rotates while the eyes counter-rotate to hold the target steady"></canvas>
         <div class="stage-tools">
           <button type="button" class="btn btn-sm" id="vorPlay">PAUSE</button>
-          <span class="badge" id="vorGainBadge">GAIN 1.00</span>
+          <span class="badge" id="vorGainBadge">GAIN 0.82</span>
         </div>
       </div>
 
@@ -351,7 +351,7 @@
           <div class="panel-head"><h3>Stimulus</h3><p>Head rotation is sinusoidal; eye velocity is modelled as a counter-rotation.</p></div>
           <label class="range"><span>FREQUENCY <b id="vorFreqV">0.50 Hz</b></span><input type="range" id="vorFreq" min="0.1" max="4" step="0.05" value="0.5" /></label>
           <label class="range"><span>AMPLITUDE <b id="vorAmpV">20&deg;</b></span><input type="range" id="vorAmp" min="2" max="60" step="1" value="20" /></label>
-          <label class="range"><span>REFLEX GAIN <b id="vorGainV">1.00</b></span><input type="range" id="vorGain" min="0" max="1.4" step="0.02" value="1" /></label>
+          <label class="range"><span>REFLEX GAIN <b id="vorGainV">0.82</b></span><input type="range" id="vorGain" min="0" max="1.4" step="0.02" value="0.82" /></label>
           <p class="caption">Gain 1.0 means eye velocity matches head velocity. Below ~0.7, retinal slip becomes visible — the world would smear.</p>
         </div>
         <div class="glass panel reveal">

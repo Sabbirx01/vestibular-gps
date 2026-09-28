@@ -135,14 +135,24 @@ function stdev(a) {
   return Math.sqrt(sum(a.map((v) => (v - m) ** 2)) / (a.length - 1));
 }
 
-/** Deterministic PRNG so a bootstrap interval is reproducible run to run. */
-function mulberry32(seed) {
+/**
+ * Deterministic PRNG so a bootstrap interval is reproducible run to run.
+ *
+ * MUST stay byte-identical to `mulberry32` in core/util.js. This module keeps
+ * its own copy so it remains import-free and testable on its own, but the two
+ * implementations had drifted into different mixings — the pairs of numbers
+ * they produced from the same seed did not match, which quietly broke the
+ * "reproducible" claim for anything comparing the two.
+ *
+ * Exported only so tests/osi.test.mjs can prove the two copies still agree;
+ * it is not part of the metric's public surface.
+ */
+export function mulberry32(seed) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
@@ -390,18 +400,28 @@ function bootstrapCI(session, baseline, { available, seed, iterations = 1000 }) 
  */
 function standardErrorOfMeasurement(baseline) {
   if (!baseline?.usable) return 3.5;      // conservative prior when unknown
-  const sems = [];
+
+  /* Keyed by domain id, NOT by position.
+     Regression: the first version pushed into an array and then indexed it
+     with the DOMAINS position. Whenever one domain was skipped — because it
+     had fewer than two baseline values — every later domain's SEM shifted one
+     slot and was multiplied by the WRONG weight, silently corrupting MDC95,
+     which is the threshold every "the change was real" claim is measured
+     against. A Map cannot get out of step. */
+  const sem = new Map();
   for (const d of DOMAINS) {
     const b = baseline.domains[d.id];
     if (!b || b.raw.length < 2) continue;
-    /* convert one MAD of raw dispersion into sub-score units near the centre */
-    const z = b.mad > 1e-6 ? 1 : 0;
-    const delta = z ? Math.abs(100 * Math.exp(-1 / K) - 100) : 0;
-    sems.push(delta || 2.2);
+    /* One scale unit is one z. Near the centre the sub-score curve has slope
+       100/K, so one MAD of raw dispersion moves the sub-score by ~20 points.
+       A perfectly flat baseline means the reference is precise, not
+       unmeasurable, so it keeps a small floor rather than zero. */
+    const delta = b.mad > 1e-6 ? Math.abs(100 * Math.exp(-1 / K) - 100) : 0;
+    sem.set(d.id, delta || 2.2);
   }
-  if (!sems.length) return 3.5;
+  if (!sem.size) return 3.5;
   /* SEM on the index is the weighted root-sum-square of the domain SEMs */
-  const acc = DOMAINS.reduce((a, d, i) => a + (sems[i] ?? 2.2) ** 2 * d.weight ** 2, 0);
+  const acc = DOMAINS.reduce((a, d) => a + (sem.get(d.id) ?? 2.2) ** 2 * d.weight ** 2, 0);
   return Math.sqrt(acc);
 }
 

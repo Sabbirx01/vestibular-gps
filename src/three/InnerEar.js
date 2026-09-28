@@ -7,9 +7,8 @@
    ═══════════════════════════════════════════════════════════ */
 
 import * as THREE from '../../vendor/three.module.js';
-import { PAL, energyMaterial, tissueMaterial, glowLine, labelSprite, disposeTree } from './materials.js';
-import { clamp, damp, TAU, lerp } from '../core/util.js';
-import { EAR_STRUCTURES } from '../science/content.js';
+import { PAL, glowLine, labelSprite, disposeTree } from './materials.js';
+import { clamp, damp, TAU } from '../core/util.js';
 
 export class InnerEar {
   constructor({ quality = 'HIGH', onSelect = () => {}, reducedMotion = false } = {}) {
@@ -19,7 +18,9 @@ export class InnerEar {
 
     this.root = new THREE.Group();
     this.root.name = 'inner-ear';
-    this.root.scale.setScalar(1);
+    /* Enlarged for the hero viewport: the canals should read as anatomy at a
+       glance, not as tiny decorative rings floating in a dark canvas. */
+    this.root.scale.setScalar(1.16);
 
     this.pickables = [];
     this.parts = {};
@@ -47,12 +48,15 @@ export class InnerEar {
   _canal({ radius, tube, axis, tilt, color, id }) {
     const grp = new THREE.Group();
     /* 270° arc so it reads as a canal rather than a full ring */
+    /* Outer membranous duct + a smaller luminous endolymph lumen. The two
+       shells give the canals depth under the glassy lighting instead of a
+       single flat neon tube. */
     const arc = new THREE.Mesh(
-      new THREE.TorusGeometry(radius, tube, 14, 96, TAU * 0.72),
+      new THREE.TorusGeometry(radius, tube, 18, 128, TAU * 0.72),
       new THREE.MeshPhysicalMaterial({
-        color: 0x9fd4ea, roughness: 0.22, metalness: 0.05,
-        transparent: true, opacity: 0.42, transmission: 0.4, thickness: 0.4, ior: 1.35,
-        clearcoat: 0.8, clearcoatRoughness: 0.2,
+        color: 0xb9d9eb, roughness: 0.18, metalness: 0.03,
+        transparent: true, opacity: 0.58, transmission: 0.48, thickness: 0.36, ior: 1.35,
+        clearcoat: 0.95, clearcoatRoughness: 0.16,
       }),
     );
     arc.rotation.z = TAU * 0.1;
@@ -61,8 +65,8 @@ export class InnerEar {
 
     /* inner lumen so the canal reads as a duct */
     const lumen = new THREE.Mesh(
-      new THREE.TorusGeometry(radius, tube * 0.52, 10, 80, TAU * 0.72),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0.24, blending: THREE.AdditiveBlending, depthWrite: false }),
+      new THREE.TorusGeometry(radius, tube * 0.56, 12, 112, TAU * 0.72),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0.46, blending: THREE.AdditiveBlending, depthWrite: false }),
     );
     lumen.rotation.z = TAU * 0.1;
     grp.add(lumen);
@@ -242,12 +246,24 @@ export class InnerEar {
 
     /* ── Base grid ring so the model sits in space ── */
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(1.15, 1.17, 96),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(PAL.cyan), transparent: true, opacity: 0.14, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }),
+      new THREE.RingGeometry(1.15, 1.17, 128),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(PAL.cyan), transparent: true, opacity: 0.18, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }),
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = -0.9;
     g.add(ring);
+
+    /* Fine instrument rings behind the organ establish scale and make the
+       model feel embedded in a calibrated vestibular scanner. */
+    for (let i = 1; i <= 3; i++) {
+      const guide = new THREE.Mesh(
+        new THREE.RingGeometry(1.15 + i * 0.16, 1.15 + i * 0.16 + 0.002, 128),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(i === 2 ? PAL.violet : PAL.blue), transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false }),
+      );
+      guide.rotation.x = -Math.PI / 2;
+      guide.position.y = -0.895 + i * 0.001;
+      g.add(guide);
+    }
 
     /* ── Lights local to the model ── */
     const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(2.4, 3, 2.6); g.add(key);
@@ -339,7 +355,11 @@ export class InnerEar {
       if (!inst) continue;
       const base = inst.userData.base;
       const localDisp = disp.clone();
-      parentMesh.worldToLocal ? null : null;
+      /* Documented simplification: the otoconia offset is applied in world
+         axes for both organs, so the utricle and saccule are not projected
+         onto their own macula planes. They are separate meshes with separate
+         base positions, but a tilt does not yet move them differently — only
+         the shared gravity vector changes. */
       for (let i = 0; i < base.length; i++) {
         const p = base[i];
         const bulge = 0.0035 * Math.sin(t * 2 + p.x * 30 + p.z * 22) * q;

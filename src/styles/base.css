@@ -9,6 +9,8 @@ html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--topbar-h) + 18px);
+  overscroll-behavior-y: none;
+  scroll-snap-type: y proximity;
 }
 html[data-reduced-motion="true"] { scroll-behavior: auto; }
 
@@ -26,8 +28,13 @@ body {
   overflow-x: hidden;
   overscroll-behavior-y: none;
 }
+main > .section { scroll-snap-align: start; scroll-margin-top: calc(var(--topbar-h) + 18px); }
 body.vg-boot, body.vg-intro { overflow: hidden; height: 100vh; }
-body.vg-custom-cursor, body.vg-custom-cursor * { cursor: none !important; }
+/* Keep the browser's native hit cursor visible. The cinematic cursor is a
+   pointer-events:none visual follower; hiding the real cursor made the glow's
+   eased position look offset and caused users to click beside controls. */
+body.vg-custom-cursor, body.vg-custom-cursor * { cursor: auto; }
+body.vg-custom-cursor .cursor { cursor: none; }
 
 img, svg, canvas { display: block; max-width: 100%; }
 h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }

@@ -229,10 +229,14 @@ export function buildPlanetTextures(id, W = 512) {
             const d = Math.sqrt(dxa * dxa + dy * dy);
             if (d < c.r * 1.6) {
               const t = d / (c.r * 1.6);
-              const wave = (t - 1.0) * 5.2;
-              const rim = Math.exp(-(wave * wave)) * 0.55 * c.depth;
-              const floor = t < 0.82 ? -0.34 * c.depth * (1 - t) : 0;
-              v2 += (rim + floor) * 120;
+              /* A softer, wider rim ring... */
+              const wave = (t - 1.0) * 3.4;
+              const rim = Math.exp(-(wave * wave)) * 0.44 * c.depth;
+              /* ...and a smooth bowl instead of a thresholded disc. The old
+                 `t < 0.82 ? -x : 0` cut off abruptly, which painted flat oval
+                 patches that read as decals stuck onto the surface. */
+              const bowl = -0.34 * c.depth * Math.pow(Math.max(0, 1 - t), 1.8);
+              v2 += (rim + bowl) * 118;
             }
           }
         }
@@ -273,6 +277,63 @@ export function buildPlanetTextures(id, W = 512) {
         const cover = clamp01((n * 0.72 + band * 0.28 - 0.50) * 3.1);
         const a = Math.round(cover * 255);
         clouds[i] = 255; clouds[i + 1] = 255; clouds[i + 2] = 255; clouds[i + 3] = a;
+      }
+    }
+  }
+
+  /* ── Lunar ray systems ────────────────────────────────────
+     Bright ejecta streaks thrown far beyond the rim of the youngest craters.
+     Tycho is the famous example, and it is what makes the Moon recognisable
+     rather than merely grey and pitted. Implemented as a bounded post-pass so
+     it costs nothing on the other bodies. */
+  if (id === 'MOON') {
+    let s = 20261;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+
+    for (let r = 0; r < 5; r++) {
+      const cx0 = 0.15 + rnd() * 0.7;
+      const cy0 = 0.15 + rnd() * 0.7;
+      const reach = 0.06 + rnd() * 0.14;          // ray length in u
+      const spokes = 9 + Math.floor(rnd() * 8);
+      const strengths = Array.from({ length: spokes }, () => 0.25 + rnd() * 0.75);
+
+      const y0 = Math.max(0, Math.floor((cy0 - reach) * H));
+      const y1 = Math.min(H - 1, Math.ceil((cy0 + reach) * H));
+
+      for (let y = y0; y <= y1; y++) {
+        const v = (y + 0.5) / H;
+        for (let x = 0; x < W; x++) {
+          const u = (x + 0.5) / W;
+          const dx = u - cx0;
+          const dy = (v - cy0) * 0.5;             // aspect correct
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d > reach || d < 0.004) continue;
+
+          /* A gentle angular wobble and a width that narrows with distance.
+             Perfectly straight, constant-width spokes are what made the
+             previous pass read as an airbrushed starburst rather than as
+             ejecta. */
+          const wobble = Math.sin(d * 46 + r * 2.1) * 0.09;
+          let ang = Math.atan2(dy, dx) / (Math.PI * 2) + wobble;
+          if (ang < 0) ang += 1;
+          const spoke = ang * spokes;
+          const frac = spoke - Math.floor(spoke);
+          const si = Math.floor(spoke) % spokes;
+          /* A gentle exponent. Raising it toward 4.6 made each wedge so narrow
+             that almost no pixel cleared the threshold and the rays vanished
+             entirely — the previous pass had visible spokes and this one had
+             none, which is a regression, not a refinement. */
+          const sharp = 1.5 + (1 - d / reach) * 0.9;
+          const wedge = Math.pow(1 - Math.abs(frac - 0.5) * 2, sharp);
+
+          const falloff = Math.pow(1 - d / reach, 1.5);
+          const amp = wedge * falloff * strengths[si] * 0.78;
+
+          const i = (y * W + x) * 4;
+          albedo[i]     = Math.min(255, albedo[i] + amp * 190);
+          albedo[i + 1] = Math.min(255, albedo[i + 1] + amp * 186);
+          albedo[i + 2] = Math.min(255, albedo[i + 2] + amp * 178);
+        }
       }
     }
   }
