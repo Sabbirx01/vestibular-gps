@@ -104,10 +104,11 @@ export function mountConsoleSection(ctx = {}) {
 
     /* eye–head coordination (deg of gaze error proxy) */
     if (cam) {
-      const avg = camRoll.reduce((a, s) => a + s.eyeHead, 0) / camRoll.length;
-      out.eye_head = +avg.toFixed(2);
-      const calibrated = camRoll[camRoll.length - 1]?.calibrated;
-      prov.eye_head = calibrated ? 'camera (calibrated)' : 'camera (uncalibrated — calibrate in section 10)';
+      /* No gaze landmarks are available in the offline camera provider.
+         Keep eye_head unavailable instead of turning head motion into a fake
+         VOR/gaze measurement. */
+      out.eye_head = null;
+      prov.eye_head = 'unavailable — camera measures head motion, not gaze';
     } else if (sim || orientation) {
       out.eye_head = +clamp(4.2 + (state.jerk || 0) * 0.02, 1, 18).toFixed(2);
       prov.eye_head = sim ? 'simulation' : 'orientation';

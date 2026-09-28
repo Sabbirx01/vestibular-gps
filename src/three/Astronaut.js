@@ -299,16 +299,22 @@ export class FloatingAstronaut {
     const t = this.t;
     const floatAmt = state.mode === 'MICROGRAVITY' ? 1.45 : 0.85;
     const q = state.reducedMotion || this.reduced ? 0 : 1;
+    const cameraLive = state.camera?.running && performance.now() - state.camera.lastAt < 1500;
+    const sensorX = cameraLive ? clamp(state.camera.dx / 8, -1, 1) : 0;
+    const sensorY = cameraLive ? clamp(state.camera.dy / 8, -1, 1) : 0;
     /* First-paint lock: no idle spin, orbit, or roll while the GLB/fallback is
        settling. After 1.6s only pointer-driven steering is allowed; the hero
        never starts rotating by itself in front of a judge. */
     const interactive = this.poseAge > 1.6 && q;
-    const steer = interactive ? this.pointer.x : 0;
-    const tilt = interactive ? this.pointer.y : 0;
+    const steer = interactive ? clamp(this.pointer.x * 0.72 + sensorX * 0.28, -1, 1) : 0;
+    const tilt = interactive ? clamp(this.pointer.y * 0.72 + sensorY * 0.28, -1, 1) : 0;
 
     this.root.position.y = this.baseY + (interactive ? Math.sin(t * 0.31) * 0.04 * floatAmt : 0);
-    this.root.position.x = interactive ? Math.sin(t * 0.19) * 0.025 * floatAmt : 0;
-    this.root.position.z = interactive ? Math.cos(t * 0.23) * 0.02 * floatAmt : 0;
+    /* Life-like microgravity drift: a slow swimming/breathing motion in the
+       open space, with no gravity drop. The amplitude stays restrained so the
+       astronaut remains readable and never clips the hero copy. */
+    this.root.position.x = interactive ? Math.sin(t * 0.19) * 0.055 * floatAmt + sensorX * 0.025 : 0;
+    this.root.position.z = interactive ? Math.cos(t * 0.23) * 0.045 * floatAmt + sensorY * 0.018 : 0;
 
     this.root.rotation.y = this.baseRot + steer * 0.28;
     this.root.rotation.x = damp(this.root.rotation.x, -tilt * 0.08, 4, dt);
@@ -325,8 +331,10 @@ export class FloatingAstronaut {
          pointer steering; resetting this to zero every frame could turn a
          re-exported asset back-facing after its correction was applied. */
       this.realBody.rotation.y = this.assetFront < 0 ? Math.PI : 0;
-      this.realBody.rotation.z = interactive ? Math.sin(t * 0.33) * 0.008 * floatAmt : 0;
-      this.realBody.rotation.x = interactive ? Math.cos(t * 0.27) * 0.010 * floatAmt : 0;
+      /* A subtle swimmer roll/yaw sells free-float without ever flipping the
+         body; the parent stays upright and the X/Z values are deliberately tiny. */
+      this.realBody.rotation.z = interactive ? Math.sin(t * 0.33) * 0.035 * floatAmt : 0;
+      this.realBody.rotation.x = interactive ? Math.cos(t * 0.27) * 0.024 * floatAmt : 0;
       this.realBody.position.y = 0.02 + (interactive ? Math.sin(t * 0.4) * 0.008 * floatAmt : 0);
       return;
     }
@@ -637,6 +645,7 @@ export class MeasurementSubject {
          interactive yaw. X/Z remain small visual drift only—never a roll. */
       this.realBody.rotation.y = this.assetFront < 0 ? Math.PI : 0;
       this.realBody.rotation.x = interactive ? Math.sin(t * 0.4) * 0.006 * q : 0;
+      this.realBody.rotation.z = interactive ? Math.sin(t * 0.33) * 0.018 * q : 0;
     }
 
     /* arms settle into the extended pose with micro-drift */

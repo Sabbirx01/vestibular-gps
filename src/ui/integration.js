@@ -265,20 +265,21 @@ export function mountIntegrationSection({ camera } = {}) {
 
     const calState = !c ? 'NOT STARTED' : c.calibrating ? `CALIBRATING ${Math.round((c.calProgress || 0) * 100)}%` : c.calibrated ? 'CALIBRATED' : 'NOT CALIBRATED — HOLD-STILL FLOOR NOT MEASURED';
     const calColour = !c ? 'info' : c.calibrating ? 'warn' : c.calibrated ? 'ok' : 'warn';
+    const liveRows = {
+      status: row('STATUS', c ? String(c.status).toUpperCase() : 'NOT STARTED'),
+      secure: row('SECURE CONTEXT', window.isSecureContext ? 'YES' : 'NO — CAMERA BLOCKED'),
+      samples: row('SAMPLES', c ? String(c.samples) : '0'),
+      rate: row('ANALYSIS RATE', c ? `${c.hz?.mean ? c.hz.mean().toFixed(1) : '—'} Hz` : '—'),
+      head: row('LIVE HEAD MOTION', state.camera ? `${state.camera.headMotion.toFixed(2)} deg/s` : '—'),
+      vor: row('LIVE EYE–HEAD / VOR', 'UNAVAILABLE — CAMERA HAS NO EYE LANDMARKS'),
+      quality: row('SIGNAL QUALITY', state.camera ? `${Math.round(state.camera.quality * 100)}%` : '—'),
+      energy: row('MOTION ENERGY (ABOVE FLOOR)', c ? Math.max(0, c.motionEnergy - (c.noiseFloor?.energy ?? 0)).toFixed(4) : '—'),
+      jitter: row('JITTER (ABOVE FLOOR)', c ? Math.max(0, c.jitter - (c.noiseFloor?.jitter ?? 0)).toFixed(4) : '—'),
+    };
 
     wrap.append(
       el('div', { class: 'cam-stage' }, video, cv),
-      el('div', { class: 'cam-rows' },
-        row('STATUS', c ? String(c.status).toUpperCase() : 'NOT STARTED'),
-        row('SECURE CONTEXT', window.isSecureContext ? 'YES' : 'NO — CAMERA BLOCKED'),
-        row('SAMPLES', c ? String(c.samples) : '0'),
-        row('ANALYSIS RATE', c ? `${c.hz?.mean ? c.hz.mean().toFixed(1) : '—'} Hz` : '—'),
-        row('LIVE HEAD MOTION', state.camera ? `${state.camera.headMotion.toFixed(2)} deg/s` : '—'),
-        row('LIVE EYE–HEAD PROXY', state.camera ? `${state.camera.eyeHead.toFixed(2)}°` : '—'),
-        row('SIGNAL QUALITY', state.camera ? `${Math.round(state.camera.quality * 100)}%` : '—'),
-        row('MOTION ENERGY (ABOVE FLOOR)', c ? Math.max(0, c.motionEnergy - (c.noiseFloor?.energy ?? 0)).toFixed(4) : '—'),
-        row('JITTER (ABOVE FLOOR)', c ? Math.max(0, c.jitter - (c.noiseFloor?.jitter ?? 0)).toFixed(4) : '—'),
-      ),
+      el('div', { class: 'cam-rows' }, ...Object.values(liveRows)),
       el('div', { class: 'cam-rows' },
         el('div', { class: 'cam-row' }, el('span', { text: 'CALIBRATION' }),
           el('span', { class: `tag tag-${calColour}`, text: calState })),

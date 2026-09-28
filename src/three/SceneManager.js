@@ -35,9 +35,10 @@ const FRAMING = {
   'sec-final':      { focus: 'astronaut',dist: 7.4,  height: 1.8, look: 1.5,  env: 0.5 },
 };
 
-/* Where the planetary bodies sit in world space. Kept as one constant so the
-   camera framing and the object placement can never drift apart. */
-const SOLAR_POS = [-1.2, -0.75, -10.5];
+  /* Earth reference sits below the astronaut in the hero composition. The
+     active planet is a gravity reference, not a floating bubble beside the
+     helmet. */
+const SOLAR_POS = [1.75, -2.35, -9.2];
 
 /* Which 3D layers are drawn in which section. Solar bodies are hidden on text-heavy
    sections so a planet can never end up sitting on top of a paragraph. */
@@ -159,11 +160,11 @@ export class SceneManager {
       /* Measured: scale 2.75 puts the figure at 49.9% of viewport height with
          419 px clearance from the HUD, but it sat high with a ~157 px dead band
          under the boots, so it is dropped to balance the composition. */
-      this.astronaut.root.position.set(2.05, -0.5, 2.05);
-      /* The suit is already normalized to 1.86 world units. 2.75 was tuned
-         against the old sideways axis and made the corrected asset fill the
-         entire hero. Keep a judge-readable half-height figure. */
-      this.astronaut.root.scale.setScalar(1.72);
+      /* Keep the astronaut prominent but inside the hero's open right column.
+         It floats above the Earth reference instead of overlapping the title
+         or cards. */
+      this.astronaut.root.position.set(2.2, -0.05, 1.85);
+      this.astronaut.root.scale.setScalar(2.15);
       /* Straight-on entrance pose. The astronaut may respond to pointer input
          after its own settle window, but it must not arrive tilted. */
       this.astronaut.root.rotation.set(0, 0, 0);

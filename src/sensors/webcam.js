@@ -367,9 +367,10 @@ export class CameraProvider extends SensorProvider {
       source: 'camera',
       t: performance.now(),
       calibrated: this.calibrated,
-      /* head-motion channels, on the same scale the simulator uses */
-      headMotion: +(6 + travelDeg * 3 + jitterDeg * 0.7).toFixed(2),
-      eyeHead: +(4.5 - jitterClean * 1.6 + travelDeg * 0.35).toFixed(2),
+       /* Camera-only truth: this provider measures head motion, not gaze.
+          There is no invented eye-head/VOR number in the live contract. */
+       headMotion: +(travelDeg * 3 + jitterDeg * 0.7).toFixed(2),
+       eyeHead: null,
       lateral: +((this.centroidX - 0.5) * 40).toFixed(2),
       vertical: +((this.centroidY - 0.5) * 40).toFixed(2),
       rateHz: +this.hz.mean().toFixed(1),
@@ -393,10 +394,10 @@ export class CameraProvider extends SensorProvider {
       running: this.running,
       calibrated: this.calibrated,
       samples: this.samples,
-      rateHz: +this.hz.mean().toFixed(1),
-      headMotion: +(6 + travelDeg * 3 + jitterDeg * 0.7).toFixed(2),
-      eyeHead: +(4.5 - jitterClean * 1.6 + travelDeg * 0.35).toFixed(2),
-      motionEnergy: +energyClean.toFixed(4),
+       rateHz: +this.hz.mean().toFixed(1),
+       headMotion: +(travelDeg * 3 + jitterDeg * 0.7).toFixed(2),
+       eyeHead: null,
+       motionEnergy: +energyClean.toFixed(4),
       jitter: +jitterClean.toFixed(4),
       dx: this.dx, dy: this.dy,
       quality: Math.max(0, Math.min(1, this.samples < 12 ? 0.35 : (this.calibrated ? 1 : 0.7) - Math.min(0.6, jitterClean))),
