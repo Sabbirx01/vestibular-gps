@@ -229,8 +229,10 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
    than 1.4: the plume behind the hull now runs to about a second of travel, and
    the nozzle flame has to be long enough to read as the start of that trail
    rather than as a separate detail. */
-.ship-flame { transform-box: fill-box; transform-origin: 50% 0%; opacity: .5; transition: opacity 150ms linear, scale 150ms linear; }
-.cursor.is-fast .ship-flame { opacity: 1; scale: 1.9; }
+.ship-flame { transform-box: fill-box; transform-origin: 50% 0%; opacity: .55; transition: opacity 150ms linear, scale 150ms linear; }
+/* 2.6 rather than 1.9: the trail behind it is longer and heavier now, and the
+   nozzle flame has to hold its own as the head of that plume. */
+.cursor.is-fast .ship-flame { opacity: 1; scale: 2.6; }
 
 /* the outer scan ring: an instrument, not a decoration */
 .cursor-lock {
@@ -267,7 +269,12 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
   box-shadow: 0 0 var(--trail-glow-size, 9px) var(--trail-glow, rgba(95,227,255,.85));
   will-change: transform, opacity, scale;
 }
-.cursor.is-target .cursor-trail i { background: var(--amber); box-shadow: 0 0 9px rgba(255,181,71,.85); }
+.cursor.is-target .cursor-trail i {
+  background: var(--amber);
+  /* size from the same variable chrome.js sets per segment, so the target state
+     keeps the plume's new shape instead of pinning the old 9 px blur */
+  box-shadow: 0 0 var(--trail-glow-size, 9px) rgba(255,181,71,.85);
+}
 
 .cursor-label {
   position: absolute; left: 38px; top: 6px; white-space: nowrap;
@@ -353,7 +360,7 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
   .sec-space .stage-canvas { min-height: 400px; }
   .topbar { padding: 0 var(--sp-3); gap: var(--sp-3); }
   .brand-text small { display: none; }
-  .topbar-tools .chip-ghost:not(#menuToggle):not(#modeToggle) { display: none; }
+  .topbar-tools .chip-ghost:not(#menuToggle) { display: none; }
   .topbar-tools .chip { padding: 6px 10px; }
   .hero-specs { grid-template-columns: minmax(0,1fr); }
   .spec-v { font-size: 1.6rem; }

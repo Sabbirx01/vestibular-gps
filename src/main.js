@@ -188,7 +188,9 @@ async function main() {
   });
 
   await boot.step(5, async () => {
-    mountNav({ onModeChange: (m) => setMode(ctx, m), hub: ctx.hub, scene: ctx.scene });
+    /* no onModeChange: the topbar mode chip is gone and the Space section's
+       gravity row is what drives setMode() now */
+    mountNav({ hub: ctx.hub, scene: ctx.scene });
     mountJourney();
     mountMicrogravityField();
     mountCursor();
@@ -201,8 +203,7 @@ async function main() {
     /* reflect the detected environment in the UI */
     const srcState = $('#sourceLabel');
     if (srcState) srcState.textContent = state.source;
-    const modeLabel = $('#modeLabel');
-    if (modeLabel) modeLabel.textContent = state.mode;
+    /* the topbar mode chip and its #modeLabel readout are gone (see mountNav) */
   });
 
   await boot.step(6, async () => {
@@ -247,10 +248,6 @@ async function main() {
     if (state.mode === mode) return;
     set({ mode }, ['mode']);
     c.scene?.setMode(mode);
-    const lbl = $('#modeLabel');
-    if (lbl) lbl.textContent = mode;
-    const btn = $('#modeToggle');
-    if (btn) btn.dataset.mode = mode;
     bus.emit('mode', mode);
 
     const copy = {

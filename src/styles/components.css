@@ -77,9 +77,9 @@
   transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
 }
 .chip:hover { color: var(--text); border-color: rgba(95,227,255,.45); }
+/* The two `[data-mode]` dot colours that used to live here are gone with the
+   topbar mode chip — no element carries data-mode now. */
 .chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 8px currentColor; }
-.chip[data-mode="EARTH"] .chip-dot { background: var(--green); box-shadow: 0 0 10px var(--green); }
-.chip[data-mode="MICROGRAVITY"] .chip-dot { background: var(--violet); box-shadow: 0 0 10px var(--violet); }
 
 .badge {
   display: inline-flex; align-items: center; gap: 7px;

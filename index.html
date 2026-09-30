@@ -82,7 +82,12 @@
   <div class="cursor-trail" id="cursorTrail">
     <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
     <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
   </div>
+  <!-- 30 segments: the plume runs about 1.1 s of travel behind the hull and the
+       trailing third of it is the smoke, so it needs both the length and the
+       count. chrome.js sizes and colours each one; an <i> per segment is what
+       keeps the whole thing compositor work. -->
   <svg class="cursor-ship" viewBox="0 0 48 48">
     <defs>
       <!-- the plume fades out along its length instead of ending in a hard tip -->
@@ -133,9 +138,6 @@
   </nav>
 
   <div class="topbar-tools">
-    <button type="button" class="chip" id="modeToggle" data-mode="EARTH" aria-live="polite">
-      <span class="chip-dot"></span><span id="modeLabel">EARTH</span>
-    </button>
     <button type="button" class="chip chip-ghost" id="sourceChip" title="Data source">
       <span class="chip-dot" id="sourceDot"></span><span id="sourceLabel">SIMULATION</span>
     </button>

@@ -97,16 +97,24 @@ export function mountCursor() {
   /* Recent path as a ring buffer of numbers, so the trail costs no
      allocations. The ghosts are simply earlier positions: the ship itself
      never lags, because the trail is what makes it fly. */
-  /* The oldest ghost sits 6 frames back and the rest step 2 frames apart.
-     A 2-frame step rather than 4 is what turns the plume from a row of beads
-     into a streak: with 20 segments the gap between them is 2 frames of travel
-     instead of 4, so at any ordinary mouse speed the segments overlap and the
-     eye reads one tapered line. Measured in a browser by cropping the plume
-     region at 3x: at a 4-frame step the segments sat ~50 px apart with 10 px
-     bodies — visibly dots, not thrust. */
+  /* How far back in the ring buffer each segment samples, in frames. Two
+     densities, because the plume is two things: across the first twelve segments
+     it is flame and is sampled every frame, so it stays one continuous ribbon
+     even in a hard flick; beyond that it is smoke, which has already spread, so
+     every third frame is enough to place it. A single 2-frame step everywhere was
+     the old shape, and it fails exactly when the plume is most visible: measured
+     in a browser during a 700 px / 260 ms sweep, neighbouring segments sat ~88 px
+     apart with 14-36 px bodies, which reads as a dotted line, not thrust. */
   const TRAIL_FIRST = 6;
-  const TRAIL_STEP = 2;
-  const N = TRAIL_FIRST + TRAIL_STEP * Math.max(1, ghosts.length) + 4;
+  const TRAIL_DENSE = 12;
+  const TRAIL_SPARSE_STEP = 3;
+  const TRAIL_N = Math.max(1, ghosts.length);
+  const trailBack = new Int32Array(TRAIL_N);
+  for (let i = 0; i < TRAIL_N; i++) {
+    trailBack[i] = TRAIL_FIRST + (i < TRAIL_DENSE ? i : TRAIL_DENSE + (i - TRAIL_DENSE) * TRAIL_SPARSE_STEP);
+  }
+  /* the buffer has to reach past the oldest sample plus the wrap slack */
+  const N = trailBack[TRAIL_N - 1] + TRAIL_FIRST + 6;
   const hx = new Float32Array(N);
   const hy = new Float32Array(N);
   let head = 0;
@@ -120,32 +128,49 @@ export function mountCursor() {
      of the ship — with three changes that make it read as thrust rather than as
      a row of beads:
 
-       1. fourteen segments, reaching about a second of travel behind the hull,
-          so a fast flick leaves a long plume rather than a stub;
+        1. thirty segments, reaching about 1.2 s of travel behind the hull
+           (dense near the nozzle, sparse through the smoke — see trailBack), so
+           a fast flick leaves a long plume rather than a stub, and the trailing
+           third has room to be smoke rather than more flame;
        2. every segment is STRETCHED along its own local direction of travel, so
           the plume bends through a turn instead of staying a straight line;
-       3. the colour ramps nozzle -> tail: hot white, cyan, amber, ember, which
-          is what exhaust looks like against a dark sky and what ties the plume
-          to the site's amber/cyan palette.
+       3. the colour ramps nozzle -> tail: hot white, cyan, amber, then grey
+          smoke, which is what exhaust looks like against a dark sky and what
+          keeps the plume tied to the site's amber/cyan palette while its tail
+          stops pretending to be fire.
 
      All three are set ONCE, here. The frame loop below only ever writes
      transform, opacity and scale, so the plume stays compositor work. */
-  const TRAIL_N = ghosts.length;
   const trailDir = new Float32Array(TRAIL_N);
-  ghosts.forEach((g, i) => {
-    const k = TRAIL_N > 1 ? i / (TRAIL_N - 1) : 0;
-    const w = 10 - k * 6.2;                 // long axis, aligned to travel
-    const h = 6.4 - k * 4.0;
-    g.style.width = `${w.toFixed(1)}px`;
+  /* Sizes GROW toward the tail rather than shrinking: a nozzle flame is small and
+     hot, and what leaves it is smoke, which spreads as it cools. The old ramp did
+     the opposite — 10 px down to 3.8 px, then scaled to 0.38 — so the trailing
+     half of the plume ended up 1-2 px across at ~11 % opacity: a thread, not
+     smoke. Owner's read of it: "make the tail bigger with more smoke, so it feels
+     like a real rocket going up." Sizes and colours are set here ONCE; the frame
+     loop below only writes transform, opacity and scale.
+     Glow blur is capped at 18 px because box-shadow is painted rather than
+     composited and the plume is now 30 of them — that is the one number here with
+     a real frame cost, so it is the number that stays modest. */
+   /* Base long-axis width per segment, kept so the frame loop can stretch a
+      segment to whichever gap it has to cover (see the scale below). */
+   const trailW = new Float32Array(TRAIL_N);
+   ghosts.forEach((g, i) => {
+     const k = TRAIL_N > 1 ? i / (TRAIL_N - 1) : 0;
+     const w = 14 + k * 22;                  // long axis, aligned to travel
+     const h = 9 + k * 14;
+     trailW[i] = w;
+     g.style.width = `${w.toFixed(1)}px`;
     g.style.height = `${h.toFixed(1)}px`;
     g.style.margin = `${(-h / 2).toFixed(1)}px 0 0 ${(-w / 2).toFixed(1)}px`;
     /* Colour goes through custom properties rather than inline background and
        box-shadow. Inline would win over the stylesheet, and the stylesheet is
        what turns the whole trail amber while the ship is over a target — that
-       state has to keep working. */
-    g.style.setProperty('--trail-fill', k < 0.14 ? '#ffffff' : k < 0.45 ? '#7fe9ff' : k < 0.75 ? '#ffc46a' : '#ff7a2f');
-    g.style.setProperty('--trail-glow', k < 0.45 ? 'rgba(120,235,255,.9)' : 'rgba(255,150,60,.85)');
-    g.style.setProperty('--trail-glow-size', `${(9 - k * 5).toFixed(0)}px`);
+       state has to keep working. White core, cyan flame, amber burn, then grey
+       smoke at the tail. */
+    g.style.setProperty('--trail-fill', k < 0.10 ? '#ffffff' : k < 0.34 ? '#a9ecff' : k < 0.62 ? '#ffc06a' : '#c8cdd2');
+    g.style.setProperty('--trail-glow', k < 0.5 ? 'rgba(120,235,255,.8)' : 'rgba(205,215,220,.55)');
+    g.style.setProperty('--trail-glow-size', `${(10 + k * 8).toFixed(0)}px`);
   });
 
   on(window, 'pointermove', (e) => {
@@ -213,7 +238,9 @@ export function mountCursor() {
     }
     cursor.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`;
 
-    cursor.classList.toggle('is-fast', travel > 7);
+    /* 5.5 rather than 7: the nozzle flame lighting up is half of what makes the
+       plume read as thrust, and at 7 it only lit during a deliberate flick. */
+    cursor.classList.toggle('is-fast', travel > 5.5);
 
     if (ship) {
       if (travel > 0.6) {
@@ -239,12 +266,12 @@ export function mountCursor() {
     /* Thrust: parked, there is no exhaust at all; flying, it trails many times
        the length of the hull. Fast attack, slower release — a plume does not
        blink out the instant a hand pauses mid-flick. */
-    const thrust = Math.min(1, travel / 18);
-    runLevel = damp(runLevel, thrust, thrust > runLevel ? 26 : 7, 1 / 60);
+    const thrust = Math.min(1, travel / 13);
+    runLevel = damp(runLevel, thrust, thrust > runLevel ? 26 : 5, 1 / 60);
     const run = runLevel;
     const now = performance.now();
     for (let i = 0; i < TRAIL_N; i++) {
-      const at = (head - 1 - TRAIL_FIRST - i * TRAIL_STEP + N * 2) % N;
+      const at = (head - 1 - trailBack[i] + N * 2) % N;
       const g = ghosts[i];
       const k = TRAIL_N > 1 ? i / (TRAIL_N - 1) : 0;
 
@@ -254,20 +281,47 @@ export function mountCursor() {
       const ddx = hx[at] - hx[newer];
       const ddy = hy[at] - hy[newer];
       if (ddx || ddy) trailDir[i] = Math.atan2(ddy, ddx) * 180 / Math.PI;
+      /* The distance from this sample to the next one along the path: the gap
+         this segment has to cover for the plume to stay continuous. At speed it
+         is far bigger than the puff's own body — during a 700 px / 260 ms sweep
+         the pointer moves ~48 px per frame while the near-field bodies are
+         13-24 px across, and the fixed-size version left a gap between every
+         pair, which read as a dotted line rather than thrust. Stretching the long
+         axis (already aligned to the direction of travel) to cover the gap is the
+         motion-blur trick, and the body grows BACKWARD only (the translate below)
+         so the leading edge stays on its recorded sample and the smear lands
+         where the exhaust has been. Growing both ways charged double, which is
+         why the first version still pinched on a machine whose frame commit ran
+         slower and put more pixels between samples. Cap 5x: high enough to close
+         the frame-rate spread, low enough that one stale ring slot cannot paint
+         an enormous streak. */
+      const gapPx = Math.hypot(ddx, ddy);
+      const grow = 0.92 + k * 0.38;           // the size ramp, from the block above
+      const stretch = Math.max(grow, Math.min(5, gapPx / (trailW[i] * 1.05)));
 
-      /* The taper scale belongs INSIDE the transform list, after the translate.
+      /* The scale belongs INSIDE the transform list, after the translate.
          Written as the `scale` CSS property it is applied BEFORE `transform` in
          the individual-transform order, which multiplied the translate by the
          same factor — so the tail segments were pulled up to 62 per cent closer
          to the ship than their recorded positions, and the plume was far shorter
-         than its own numbers said. Leftmost first: move, turn, then shrink. */
+         than its own numbers said. Leftmost first: move, turn, then size.
+         Two factors: the long axis is stretched to whatever gap this segment has
+         to cover, the short axis only carries the nozzle-to-tail size ramp
+         (0.92 → 1.30). It used to taper to 0.38 on both axes. */
       g.style.transform =
         `translate3d(${(hx[at] - pos.x).toFixed(1)}px, ${(hy[at] - pos.y).toFixed(1)}px, 0)` +
-        ` rotate(${trailDir[i].toFixed(1)}deg) scale(${(1 - k * 0.62).toFixed(3)})`;
+        ` rotate(${trailDir[i].toFixed(1)}deg)` +
+        /* half of whatever the stretch added, pulled back along the local +x —
+           which the rotate above has just aimed down the direction of travel —
+           so all of the growth goes behind the sample instead of half in front */
+        ` translateX(${(-(stretch - 1) * trailW[i] / 2).toFixed(1)}px)` +
+        ` scale(${stretch.toFixed(3)}, ${grow.toFixed(3)})`;
       /* A slow flicker down the plume: fire that holds perfectly still reads as
          a drawn line, and this costs one sine per segment. */
       const flick = 0.86 + 0.14 * Math.sin(now * 0.018 + i * 1.9);
-      g.style.opacity = (0.95 * (1 - k * 0.88) * run * flick).toFixed(3);
+      /* 0.98 down to 0.18 — the tail has to stay visible now that it is smoke
+         rather than a hairline; it used to fall to 0.11. */
+      g.style.opacity = (0.98 * (1 - k * 0.82) * run * flick).toFixed(3);
     }
   };
   tick();
@@ -370,7 +424,7 @@ export function mountMicrogravityField() {
 }
 
 /* ═══════════ 4. NAVIGATION + TOPBAR ═══════════ */
-export function mountNav({ onModeChange, hub, scene }) {
+export function mountNav({ hub, scene }) {
   const nav = $('#nav');
   const menuBtn = $('#menuToggle');
   const topbar = $('#topbar');
@@ -387,13 +441,16 @@ export function mountNav({ onModeChange, hub, scene }) {
     topbar.classList.toggle('is-stuck', window.scrollY > 24);
   }, { passive: true });
 
-  /* mode toggle: EARTH ↔ MICROGRAVITY, with MOON/MARS reachable from the space section */
-  const modeBtn = $('#modeToggle');
-  const modeLabel = $('#modeLabel');
-  on(modeBtn, 'click', () => {
-    const next = state.mode === 'EARTH' ? 'MICROGRAVITY' : 'EARTH';
-    onModeChange(next);
-  });
+  /* The topbar mode chip is gone. It read "● EARTH" / "● MARS" next to the ship
+     in the header, and the owner read it as another floating label on top of the
+     screen. What it did is still reachable: the Space section's gravity row
+     switches between all four environments (EARTH · MOON · MARS · MICROGRAVITY)
+     through the same setMode(), and it highlights the active one. For the state
+     itself, the live HUD's MODE row carries it (that panel only exists at
+     >= 1876 px wide), the LAB section's gravity-comparison test prints it, and
+     every change raises a toast naming the new environment. The `#modeToggle` /
+     `#modeLabel` hooks are gone from index.html, including the dead null-guarded
+     writes in main.js, so nothing reads a missing node. */
 
   /* source chip cycles SIMULATION → LIVE SENSOR → REPLAY */
   const srcBtn = $('#sourceChip');
