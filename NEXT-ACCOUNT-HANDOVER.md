@@ -39,7 +39,9 @@ The last pushed commit before the current Earth upgrade is:
 ce3e0a4 fix(earth,cursor,licence): stop the Earth blowing out, make the exhaust read as smoke, add a proprietary licence
 ```
 
-At handover creation, the branch is `main`, `origin/main` is synchronized with the local HEAD, and the working tree has **intentional uncommitted Earth-upgrade work**:
+**Update — 30 September 2026.** The staged Earth work listed below has since been verified, committed and pushed as `54edda2` (`feat(earth): use a locally bundled NASA Blue Marble surface map`). The live page and the live asset both return HTTP 200. Full evidence: `reports/fix-reports/EARTH-BLUE-MARBLE-VERIFICATION-2026-09-30-BN.md`.
+
+At handover creation the branch was `main`, `origin/main` was synchronized with the local HEAD, and the working tree held **intentional uncommitted Earth-upgrade work**:
 
 ```text
  M LICENSE
@@ -50,7 +52,7 @@ At handover creation, the branch is `main`, `origin/main` is synchronized with t
 ?? NEXT-ACCOUNT-HANDOVER.md
 ```
 
-Do not assume the Earth upgrade is already live. It is **not live until it is verified, committed and pushed**.
+The Earth upgrade is now **live**: verified, committed as `54edda2`, pushed, and the live asset checked. Do not re-stage it.
 
 The local QA server may be running in a background process, but the environment may stop it after roughly 15 minutes. If `127.0.0.1:8322` refuses the connection, start `python serve.py` again. The GitHub Pages site does not depend on the local server.
 
@@ -174,7 +176,9 @@ Moon and Mars are still procedural in `src/three/planetTextures.js`:
 - Moon: procedural maria, craters and ray systems.
 - Mars: procedural red/orange terrain, dust variation and polar caps.
 
-The user said Earth comes first, then Moon and Mars should also be improved. After Earth is accepted:
+**BLOCKER — fix this before touching the Moon/Mars textures.** Clicking MOON changes the UI and both `state.mode` and `solar.activeId` become `MOON`, but the rendered disc stays the Blue Marble Earth. Verified live through the app's own debug surface (`window.VESTIBULAR_GPS` → `scene().solar`): all four bodies are built, but MOON and MARS sit roughly inside the EARTH sphere (centre separation ≈ 0.32 world units against an EARTH showcase radius of 0.924; the MOON's full extent is 0.71), the EARTH mesh is never hidden, and the sub-surface materials read `transparent: false, opacity: 1`, so the `userData.opacity` blend weight has no rendering effect. MARS is only partially visible for the same reason. Fix the body swap first — otherwise an improved lunar map can never be seen.
+
+The user said Earth comes first, then Moon and Mars should also be improved. After the body swap is fixed:
 
 1. Find suitable public-domain or clearly licensed local lunar and Mars surface maps.
 2. Prefer NASA/USGS/ESA source records with explicit reuse status.
@@ -253,14 +257,12 @@ GitHub Pages may take a short time to update. Do not report “live” until the
 ```text
 Take over VESTIBULAR GPS. Read NEXT-ACCOUNT-HANDOVER.md first.
 
-The current pushed baseline is ce3e0a4. The Earth Blue Marble upgrade is staged
-but not pushed: assets/earth-blue-marble-1280.jpg, SolarSystem.js texture loader,
-planetTextures.js cloudOpacity 0.22, LICENSE attribution, and test timestamp.
+The current pushed baseline is 54edda2 (Earth Blue Marble, verified and live).
 
-Your first job is NOT to redesign everything. Start the local server, verify the
-local Earth asset and the Earth view at desktop + mobile, verify Moon/Mars clicks,
-run the 93/0 tests, then review and push the staged Earth work. Only after that,
-improve Moon and Mars with properly licensed local texture maps. Report exactly
-what was verified; do not claim photographic realism until a browser screenshot
-shows it.
+Your first job is the body swap, not new textures. Clicking MOON changes the UI and
+state.mode but the rendered body stays Earth: all four bodies are built but MOON and
+MARS sit inside the EARTH sphere's volume and the Earth mesh is never hidden, so the
+Moon can never show. Fix that, verify it visually at desktop and mobile, keep the
+93/0 tests green, and only then improve Moon and Mars with properly licensed local
+texture maps. Report exactly what was verified.
 ```
