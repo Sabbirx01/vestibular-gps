@@ -284,9 +284,27 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
 }
 
 /* ── Responsive chrome ──────────────────────────────────── */
+/* The HUD is a fixed overlay and every section's content is a full-width panel
+   (`.section` is `min(100% - 60px, 1440px)`), so the two only coexist while the
+   centred 1440 px shell still clears the HUD's left edge:
+     shell right edge (W + 1440) / 2   <=   HUD left edge (W - 218)   ->  W >= 1876
+   Above that, the panel column ends ~14 px short of the HUD (measured at
+   1920x1080: shell right 1672.5, HUD left 1687). Below it the HUD covers live
+   content instead of the empty backdrop it was designed for — measured at
+   1440x900 on the hero, where the spec grid runs x 1222..1395 and the HUD sits at
+   x 1207..1403, y 84..393, leaving the OTOCONIA card and its neighbour
+   unreadable. Moving the grid out of the way is not the alternative there: at
+   1440 its left edge would land on the astronaut. So the chrome gives way — and
+   at every section rather than only on the hero, because the same collision
+   recurs wherever a panel's top edge is inside the HUD's y band on a window this
+   narrow. What is lost below 1876 px is the telemetry panel; everything it shows
+   is also in the CONSOLE section and in the topbar chips.
+   This also makes the old `.hud { width: 168px }` rule at <= 1180px unreachable
+   (the HUD is already hidden at any width that matches it), so that rule is
+   gone rather than left looking like it still does something. */
+@media (max-width: 1875px) { .hud { display: none; } }
 @media (max-width: 1180px) {
   .journey { display: none; }
-  .hud { width: 168px; }
 }
 @media (max-width: 980px) {
   .nav { display: none; }
