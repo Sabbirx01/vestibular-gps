@@ -26,14 +26,16 @@ const FRAMING = {
   'sec-vor':        { focus: 'astronaut',dist: 5.0,  height: 1.7, look: 1.6,  env: 0.42 },
   'sec-sensors':    { focus: 'astronaut',dist: 4.4,  height: 1.7, look: 1.6,  env: 0.5 },
   /* The Space section is the only framing with an `anchor`: the reference body
-     has to sit inside a specific DOM gap (the open column right of the heading,
-     above the glass panel), and that gap is laid out in percent of the window
-     while the camera's vertical FOV is a constant 46 degrees. So this section's
-     aim is SOLVED in screen space every frame — see _anchorBody. `look` and
-     `offset` below are what the narrow-window fallback still uses (below 1280 px
-     the heading column reaches across the gap and the body stays out of the
-     reading column instead). */
-  'sec-space':      { focus: 'planet',   dist: 5.8,  height: 0.15, look: -1.0, offset: [0.0, -0.35], env: 0.72, anchor: [0.68, 0.35] },
+     has to sit in a specific gap between DOM elements, and that gap is laid out
+     in percent of the window while the camera's vertical FOV is a constant 46
+     degrees. So this section's aim is SOLVED in screen space every frame — see
+     _anchorBody. There are two targets because the gap changes shape: `anchor` is
+     the free column right of the heading on the wide two-column shell, and
+     `anchorNarrow` is the band the stylesheet reserves above the heading once
+     that shell collapses to a single column (sections.css, same breakpoint, and
+     see _spaceAnchor). `look`/`offset` below are only the solve's seed and the
+     fallback for the case the solve reports as unreachable. */
+  'sec-space':      { focus: 'planet',   dist: 5.8,  height: 0.15, look: -1.0, offset: [0.0, -0.35], env: 0.72, anchor: [0.68, 0.35], anchorNarrow: [0.5, 0.30] },
   'sec-lab':        { focus: 'astronaut',dist: 5.8,  height: 1.6, look: 1.4,  env: 0.4 },
   /* Dense instrument panels: pulled far back and dimmed so nothing drifts
      behind a readout. */
@@ -100,6 +102,13 @@ const FRAMING = {
    screen in the Space section — which is exactly how the two sections drifted
    apart in the first place. */
 const SOLAR_POS = [7.4, -5.0, -8.8];
+
+/* Narrowest window that still has the two-column shell the Space section's side
+   anchor needs. Below it the heading column reaches across the free space — at
+   1024x768 the heading box already ends at x 698 and the 128 px disc centred at
+   0.68 W would start at x 696 — so the section switches to the reserved band
+   above the heading instead. Matching breakpoint in sections.css. */
+const SIDE_COLUMN_MIN_W = 1280;
 
 /* Scratch vectors for the Space section's screen-space anchor. Held at module
    scope so the render loop allocates nothing per frame. */
@@ -447,7 +456,8 @@ export class SceneManager {
        seed would be the framing's own aim instead. The anchor then eases from
        there, so entering the section glides the planet into its column instead
        of teleporting it across the window. */
-    if (f.anchor && this.solar && innerWidth >= 1280 && this.camState.ax === undefined) {
+    const anchor = this._spaceAnchor(f);
+    if (anchor && this.solar && this.camState.ax === undefined) {
       this.solar.root.getWorldPosition(_bodyPos);
       _bodyNdc.copy(_bodyPos).project(this.camera);
       this.camState.ax = (_bodyNdc.x + 1) / 2;
@@ -492,8 +502,8 @@ export class SceneManager {
     /* The Space section re-aims the camera at the body itself. It runs after
        the orbit compensation above, because it solves against the body's world
        position and the compensation is what finally decides that. */
-    if (f.anchor && this.solar && innerWidth >= 1280) {
-      this._anchorBody(f.anchor, k, dt);
+    if (anchor && this.solar) {
+      this._anchorBody(anchor, k, dt);
     }
 
     /* layer visibility per section so text stays readable */
@@ -565,6 +575,25 @@ export class SceneManager {
    * further scroll brings the glass panel up across it, which nothing fixed to
    * the viewport can avoid.
    */
+  /**
+   * Which screen position the reference body is anchored to for this section, in
+   * the window we are actually in — [x, y] as fractions of the render surface.
+   *
+   * The two targets exist because the gap between the section's DOM elements
+   * changes shape with the layout, not because of taste: above
+   * SIDE_COLUMN_MIN_W the section is a two-column shell and the body lives in the
+   * open column right of the heading; below it the heading fills the width and
+   * the only clean space left is the band the stylesheet reserves above the
+   * heading for exactly this (sections.css, `#sec-space` padding-top, same
+   * breakpoint). Without the second target the body had nowhere to go on a phone
+   * or a tablet — the framing's world-space aim parked it below the fold, so the
+   * planet simply was not there.
+   */
+  _spaceAnchor(f) {
+    if (!f.anchor) return null;
+    return innerWidth >= SIDE_COLUMN_MIN_W ? f.anchor : (f.anchorNarrow || f.anchor);
+  }
+
   _anchorBody([fx, fy], k, dt) {
     const root = this.solar && this.solar.root;
     if (!root) return;

@@ -306,6 +306,20 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
    (the HUD is already hidden at any width that matches it), so that rule is
    gone rather than left looking like it still does something. */
 @media (max-width: 1875px) { .hud { display: none; } }
+
+/* Once the section shell is a single column there is no free space beside the
+   heading for the Space section's reference body to sit in, so the section
+   reserves one above the heading and the camera anchors the body in it
+   (SceneManager._spaceAnchor asks for 0.5 / 0.30 of the viewport at this same
+   breakpoint). The band is in vh so the disc keeps its proportion against the
+   viewport; the clamp keeps a workable band on short landscape windows without
+   letting it grow without limit on tall phones. Measured on the section's
+   resting scroll position, the body then sits inside this band with clear space
+   above and below it, and the heading starts below the band — before this the
+   planet had nowhere to go on a phone and simply never appeared. */
+@media (max-width: 1279px) {
+  #sec-space { padding-top: clamp(250px, 30vh, 320px); }
+}
 @media (max-width: 1180px) {
   .journey { display: none; }
 }

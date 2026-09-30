@@ -7,7 +7,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 import * as THREE from '../../vendor/three.module.js';
-import { PAL, fresnelMaterial, atmosphereMaterial, labelSprite, disposeTree } from './materials.js';
+import { PAL, fresnelMaterial, atmosphereMaterial, disposeTree } from './materials.js';
 import { damp, TAU, clamp } from '../core/util.js';
 import { GRAVITIES } from '../science/content.js';
 import { BODIES, buildPlanetTextures } from './planetTextures.js';
@@ -23,7 +23,6 @@ export class SolarSystem {
     this.root = new THREE.Group();
     this.root.name = 'solar-system';
     this.bodies = {};
-    this.labels = [];
     this.t = 0;
     this.activeId = 'EARTH';
     this.transitionSpeed = 10.5;
@@ -120,12 +119,15 @@ export class SolarSystem {
     );
     grp.add(limb);
 
-    /* Label */
-    const label = labelSprite(id === 'MICROGRAVITY' ? 'FREE FLOAT' : id, { size: 38, scale: 0.5, color: '#bfe6ff' });
-    label.position.set(0, showcaseRadius + 0.52, 0);
-    label.userData.target = id;
-    grp.add(label);
-    this.labels.push(label);
+    /* No name label above the body any more.
+       It was a floating chip reading EARTH / MOON / MARS / FREE FLOAT parked at
+       showcaseRadius + 0.52, and in the Space section — where the camera sits
+       close and the disc is large — it landed across the planet's upper limb as
+       a white-outlined box, which is the one thing that section is not supposed
+       to look like. It was also redundant: the topbar's mode chip names the
+       active body, the SENSORS readout repeats it, and the gravity row
+       highlights the button the visitor just pressed. Removed rather than
+       dimmed, so nothing is left hovering at the top of the frame. */
 
     /* Key light from the direction of the sun.
        Raised from 3.6 and the fill dropped from 1.15 so the sphere carries a
@@ -280,10 +282,6 @@ export class SolarSystem {
       p.material.opacity = 0.045 + 0.045 * (0.5 + 0.5 * Math.sin(t * 0.35 + i * 1.1));
     });
 
-    this.labels.forEach((l) => {
-      const on = l.userData.target === this.activeId;
-      l.material.opacity = damp(l.material.opacity, on ? 0.92 : 0, 4, dt);
-    });
   }
 
   dispose() { disposeTree(this.root); }
