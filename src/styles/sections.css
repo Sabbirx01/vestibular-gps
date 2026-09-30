@@ -297,8 +297,11 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
    1440 its left edge would land on the astronaut. So the chrome gives way — and
    at every section rather than only on the hero, because the same collision
    recurs wherever a panel's top edge is inside the HUD's y band on a window this
-   narrow. What is lost below 1876 px is the telemetry panel; everything it shows
-   is also in the CONSOLE section and in the topbar chips.
+   narrow. What is lost below 1876 px is the telemetry panel, and each of its rows
+   is readable elsewhere: MODE in the topbar's mode chip, SOURCE / SAMPLE RATE /
+   JERK (MODEL) / LINK in the SENSORS section's key-value readout, and 3D ENGINE
+   in the footer. The live FPS bar under it has no duplicate, and the page is
+   still fully usable without any of it.
    This also makes the old `.hud { width: 168px }` rule at <= 1180px unreachable
    (the HUD is already hidden at any width that matches it), so that rule is
    gone rather than left looking like it still does something. */
