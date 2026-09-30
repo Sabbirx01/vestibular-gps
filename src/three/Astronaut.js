@@ -300,6 +300,19 @@ export class FloatingAstronaut {
 
   setPointer(nx, ny) { this.pointer.x = nx; this.pointer.y = ny; }
 
+  /**
+   * Rotate the figure by hand: pointer travel in pixels from a drag.
+   * Direct 1:1 tracking while the pointer moves, plus an impulse kept as
+   * angular momentum, so releasing the drag leaves the figure turning — with no
+   * gravity and no thrusters out there, nothing is going to stop it.
+   */
+  drag(dx, dy) {
+    this.userYaw = (this.userYaw || 0) + dx * 0.0055;
+    this.userPitch = clamp((this.userPitch || 0) + dy * 0.0038, -0.85, 0.85);
+    this.userVelY = clamp(dx * 0.0045, -1.6, 1.6);
+    this.userVelP = clamp(dy * 0.0030, -1.0, 1.0);
+  }
+
   update(dt, state) {
     this.t += dt;
     this.poseAge += dt;
@@ -337,12 +350,23 @@ export class FloatingAstronaut {
        (interactive), so the hero never appears already spinning on first
        paint; pointer/sensor steering rides on top of the tumble everywhere.
        floatAmt already makes MICROGRAVITY more restless than Earth/Moon/Mars. */
-    const tumbleY = interactive ? t * 0.052 * floatAmt : 0;
-    const tumbleX = interactive ? Math.sin(t * 0.087) * 0.10 * floatAmt : 0;
-    const tumbleZ = interactive ? Math.cos(t * 0.071) * 0.07 * floatAmt : 0;
-    this.root.rotation.y = this.baseRot + tumbleY + steer * 0.28;
-    this.root.rotation.x = damp(this.root.rotation.x, tumbleX - tilt * 0.08, 4, dt);
-    this.root.rotation.z = damp(this.root.rotation.z, tumbleZ, 5, dt);
+     const tumbleY = interactive ? t * 0.052 * floatAmt : 0;
+     const tumbleX = interactive ? Math.sin(t * 0.087) * 0.10 * floatAmt : 0;
+     const tumbleZ = interactive ? Math.cos(t * 0.071) * 0.07 * floatAmt : 0;
+
+     /* Hand-driven rotation, on top of the tumble and the pointer steering.
+        It keeps its own angular momentum: the impulse from the last drag decays
+        over a couple of seconds instead of snapping to a stop. */
+     /* userVel is an angular RATE (rad/s): integrate it with dt, or the
+        impulse lands once per frame and the drag depends on frame rate. */
+     this.userYaw = (this.userYaw || 0) + (this.userVelY || 0) * dt * q;
+     this.userPitch = clamp((this.userPitch || 0) + (this.userVelP || 0) * dt * q, -0.85, 0.85);
+     this.userVelY = (this.userVelY || 0) * Math.pow(0.35, dt);
+     this.userVelP = (this.userVelP || 0) * Math.pow(0.35, dt);
+
+     this.root.rotation.y = this.baseRot + tumbleY + steer * 0.28 + this.userYaw;
+     this.root.rotation.x = damp(this.root.rotation.x, tumbleX - tilt * 0.08 + this.userPitch, 4, dt);
+     this.root.rotation.z = damp(this.root.rotation.z, tumbleZ, 5, dt);
 
     /* The real suit is a single rigid mesh with no skeleton attached, so the
        microgravity drift is expressed by the whole figure instead of joints. */

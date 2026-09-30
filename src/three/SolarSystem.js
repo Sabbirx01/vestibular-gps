@@ -41,6 +41,10 @@ const BUMP_ASSETS = {
   MOON: 'assets/moon-ldem-1024.jpg',
 };
 
+/* Scratch vector for hit-testing; module scope so a pointer event never
+   allocates inside the render loop. */
+const _hitPos = new THREE.Vector3();
+
 /* ── Night-side city lights ─────────────────────────────────
    A MODEL, not measured city-light data: the app has no night-lights dataset
    and must not imply one. What it does have is the bundled surface map, so the
@@ -157,8 +161,14 @@ export class SolarSystem {
     const mat = new THREE.MeshStandardMaterial({
       map: maps.map,
       roughnessMap: maps.roughnessMap,
-      roughness: id === 'EARTH' || id === 'MICROGRAVITY' ? 0.78 : 0.92,
-      metalness: 0.02,
+      /* Matte everywhere, including the Earth. At roughness 0.78 the showcase
+         body carried a broad specular sheen which, combined with the white limb
+         shell on top, made it read as a glass marble rather than a planet — the
+         owner's read, twice. A real Earth from orbit has almost no specular
+         response off land; letting the albedo (ocean, land, cloud) do the
+         talking is what makes it recognisable. */
+      roughness: 0.92,
+      metalness: 0,
     });
 
     /* Albedo scale, where a body needs it. The lunar mosaic is tuned for
@@ -356,7 +366,14 @@ export class SolarSystem {
     bounce.position.set(0, -spec.radius * 4, spec.radius * 1.5);
     grp.add(bounce);
 
-    grp.userData = { surface, clouds, atmo, limb, darkness, spec, radius: showcaseRadius, opacity: 1 };
+    grp.userData = {
+      surface, clouds, atmo, limb, darkness, spec, radius: showcaseRadius, opacity: 1,
+      /* Hand-driven rotation, kept separate from the idle spin so a drag does
+         not have to fight (or reset) the automatic motion. */
+      userRot: { x: 0, y: 0 },
+      /* Angular momentum carried out of a drag, decaying on its own. */
+      dragSpin: { x: 0, y: 0 },
+    };
     this.root.add(grp);
     this.bodies[id] = grp;
     return grp;
@@ -430,6 +447,42 @@ export class SolarSystem {
     this.otolithLoad = g.otolith;
   }
 
+  /**
+   * Rotate the active body by hand: pointer travel in pixels from a drag.
+   * The impulse is kept as angular momentum (dragSpin) and decays slowly, so
+   * releasing a drag leaves the planet turning — which is what a body does
+   * when nothing is there to stop it. Idle spin is paused for a moment after
+   * a drag so the hand-off does not fight the user.
+   */
+  drag(dx, dy) {
+    const b = this.bodies[this.activeId];
+    if (!b) return;
+    const ur = b.userData.userRot;
+    ur.y += dx * 0.0062;
+    ur.x = clamp(ur.x + dy * 0.0048, -1.35, 1.35);
+    b.userData.dragSpin.y = clamp(dx * 0.0042, -1.4, 1.4);
+    b.userData.dragSpin.x = clamp(dy * 0.0032, -1.1, 1.1);
+    this.userSpinUntil = (typeof performance !== 'undefined' ? performance.now() : Date.now()) + 2600;
+  }
+
+  /**
+   * Is the pointer over the active body's disc? Used to decide whether a drag
+   * turns the planet or the astronaut. Generous margin (1.4x) because the
+   * target is small and hit-testing should not feel fussy.
+   */
+  hitTest(ndcX, ndcY, camera) {
+    const b = this.bodies[this.activeId];
+    if (!b || !b.visible || !b.userData.opacity) return false;
+    b.getWorldPosition(_hitPos);
+    const proj = _hitPos.clone().project(camera);
+    const depth = _hitPos.distanceTo(camera.position);
+    const tanV = Math.tan((camera.fov * Math.PI) / 360);
+    const rY = (b.userData.radius / Math.max(0.001, depth)) / tanV;
+    const dx = (ndcX - proj.x) * camera.aspect;
+    const dy = ndcY - proj.y;
+    return dx * dx + dy * dy <= (rY * 1.4) * (rY * 1.4);
+  }
+
   update(dt, state) {
     this.t += dt;
     const t = this.t;
@@ -445,8 +498,48 @@ export class SolarSystem {
       const spec = b.userData.spec;
       const o = b.userData.opacity;
 
-      b.userData.surface.rotation.y += dt * spec.spin * q;
-      if (b.userData.clouds) b.userData.clouds.rotation.y += dt * (spec.spin * 1.35) * q;
+      /* ── Rotation ──────────────────────────────────────────
+         Three contributions that add rather than replace each other:
+           idle spin    — a body in vacuum keeps turning; there is no gravity
+                          and nothing to slow it down, so this is the baseline.
+                          It pauses briefly while the pointer owns the body and
+                          resumes on its own.
+           hand rotation— the drag offset (userRot), which the pointer owns.
+           momentum     — the impulse carried out of the last drag (dragSpin),
+                          decaying like angular momentum instead of snapping.
+         Only the surface and cloud deck turn. The group is left alone on
+         purpose: it carries the body's lights, and rotating it would swing the
+         sun with the planet, which is the one thing a body in space cannot do.
+         The axial tilt is re-applied every frame (rotation.z is now owned by
+         this block), with a very slow wobble so the body reads as floating free
+         rather than mounted on an axis. */
+      const ur = b.userData.userRot;
+      const ds = b.userData.dragSpin;
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const idle = now > (this.userSpinUntil || 0) ? 1 : 0;
+      const phase = k.length * 0.7;
+
+      /* dragSpin is an angular RATE (rad/s), so it must be integrated with dt.
+         Without it the impulse was applied once per frame regardless of frame
+         length, which made a drag turn the body several times too far — and
+         made the result depend on frame rate rather than on the hand. */
+      ur.y += ds.y * dt * q;
+      ur.x = clamp(ur.x + ds.x * dt * q, -1.35, 1.35);
+      ds.y *= Math.pow(0.30, dt);
+      ds.x *= Math.pow(0.30, dt);
+
+      b.userData.spinY = (b.userData.spinY ?? 0) + dt * spec.spin * q * idle;
+      const tumbleX = Math.sin(t * 0.073 + phase) * 0.055 * q;
+      const tumbleZ = Math.cos(t * 0.061 + phase) * 0.04 * q;
+      b.userData.surface.rotation.y = b.userData.spinY + ur.y;
+      b.userData.surface.rotation.x = ur.x + tumbleX;
+      b.userData.surface.rotation.z = spec.tilt + tumbleZ;
+      if (b.userData.clouds) {
+        /* Deck drifts a little faster than the ground, as it always has. */
+        b.userData.clouds.rotation.y = b.userData.spinY * 1.35 + ur.y;
+        b.userData.clouds.rotation.x = ur.x + tumbleX * 1.25;
+        b.userData.clouds.rotation.z = spec.tilt * 0.6 + tumbleZ;
+      }
 
       /* Slow orbital drift, so the bodies visibly travel rather than only
          spinning in place. The amplitude is deliberately small: this section's
@@ -454,7 +547,6 @@ export class SolarSystem {
          revolution would walk the planet straight out of frame. At 0.46 units
          on a 5.8-unit framing distance it is unmistakable motion that never
          leaves the composition. */
-      const phase = k.length * 0.7;
       b.position.x = Math.sin(t * 0.055 + phase) * 0.46 * q;
       b.position.z = Math.cos(t * 0.055 + phase) * 0.24 * q;
       b.position.y = Math.sin(t * 0.24 + k.length) * 0.13 * q;

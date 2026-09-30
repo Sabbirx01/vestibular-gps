@@ -284,7 +284,19 @@ produces stale frames and false conclusions.
 
 Done since: Mars carries the Viking MDIM 2.1 mosaic, the Moon got the
 limb-darkening/albedo contrast pass, and the narrow-layout body overlap was
-fixed. Still open: nothing on the planets themselves — the next real work is the
+fixed. **Third update — same day, interaction pass.** Bodies are now draggable: a pointer
+drag rotates the planets (1:1, with decaying angular momentum, so a released planet
+keeps turning) and the astronaut (yaw plus limited pitch). The drag is routed by a
+projected-disc hit test and freezes the camera orbit for its duration. The Earth's
+material was made matte (roughness 0.92, metalness 0, white limb shell 0.95 → 0.30)
+because the specular sheen plus a bright rim read as a glass marble; the hero now
+places its Earth by screen fraction, with a short-window variant, since a fixed world
+position projects into the bottom-right corner — and behind the card grid — at wide,
+short aspects. One trap cost a probe cycle: an angular impulse integrated without
+`dt` makes a drag frame-rate dependent and overshoots by ~6x (see the `dragSpin` /
+`userVel` comments).
+
+Still open: nothing on the planets themselves — the next real work is the
 submission requirements and the relevance bridge described earlier in this file.
 Keep the 93/0 tests green and report exactly what was verified.
 

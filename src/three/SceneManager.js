@@ -17,7 +17,22 @@ import { damp, clamp } from '../core/util.js';
 
 /* ── Section → camera framing ───────────────────────────── */
 const FRAMING = {
-  'sec-hero':       { focus: 'wide',     dist: 12.5, height: 1.0, look: 1.0, offset: [0.0, 0.0], env: 1.0 },
+  'sec-hero':       { focus: 'wide',     dist: 12.5, height: 1.0, look: 1.0, offset: [0.0, 0.0], env: 1.0,
+                      /* The hero is the one framing that places the solar body by
+                         SCREEN fraction instead of leaving it at SOLAR_POS: the
+                         screen position of a fixed world point moves with the
+                         viewport aspect, and at 1500x600 the Earth was cropped by
+                         the bottom-right corner. solarScale enlarges it in the
+                         hero only — at ~150 px it was too small to read as Earth
+                         at all. See _placeSolar. */
+                      solarAnchor: [0.76, 0.78], solarScale: 1.3,
+                      /* Short, wide windows are their own composition: the card
+                         grid is tall enough to overflow the viewport, so the
+                         area the Earth normally occupies is BEHIND the cards and
+                         the planet becomes invisible (0.76/0.78 landed behind
+                         the grid at 1500x600). There it moves into the gap
+                         between the figure and the grid, sized to fit it. */
+                      solarAnchorShort: [0.625, 0.85], solarScaleShort: 1.4, shortAspect: 2.05 },
   /* offset shifts the look-at target so the subject lands in the open right-hand
      column instead of centred behind the panel grid */
   'sec-body':       { focus: 'subject',  dist: 4.6,  height: 1.55, look: 1.15, offset: [-1.75, 0.15], env: 0.42 },
@@ -114,6 +129,11 @@ const SIDE_COLUMN_MIN_W = 1280;
    scope so the render loop allocates nothing per frame. */
 const _bodyPos = new THREE.Vector3();
 const _bodyNdc = new THREE.Vector3();
+/* Camera basis + scratch for the hero's screen-space placement. */
+const _camRight = new THREE.Vector3();
+const _camUp = new THREE.Vector3();
+const _otherPos = new THREE.Vector3();
+const _zeroVec = new THREE.Vector3();
 
 /* Which 3D layers are drawn in which section. Solar bodies are hidden on text-heavy
    sections so a planet can never end up sitting on top of a paragraph. */
@@ -301,14 +321,48 @@ export class SceneManager {
 
   _bindPointer() {
     window.addEventListener('pointermove', (e) => {
+      /* A drag that owns a body takes the pointer exclusively. Note what is NOT
+         updated here: pointer.tx/ty, which drive the camera orbit. Turning the
+         planet must not also swing the camera around it, and freezing the orbit
+         input (rather than the orbit itself) means releasing the drag leaves the
+         camera exactly where it was. */
+      if (this.dragTarget) {
+        const dx = e.clientX - this.dragLast.x;
+        const dy = e.clientY - this.dragLast.y;
+        if (dx || dy) {
+          this.dragLast = { x: e.clientX, y: e.clientY };
+          if (this.dragTarget === 'solar') this.solar?.drag(dx, dy);
+          else if (this.dragTarget === 'astronaut') this.astronaut?.drag(dx, dy);
+        }
+        return;
+      }
+
       this.pointer.tx = (e.clientX / innerWidth) * 2 - 1;
       this.pointer.ty = (e.clientY / innerHeight) * 2 - 1;
       this.astronaut.setPointer(this.pointer.tx, this.pointer.ty);
       this.subject.setPointer(this.pointer.tx, this.pointer.ty);
     }, { passive: true });
 
-    window.addEventListener('pointerdown', () => { this._pointerDown = true; });
-    window.addEventListener('pointerup', () => { this._pointerDown = false; });
+    window.addEventListener('pointerdown', (e) => {
+      this._pointerDown = true;
+      /* What is under the pointer decides what a drag turns. The astronaut is
+         tested first: it is the larger subject and it stands in front of the
+         planet on the hero. Anywhere else, a drag does nothing — the page still
+         scrolls — which keeps the interaction discoverable rather than global. */
+      const ndcX = (e.clientX / innerWidth) * 2 - 1;
+      const ndcY = -((e.clientY / innerHeight) * 2 - 1);
+      this.dragTarget = null;
+      if (this.astronaut && this.astronaut.root.visible && this._overAstronaut(ndcX, ndcY)) {
+        this.dragTarget = 'astronaut';
+      } else if (this.solar && this.solar.hitTest(ndcX, ndcY, this.camera)) {
+        this.dragTarget = 'solar';
+      }
+      this.dragLast = { x: e.clientX, y: e.clientY };
+    });
+    window.addEventListener('pointerup', () => {
+      this._pointerDown = false;
+      this.dragTarget = null;
+    });
 
     /* device tilt nudges the camera too, when a sensor is live */
     bus.on('sample', (s) => {
@@ -343,6 +397,10 @@ export class SceneManager {
     this.framing = f;
     this._section = id;
     this.framingInstant = instant;
+    /* Drop the hero's screen-space correction: only framings that declare
+       `solarAnchor` drive it, so a stale offset would displace the planet in
+       every other section. */
+    if (this._solarOffset) this._solarOffset.set(0, 0, 0);
     /* Drop the screen-space anchor (Space section): it re-seeds from wherever
        the body is when its section next comes up, so re-entering glides the
        planet into the column from the previous section's pose rather than
@@ -499,6 +557,17 @@ export class SceneManager {
       );
     }
 
+    /* Framings that declare `solarAnchor` place the body by screen fraction.
+       The offset accumulates in _solarOffset and is applied on top of the orbit
+       compensation above, which re-sets the base position every frame. The
+       camera is deliberately NOT re-aimed here — _anchorBody rotates it, and
+       the hero's astronaut column and card grid are measured and must not move. */
+    const solarTarget = this._solarTarget();
+    if (solarTarget && this.solar) {
+      this.solar.root.position.add(this._solarOffset || _zeroVec);
+      this._placeSolar(solarTarget.anchor, dt);
+    }
+
     /* The Space section re-aims the camera at the body itself. It runs after
        the orbit compensation above, because it solves against the body's world
        position and the compensation is what finally decides that. */
@@ -631,14 +700,93 @@ export class SceneManager {
     const root = this.solar && this.solar.root;
     if (!root) return;
     let presence = 1;
+    let scale = 1;
     if (innerWidth < SIDE_COLUMN_MIN_W && this._section === 'sec-space') {
       const band = this._spaceBand();
       if (band) presence = band.presence;
+    } else if (innerWidth >= SIDE_COLUMN_MIN_W && this._solarTarget()) {
+      /* Enlarged in the hero only, and only where the layout has room for it:
+         at ~150 px on a dark starfield the Earth read as a blue marble, not as
+         the Earth. The Space section keeps its measured size, and narrow layouts
+         keep theirs. */
+      scale = this._solarTarget().scale;
     }
     this._solarPresence = presence;
-    root.scale.setScalar(0.001 + 0.999 * presence);
+    root.scale.setScalar((0.001 + 0.999 * presence) * scale);
     const want = (SECTION_LAYERS[this._section] || SECTION_LAYERS['sec-hero']).solar;
     root.visible = want && presence > 0.02;
+  }
+
+  /* ── Hero: place the solar body by SCREEN fraction ────────
+     A fixed world position projects to a different screen point at every
+     viewport aspect, which is why the hero's Earth slid into the bottom-right
+     corner and got cropped on a wide, short window. This solves a world-space
+     correction that puts the disc where the framing asks for it, clamped so the
+     whole disc stays inside the frame with a little air around it. It converges
+     over a few frames (the offset changes the projection it is solving for), so
+     it runs as a damped feedback loop rather than a one-shot calculation. */
+  /* Which screen target and scale the current framing wants for the solar body.
+     Split out because two call sites need the same answer (placement and scale)
+     and the short-window case depends on the live aspect, not on the section. */
+  _solarTarget() {
+    const f = this.framing;
+    if (!f || !f.solarAnchor) return null;
+    const short = innerWidth / Math.max(1, innerHeight) > (f.shortAspect || 2.05);
+    return {
+      anchor: short && f.solarAnchorShort ? f.solarAnchorShort : f.solarAnchor,
+      scale: (short && f.solarScaleShort ? f.solarScaleShort : (f.solarScale || 1)),
+    };
+  }
+
+  _placeSolar([fx, fy], dt) {
+    const root = this.solar && this.solar.root;
+    if (!root || !root.visible) return;
+    const body = this.solar.bodies[this.solar.activeId];
+    if (!body) return;
+
+    root.getWorldPosition(_bodyPos);
+    _bodyNdc.copy(_bodyPos).project(this.camera);
+
+    const tanV = Math.tan((this.camera.fov * Math.PI) / 360);
+    const depth = Math.max(0.001, _bodyPos.distanceTo(this.camera.position));
+    const rNdcY = ((body.userData.radius * (root.scale.x || 1)) / depth) / tanV;
+    const rNdcX = rNdcY / Math.max(0.2, this.camera.aspect);
+
+    /* Margin = the disc plus its own drift. The body wanders ±0.46 world units
+       inside its group, which at this depth is about 0.05 of the frame height —
+       without allowance for it the disc would clip the edge on the far side of
+       the drift. */
+    const tx = clamp(fx, rNdcX + 0.03, 1 - rNdcX - 0.03);
+    const ty = clamp(fy, rNdcY + 0.055, 1 - rNdcY - 0.055);
+
+    const errX = tx * 2 - 1 - _bodyNdc.x;
+    const errY = 1 - ty * 2 - _bodyNdc.y;
+
+    if (!this._solarOffset) this._solarOffset = new THREE.Vector3();
+    this.camera.matrixWorld.extractBasis(_camRight, _camUp, _otherPos);
+    const step = clamp(dt * 4.5, 0, 1);
+    this._solarOffset.addScaledVector(_camRight, errX * depth * tanV * this.camera.aspect * step);
+    this._solarOffset.addScaledVector(_camUp, errY * depth * tanV * step);
+    root.position.addScaledVector(_camRight, errX * depth * tanV * this.camera.aspect * step);
+    root.position.addScaledVector(_camUp, errY * depth * tanV * step);
+  }
+
+  /* Is the pointer over the astronaut? Same projected-disc test the solar body
+     uses, against the torso rather than the feet, with a generous margin — this
+     decides whether a drag turns the figure or the planet behind it. */
+  _overAstronaut(ndcX, ndcY) {
+    const a = this.astronaut;
+    if (!a || !a.root) return false;
+    const s = a.root.scale.x || 1;
+    a.root.getWorldPosition(_otherPos);
+    _otherPos.y += 1.0 * s;
+    const proj = _bodyNdc.copy(_otherPos).project(this.camera);
+    const depth = Math.max(0.001, _otherPos.distanceTo(this.camera.position));
+    const tanV = Math.tan((this.camera.fov * Math.PI) / 360);
+    const rNdcY = ((0.55 * s) / depth) / tanV;
+    const dx = (ndcX - proj.x) * this.camera.aspect;
+    const dy = ndcY - proj.y;
+    return dx * dx + dy * dy <= (rNdcY * 1.25) * (rNdcY * 1.25);
   }
 
   _anchorBody([fx, fy], k, dt) {
