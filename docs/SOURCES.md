@@ -11,9 +11,10 @@ Machine-readable copy: [`docs/_source-check.txt`](_source-check.txt), produced b
 ## Verification status
 
 All 15 registry URLs were re-checked on **2026-09-28**. **14 resolved with
-HTTP 200.** One did not — see the note under NASA below. Dead links in a
-submission damage credibility more than missing ones, so this list is checked
-rather than assumed.
+HTTP 200.** One did not at that time — see the note under NASA below. That one
+was re-checked on **2026-10-01** and **now resolves**, so all 15 are confirmed
+live. Dead links in a submission damage credibility more than missing ones, so
+this list is checked rather than assumed.
 
 ---
 
@@ -21,7 +22,7 @@ rather than assumed.
 
 | # | Source | URL | Status |
 |---|---|---|---|
-| 1 | **Risk of Altered Sensorimotor/Vestibular Function Impacting Critical Mission Tasks, Human Health, and Long-Term Health** — NASA Human Research Program | `https://humanresearchroadmap.nasa.gov/Risks/risk.aspx?i=88` | ⚠️ **did not respond** |
+| 1 | **Risk of Altered Sensorimotor/Vestibular Function Impacting Critical Mission Tasks, Human Health, and Long-Term Health** — NASA Human Research Program | `https://humanresearchroadmap.nasa.gov/Risks/risk.aspx?i=88` | ✅ **resolved 2026-10-01** |
 | 2 | **Sensorimotor Risk** — NASA OCHMO / Human Health and Performance | https://www.nasa.gov/directorates/esdmd/hhp/sensorimotor-risk/ | ✅ 200 |
 | 3 | **Sensorimotor Risk — Directed Acyclic Graph narrative** — NASA HRP | https://www.nasa.gov/wp-content/uploads/2025/07/sensorimotor-dag-narrative.pdf | ✅ 200 |
 | 4 | **Sensorimotor Countermeasures** — NASA TechPort 157166, Mars Campaign Office | https://techport.nasa.gov/projects/157166 | ✅ 200 |
@@ -32,14 +33,19 @@ rather than assumed.
 | 9 | **Sensorimotor Countermeasures — technical report** — NTRS | https://ntrs.nasa.gov/citations/20240008210 | ✅ 200 |
 | 10 | **About CIPHER** — NASA HRP | https://www.nasa.gov/reference/about-cipher/ | ✅ 200 |
 
-> ⚠️ **On source 1.** The Human Research Roadmap risk page was reachable and was
-> used earlier in this project for the formal risk statement and the
-> Design Reference Mission ratings. At the time of the final check the host did
-> not respond at all — a connection timeout, not a 403 or a 404. It may be
-> temporarily unavailable or unreachable from this network. **Treat that
-> citation as unconfirmed at publish time**, and prefer source 2, which states
-> the same risk in NASA's own words and resolves cleanly. If you cite the DRM
-> ratings in a submission, re-verify source 1 first.
+> **On source 1.** The Human Research Roadmap risk page is the formal risk
+> entry, and it is the source for the risk statement and the Design Reference
+> Mission ratings. On **2026-09-28** it did not respond at all — a connection
+> timeout, not a 403 or a 404 — and it was recorded here as unconfirmed rather
+> than quietly dropped. Re-checked on **2026-10-01**, it resolves and serves
+> the risk entry with its tasks and gaps. **All 15 sources are now confirmed
+> live.** The failure was the host being intermittent, not the link being
+> wrong.
+>
+> The site's own UI reads the risk statement from source 2 rather than source 1,
+> because source 2 states the same risk verbatim and is on a host that has been
+> reliable. See [`HRP-RISK-MAPPING.md`](HRP-RISK-MAPPING.md) for the mapping that
+> uses both.
 
 ## Human vestibular science
 

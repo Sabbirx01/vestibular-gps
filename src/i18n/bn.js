@@ -404,6 +404,28 @@ export const BN = {
   'TRACEABILITY': 'ট্রেসেবিলিটি',
   'DOMAIN': 'ডোমেইন',
   'NASA DAG NODE': 'NASA DAG নোড',
+  'NASA HUMAN RESEARCH PROGRAM': 'NASA হিউম্যান রিসার্চ প্রোগ্রাম',
+  'The risk this project sits inside': 'এই প্রজেক্ট যে ঝুঁকির ভিতরে বসে',
+  'The domains this instrument measures are the functional impairments named in a formal NASA risk. The table in the Mission Console shows which published DAG node each domain descends from; this is the risk statement itself, and the causal chain that leads to it.':
+    'এই ইন্সট্রুমেন্ট যে domain-গুলো মাপে, সেগুলো NASA-র একটা আনুষ্ঠানিক ঝুঁকিতে নাম ধরে বলা functional impairment। Mission Console-এর টেবিলটা দেখায় কোন domain কোন প্রকাশিত DAG নোড থেকে এসেছে; আর এখানে আছে ঝুঁকির বিবৃতিটা নিজে, আর তার দিকে নিয়ে যাওয়া কারণ-থেকে-ফলাফলের শিকল।',
+  "CAUSAL CHAIN, IN NASA'S NODE NAMES": 'কারণ-থেকে-ফলাফলের শিকল — NASA-র নিজের নোড-নামে',
+  'WHY EACH DOMAIN IS IN THAT CHAIN': 'প্রতিটা domain কেন ওই শিকলে আছে',
+  'Quoted from the HHP sensorimotor risk page (nasaSensorimotorHub), last updated 8 July 2025.':
+    'NASA-র HHP sensorimotor risk পেজ থেকে হুবহু উদ্ধৃত — মূল লেখা ইংরেজিতে, ইচ্ছাকৃতভাবে অনুবাদ করা হয়নি। পেজটি সর্বশেষ হালনাগাদ ৮ জুলাই ২০২৫।',
+  "We are inside NASA's risk statement. We are not inside NASA's metric. OSI is a proposed prototype index: its domain structure is mapped from the published DAG, but its weights are declared heuristics and its thresholds are ours. NASA has not reviewed, approved or endorsed this.":
+    'আমরা NASA-র ঝুঁকির বিবৃতির ভিতরে আছি। NASA-র মেট্রিকের ভিতরে নই। OSI একটা প্রস্তাবিত prototype ইনডেক্স: তার domain কাঠামো প্রকাশিত DAG থেকে ম্যাপ করা, কিন্তু ওজনগুলো ঘোষিত heuristic আর থ্রেশহোল্ড আমাদের নিজেদের। NASA এটা দেখেনি, অনুমোদন দেয়নি, এনডোর্সও করেনি।',
+  'Gaze stabilisation. NASA puts this under gaze control, upstream of spatial orientation and manual control.':
+    'দৃষ্টি স্থির রাখা। NASA এটাকে gaze control-এর নিচে রাখে — spatial orientation আর manual control-এর আগের ধাপে।',
+  'Upright balance and locomotion — the impairment NASA says drives falls at egress and on EVA.':
+    'সোজা হয়ে দাঁড়ানো আর হাঁটা — NASA বলছে এই দুর্বলতাই egress আর EVA-তে পড়ে যাওয়ার কারণ।',
+  'Fine motor control, which NASA links to manual control of vehicles and to EVA risk.':
+    'সূক্ষ্ম হাতের নিয়ন্ত্রণ — NASA এটাকে যানবাহনের manual control আর EVA ঝুঁকির সাথে জুড়েছে।',
+  'Motion sickness, which NASA describes as arising when vestibular and visual signals conflict.':
+    'মোশন সিকনেস — NASA বলছে এটা তখনই হয় যখন vestibular আর visual সংকেত নিজেদের মধ্যে বিরোধ করে।',
+  'Vestibular gain recalibration — the relationship between acceleration, including gravity, and the vestibular response.':
+    'Vestibular gain recalibration — ত্বরণ (মাধ্যাকর্ষণসহ) আর vestibular প্রতিক্রিয়ার মধ্যে সম্পর্ক।',
+  "The slow component: whether the crew member's own reference is itself moving, which is why a personal baseline rather than a population average is the comparison.":
+    'ধীর উপাদানটা: ক্রু-র নিজের রেফারেন্সটাই নড়ে যাচ্ছে কি না — সেজন্যই তুলনা করা হয় নিজের ব্যক্তিগত baseline-এর সাথে, জনগণের গড়ের সাথে নয়।',
   'TIME CONSTANT': 'টাইম কনস্ট্যান্ট',
   'RECORD + CREW BURDEN': 'রেকর্ড + ক্রু-র পরিশ্রম',
   'LEVEL': 'স্তর',

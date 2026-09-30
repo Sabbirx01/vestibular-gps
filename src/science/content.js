@@ -204,6 +204,53 @@ export const SOURCES = {
 
 export const SOURCE_LIST = Object.values(SOURCES);
 
+/* ── NASA Human Research Program risk traceability ───────────
+   The formal risk this project sits inside, and the causal chain NASA
+   publishes for it. This is the Relevance argument written out: the
+   framework is not "inspired by space", it is placed inside a named HRP
+   risk and mapped onto that risk's own published DAG nodes.
+
+   Every node name below is taken verbatim from the Sensorimotor Risk DAG
+   narrative (nasaDagNarrative) or the HHP sensorimotor risk page
+   (nasaSensorimotorHub). Nothing is paraphrased into a stronger claim
+   than NASA makes, and no number appears here that NASA does not
+   publish. Quoted phrases stay in NASA's words on purpose.
+   ──────────────────────────────────────────────────────────── */
+export const HRP_RISK = {
+  id: 'hrpSensorimotor',
+  title: 'Risk of Altered Sensorimotor/Vestibular Function Impacting Critical Mission Tasks, Human Health, and Long-Term Health',
+  short: 'Sensorimotor Risk',
+  org: 'NASA Human Research Program',
+  sourceId: 'nasaSensorimotorHub',
+  riskPageSourceId: 'nasaSensorimotorRisk',
+  statement: 'Exposure to altered gravity leads to changes in sensorimotor/vestibular function that manifest in motion sickness, spatial disorientation, decrements in postural control and locomotion, and manual and fine motor control deficits. It takes hours to days for the body to readapt to gravity upon landing, with associated balance issues and visual inconsistencies. The risk of impairment is greatest during and soon after G-transitions when performance decrements may have high operational impact [manual landings, immediate egress following landing, early extravehicular activities (EVAs)].',
+  statementSource: 'Quoted from the HHP sensorimotor risk page (nasaSensorimotorHub), last updated 8 July 2025.',
+  why: 'This is the risk VESTIBULAR GPS is built for. The domains the index measures are the impairments named in that paragraph; the gravity-transition window it is designed around is the window NASA says the risk is greatest.',
+  caveat: 'We are inside NASA\'s risk statement. We are not inside NASA\'s metric. OSI is a proposed prototype index: its domain structure is mapped from the published DAG, but its weights are declared heuristics and its thresholds are ours. NASA has not reviewed, approved or endorsed this.',
+};
+
+/* The DAG's causal chain, stage by stage, in NASA's own node names. */
+export const HRP_CHAIN = [
+  { stage: 'ENVIRONMENTAL', nodes: ['Altered Gravity', 'Radiation', 'Hostile Closed Environment', 'Distance from Earth'] },
+  { stage: 'PHYSICAL EFFECT', nodes: ['Fluid Shifts', 'Musculoskeletal Loads', 'G-Receptor Loads'] },
+  { stage: 'PHYSIOLOGICAL CHANGE', nodes: ['Vestibular Gain Recalibration', 'Vision and Gaze Control', 'Vestibular Motor Neuron Change', 'Proprioception Change', 'Muscle Physiologic Changes'] },
+  { stage: 'CENTRAL PROCESSING', nodes: ['Multi-Sensory Integration Alterations'] },
+  { stage: 'FUNCTIONAL IMPAIRMENT', nodes: ['Motion Sickness', 'Fine Motor Control', 'Postural Control and Locomotion', 'Spatial Orientation'] },
+  { stage: 'MISSION OUTCOME', nodes: ['Individual Readiness', 'Crew Capability', 'Task Performance', 'Manual Control of Vehicles', 'EVA (Risk)', 'Crew Egress (Risk)'] },
+];
+
+/* Which DAG stage each measured domain sits at, and what it is there for.
+   The node name itself comes from DOMAINS[].dag in src/core/osi.js so the
+   console and this page can never disagree about the mapping. */
+export const HRP_DOMAIN_ROLE = {
+  eye_head: 'Gaze stabilisation. NASA puts this under gaze control, upstream of spatial orientation and manual control.',
+  body_control: 'Upright balance and locomotion — the impairment NASA says drives falls at egress and on EVA.',
+  task_perf: 'Fine motor control, which NASA links to manual control of vehicles and to EVA risk.',
+  symptoms: 'Motion sickness, which NASA describes as arising when vestibular and visual signals conflict.',
+  head_motion: 'Vestibular gain recalibration — the relationship between acceleration, including gravity, and the vestibular response.',
+  drift: 'The slow component: whether the crew member\'s own reference is itself moving, which is why a personal baseline rather than a population average is the comparison.',
+};
+
 /* ── Ear structures ─────────────────────────────────────── */
 export const EAR_STRUCTURES = [
   {

@@ -14,7 +14,9 @@ import { MeasurementSubject } from '../three/Astronaut.js';
 import {
   EAR_STRUCTURES, BRAIN_STAGES, LAB_TESTS, SOURCE_LIST, RESEARCH_TOPICS,
   findSource, sourcesOf, CANAL_AXIS_MAP,
+  HRP_RISK, HRP_CHAIN, HRP_DOMAIN_ROLE,
 } from '../science/content.js';
+import { DOMAINS } from '../core/osi.js';
 import { PathChart, RollingChart } from './panels.js';
 
 /* ═══════════════════════════════════════════════════════════
@@ -1304,6 +1306,9 @@ export function mountResearchSection() {
     btns.set(t.id, b);
   });
 
+  renderHrp();
+  render();
+
   function render() {
     btns.forEach((b, k) => b.classList.toggle('is-on', k === active));
     const list = SOURCE_LIST.filter((s) => active === 'all' || s.topics.includes(active));
@@ -1332,5 +1337,83 @@ export function mountResearchSection() {
       grid.append(card);
     });
   }
-  render();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NASA HRP RISK TRACEABILITY
+   Why this belongs on the Research page and not only in the console:
+   the console table answers "which DAG node does this number come from",
+   which is an engineering question. A reader deciding whether the project
+   is relevant to the challenge asks a different one — "is this inside a
+   real NASA problem, and did they get the problem right". So this panel
+   carries the risk statement verbatim and the published causal chain, and
+   the per-domain role sentences explain the jump from domain to node.
+
+   The node names are NASA's, quoted; the mapping is ours and is labelled
+   as a mapping. No paraphrase is written as if it were a NASA claim.
+   ═══════════════════════════════════════════════════════════ */
+function renderHrp() {
+  const root = $('#hrpPanel');
+  if (!root) return;
+
+  const title = $('#hrpRiskTitle');
+  if (title) {
+    title.append(
+      el('b', { text: `${HRP_RISK.title} (${HRP_RISK.short})` }),
+      document.createTextNode(` — ${HRP_RISK.org}`),
+    );
+  }
+
+  const quote = $('#hrpStatement');
+  if (quote) quote.textContent = `"${HRP_RISK.statement}"`;
+
+  const qsrc = $('#hrpStatementSource');
+  if (qsrc) qsrc.textContent = HRP_RISK.statementSource;
+
+  /* The chain reads left-to-right as NASA's own cause-to-outcome ordering.
+     Each stage is one cell; the nodes inside it are NASA's node names. */
+  const chain = $('#hrpChain');
+  if (chain) {
+    HRP_CHAIN.forEach((stage, i) => {
+      const cell = el('div', { class: 'num-cell' },
+        el('span', { class: 'num-k', text: `${i + 1}. ${stage.stage}` }),
+        el('span', { class: 'num-v', text: stage.nodes.join(' · ') }));
+      chain.append(cell);
+    });
+  }
+
+  /* Domain -> DAG node. The node name is read from DOMAINS so this page and
+     the Mission Console cannot drift apart; if osi.js changes the mapping,
+     both change together. */
+  const roles = $('#hrpRoles');
+  if (roles) {
+    DOMAINS.forEach((d) => {
+      /* The role sentence is its own element, not appended to the node
+         name, so the Bengali dictionary can match it on its own. d.dag is
+         NASA's node name and stays in English on both pages — a quoted
+         node name is not something we translate. */
+      roles.append(el('p', { class: 'src-use' },
+        el('b', { text: `${d.label} \u2192 ${d.dag} \u2014` }),
+        el('span', { text: ` ${HRP_DOMAIN_ROLE[d.id] || ''}` })));
+    });
+  }
+
+  const caveat = $('#hrpCaveat');
+  if (caveat) caveat.textContent = HRP_RISK.caveat;
+
+  const links = $('#hrpLinks');
+  if (links) {
+    const hub = findSource(HRP_RISK.sourceId);
+    const risk = findSource(HRP_RISK.riskPageSourceId);
+    const dag = findSource('nasaDagNarrative');
+    [['HHP sensorimotor risk page', hub], ['HRP risk entry', risk],
+     ['Sensorimotor Risk DAG narrative', dag]].forEach(([label, s], i) => {
+      if (!s) return;
+      if (i) links.append(document.createTextNode(' · '));
+      links.append(el('a', {
+        class: 'src-link', href: s.url, target: '_blank',
+        rel: 'noopener noreferrer', text: `${label} ↗`,
+      }));
+    });
+  }
 }

@@ -4,12 +4,12 @@
 > NASA Space Apps Challenge-এর শর্ত অনুযায়ী এই প্রজেক্ট ওপেন সোর্স: কোড দেখা, চালানো, পরিবর্তন ও পুনঃবিতরণ করা যাবে — শর্ত শুধু লাইসেন্সের অ্যাট্রিবিউশন ও নোটিশ রক্ষা করা।
 > থার্ড-পার্টি অ্যাসেট (Three.js, NASA মডেল/ম্যাপ, NIH ব্রেইন) নিজেদের লাইসেন্সেই আছে — বিস্তারিত [NOTICE](NOTICE)-এ।
 
-> **এই README-টি পরের AI/Agent-এর জন্য canonical project handoff document।** নতুন কাজ শুরু করার আগে এটি, `docs/ARCHITECTURE.md`, `docs/SENSOR_API.md`, `docs/SOURCES.md`, `docs/TESTING.md`, এবং root-level `PLAN-A-Full-Roadmap-BN.md` পড়বে। অনুমান করে কোনো feature, sensor বা NASA claim যোগ করবে না।
+> **এই README-টি পরের AI/Agent-এর জন্য canonical project handoff document।** নতুন কাজ শুরু করার আগে এটি, `docs/ARCHITECTURE.md`, `docs/SENSOR_API.md`, `docs/SOURCES.md`, `docs/TESTING.md`, `docs/HRP-RISK-MAPPING.md`, এবং `reports/plans/PLAN-A-Full-Roadmap-BN.md` (= প্রজেক্ট রুটের `F:\Nasa Project\reports\plans\`, রিপোর ভিতরে নয়) পড়বে। অনুমান করে কোনো feature, sensor বা NASA claim যোগ করবে না।
 
 > **সাবমিশনের দুটো অতিরিক্ত ফাইল:** **`docs/AI_USE.md`** — প্রজেক্ট পেজের বাধ্যতামূলক "Use of AI" ফিল্ডের উত্তর (কোনটা AI দিয়ে বানানো, কোনটা নয়, কীভাবে লেবেল করা)। **`captions/`** — ইংরেজি সাবটাইটেল (`.srt` + `.vtt`), narration-এর হুবহু লেখা: ফাইনাল ফিল্ম `VESTIBULAR-GPS-3MIN-FINAL.mp4` (১৭৬s)-এর জন্য `VGPS-FILM-3MIN-EN.*`, আর ২৪০s কাটের জন্য `VGPS-PITCH-4MIN-EN.*` — দুটো আলাদা ভিডিও, গুলিয়ে ফেলবেন না।
 
 **Last verified:** 28 September 2026, Asia/Dhaka  
-**Code baseline verified before this README update:** `4cc0120`  
+**Code baseline:** the `tests/osi.test.result.txt` in this repository is regenerated on every test run, and its timestamp is the authority on when the suite last passed. A hard-coded commit hash here went stale once and was misread as a code state, so it is not repeated.  
 **Live site:** <https://sabbirx01.github.io/vestibular-gps/>  
 **Repository:** <https://github.com/Sabbirx01/vestibular-gps>  
 **Project folder:** `F:\Nasa Project\VESTIBULAR GPS Webpage\`
