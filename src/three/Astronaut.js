@@ -16,6 +16,11 @@ import {
 } from './ModelLibrary.js';
 import { damp, TAU, clamp } from '../core/util.js';
 
+/* Scratch for FloatingAstronaut.frame(); module scope so a per-frame call never
+   allocates. */
+const _frameQuat = new THREE.Quaternion();
+const _frameUp = new THREE.Vector3();
+
 /* Pick the exporter transform that makes the GLB read like a standing human.
    This avoids hard-coding one vendor/exporter's axis convention. */
 function orientHumanoid(root) {
@@ -301,16 +306,52 @@ export class FloatingAstronaut {
   setPointer(nx, ny) { this.pointer.x = nx; this.pointer.y = ny; }
 
   /**
+   * World-space bounds of the figure, recomputed on demand. The figure drifts,
+   * tumbles and can be re-scaled, so a cached box goes stale immediately — and
+   * hard-coded model units are wrong anyway: the GLB is not normalised like the
+   * procedural fallback, which is how a guessed "head height" ended up a full
+   * helmet above the actual head.
+   */
+  /**
+   * Live frame of the figure: its centre, its head and its size, in world space.
+   *
+   * Derived from `realMetrics`, measured once when the suit was loaded, rather
+   * than from a live subtree box. A live Box3 over the suit carrier came back
+   * 7.5 world units tall and 6 deep for a figure that measures 3.37 x 1.50 —
+   * it picks up the mirrored visor plane and helper geometry inside the asset,
+   * and the hero's Earth ended up a full helmet above the astronaut's head.
+   * The offsets below are the measured layout of the figure relative to its
+   * root: the suit sits slightly below the origin, so the head is 0.44 of the
+   * height above the root and the visual centre just under it.
+   *
+   * Rotating with the figure matters: the astronaut tumbles, so "up" is the
+   * root's own up axis, not world up.
+   */
+  frame(out) {
+    const h = (this.realMetrics && this.realMetrics.height) || 2.0;
+    const w = (this.realMetrics && this.realMetrics.width) || 1.0;
+    this.root.getWorldPosition(out.centre);
+    this.root.getWorldQuaternion(_frameQuat);
+    _frameUp.set(0, 1, 0).applyQuaternion(_frameQuat);
+    out.size.set(w, h, w);
+    out.head.copy(out.centre).addScaledVector(_frameUp, h * 0.44);
+    return out;
+  }
+
+  /**
    * Rotate the figure by hand: pointer travel in pixels from a drag.
    * Direct 1:1 tracking while the pointer moves, plus an impulse kept as
    * angular momentum, so releasing the drag leaves the figure turning — with no
    * gravity and no thrusters out there, nothing is going to stop it.
    */
   drag(dx, dy) {
-    this.userYaw = (this.userYaw || 0) + dx * 0.0055;
-    this.userPitch = clamp((this.userPitch || 0) + dy * 0.0038, -0.85, 0.85);
-    this.userVelY = clamp(dx * 0.0045, -1.6, 1.6);
-    this.userVelP = clamp(dy * 0.0030, -1.0, 1.0);
+    /* A touch more travel per pixel than the planets get: the suit has to read
+       as turned by hand while the figure is already drifting on its own tumble,
+       and the owner reported that a drag felt like it did nothing. */
+    this.userYaw = (this.userYaw || 0) + dx * 0.0078;
+    this.userPitch = clamp((this.userPitch || 0) + dy * 0.0048, -1.0, 1.0);
+    this.userVelY = clamp(dx * 0.0060, -1.8, 1.8);
+    this.userVelP = clamp(dy * 0.0038, -1.2, 1.2);
   }
 
   update(dt, state) {
