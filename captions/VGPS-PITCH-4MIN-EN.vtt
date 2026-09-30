@@ -1,0 +1,189 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:04.304
+Six months in space. Today, gravity
+comes back.
+
+2
+00:00:15.000 --> 00:00:21.108
+After microgravity, the inner ear — the
+body’s balance sensor — is miscalibrated.
+
+3
+00:00:21.148 --> 00:00:24.296
+The ground is still. It only feels tilted.
+
+4
+00:00:30.000 --> 00:00:31.507
+And help is not close.
+
+5
+00:00:31.547 --> 00:00:35.937
+A message to Earth can take up to
+twenty-two minutes — one way.
+
+6
+00:00:35.977 --> 00:00:38.960
+So we built the instrument for
+that moment.
+
+7
+00:00:45.000 --> 00:00:49.688
+We are six students from Bangladesh — one
+team, one obsession.
+
+8
+00:01:00.000 --> 00:01:05.504
+Turning an invisible medical risk into
+something an astronaut can actually see.
+
+9
+00:01:15.000 --> 00:01:17.917
+We didn’t want to fake a
+spaceship dashboard.
+
+10
+00:01:17.957 --> 00:01:21.992
+We wanted to answer one honest question —
+am I still me today?
+
+11
+00:01:30.000 --> 00:01:33.211
+Every claim is backed by a test and
+a source —
+
+12
+00:01:33.251 --> 00:01:37.169
+ninety-three automated checks,
+fifteen cited references.
+
+13
+00:01:37.209 --> 00:01:40.208
+If we couldn’t prove it, we didn’t
+ship it.
+
+14
+00:01:45.000 --> 00:01:49.509
+Go back to that moment. If that astronaut
+had their own baseline —
+
+15
+00:01:49.549 --> 00:01:54.059
+their own normal, captured before the
+mission — the story changes.
+
+16
+00:01:54.099 --> 00:01:59.504
+We don’t compare them to an average human.
+We compare them to yesterday’s self.
+
+17
+00:02:00.000 --> 00:02:01.160
+Six domains —
+
+18
+00:02:01.200 --> 00:02:06.984
+balance, reaction, symptoms, head motion,
+eye-head coordination, drift —
+
+19
+00:02:07.024 --> 00:02:11.271
+fold into one score: the
+Orientation Stability Index.
+
+20
+00:02:11.311 --> 00:02:16.784
+Beside every score sits its uncertainty,
+and a noise floor called MDC.
+
+21
+00:02:17.074 --> 00:02:18.893
+Every number is traceable.
+
+22
+00:02:18.933 --> 00:02:23.398
+The science is keyed to NASA’s Human
+Research Program, the NIH,
+
+23
+00:02:23.438 --> 00:02:27.402
+and peer-reviewed literature — cited on
+the page itself.
+
+24
+00:02:30.000 --> 00:02:32.752
+And here is what makes us different.
+
+25
+00:02:32.792 --> 00:02:37.637
+When a camera cannot measure the eyes, we
+do not invent a zero.
+
+26
+00:02:37.677 --> 00:02:41.592
+We write “unavailable” — and widen
+the uncertainty.
+
+27
+00:02:41.632 --> 00:02:44.384
+An honest gap beats a confident lie.
+
+28
+00:02:45.000 --> 00:02:51.008
+This is not a mockup. It runs right now,
+in a browser, fully offline.
+
+29
+00:03:00.000 --> 00:03:02.237
+Calibrate in about two seconds.
+
+30
+00:03:02.277 --> 00:03:07.232
+The camera measures head motion on the
+device — nothing is uploaded.
+
+31
+00:03:15.000 --> 00:03:20.968
+Capture a baseline, and the console gives
+you a score, its confidence, an advisory,
+
+32
+00:03:21.008 --> 00:03:23.284
+a countermeasure, and a recheck.
+
+33
+00:03:23.324 --> 00:03:28.568
+Data moves as a small, delay-tolerant
+file — no video streaming required.
+
+34
+00:03:30.000 --> 00:03:33.383
+The decision engine is finished
+and deployable today.
+
+35
+00:03:33.423 --> 00:03:37.839
+What comes next needs hardware:
+eye-tracking to fill that honest gap,
+
+36
+00:03:37.879 --> 00:03:41.584
+force plates and IMUs through our
+open ingestion contract,
+
+37
+00:03:41.624 --> 00:03:45.846
+a crew-wide view for the medical officer,
+and clinical validation.
+
+38
+00:03:45.886 --> 00:03:49.592
+The software is ready — the sensors are
+the mission ahead.
+
+39
+00:03:49.882 --> 00:03:55.386
+VESTIBULAR GPS. We measure what we can —
+and we are honest about the rest.
+
