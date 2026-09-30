@@ -132,6 +132,18 @@ export const BODIES = {
     clouds: false, nightLights: false, nightGlow: 0, craters: 46,
     /* bumpScale for the bundled LOLA elevation map (relief, not paint). */
     bumpScale: 0.035,
+    /* The contrast pass. The first version of this body used the bundled map at
+       full strength under the body's default lighting and read as flat and pale
+       — the surface was fine, the falloff was missing. These four values are the
+       honest fix, in the order they matter:
+         limbDarkening — the regolith returns almost nothing at grazing angles,
+                         so the disc has to fall off towards its edge;
+         albedoScale   — the kit's map is far brighter than the Moon's ~0.12
+                         albedo and sat on the ACES shoulder, where contrast is
+                         bought back by going down, not up;
+         fillScale /    — there is no atmosphere around an airless body to
+         bounceScale     scatter or bounce light into the shadowed limb. */
+    limbDarkening: 0.42, albedoScale: 0.66, fillScale: 0.30, bounceScale: 0.25,
   },
   MARS: {
     radius: 0.74, tilt: 0.44, spin: 0.07, bump: 0.03,

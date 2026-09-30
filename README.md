@@ -52,9 +52,10 @@ Do not describe the product as a validated clinical monitor. Describe it as a **
 - The scan reports a **coarse head pose** (yaw/pitch/roll) from the fitted region: centroid displacement, the change in the ratio of the region's two spreads, and the tilt of its principal axis. Pose is zeroed against a neutral captured by CALIBRATE and stays `null` until that neutral exists. Every published value carries `estimated: true` and a `basis` field naming the channel that is holding the lock; `basis: "structure"` means the colour rule is silent and the lock is far less certain.
 - Camera does **not** measure gaze and therefore does **not** produce VOR gain. The UI must say `UNAVAILABLE — CAMERA HAS NO EYE LANDMARKS`; do not invent eye/VOR values. The face scan does not change this: it uses no landmarks, so `eyeHead` stays null.
 - The face-scan pose is a proxy, not a goniometer: a lateral head translation moves the region exactly like a yaw, and the direction term has a dead zone (0.06 of a face width) so that noise cannot decide which way the head turned.
-- The Earth uses a locally bundled NASA Blue Marble surface map, and the Moon uses the SVS "CGI Moon Kit" LROC WAC colour mosaic with the LOLA elevation map as a bump map, so the maria and crater rims carry real relief. Both load non-blockingly over the procedural fallback and both are credited in `LICENSE`.
+- All four bodies of the Space section now carry real surface maps instead of procedural colour: the Earth and MICROGRAVITY the NASA Blue Marble composite, the Moon the SVS "CGI Moon Kit" LROC WAC colour mosaic with the LOLA elevation map as a bump map (so the maria and crater rims carry real relief, not just paint), and Mars the USGS/NASA Viking MDIM 2.1 colourised global mosaic. Every map is bundled locally, loads non-blockingly over the procedural fallback, and is credited in `LICENSE`.
+- The Moon additionally gets an airless-body treatment that the other bodies do not: its atmosphere shell and white limb glow sit near zero, its fill and bounce lights are cut (there is no atmosphere around it to scatter light), its albedo is scaled down off the tone curve's shoulder, and a **limb-darkening shell** darkens the disc towards its edge. Measured on the rendered frame: the edge/centre falloff went from 0.903 to 0.842 and the core's mean luminance from 194 to 177, so the maria separate and the disc reads as a lit rock instead of a pale ball.
+- **Narrow layouts:** below 1280 px the Space section has no free column for the reference body, so the camera anchors it inside the padding band the stylesheet reserves above the heading, tracking that band's real position rather than a fixed fraction of the viewport. Once the band has scrolled past, the body is scaled away instead of parking on top of the readout copy — verified at 390x844 (band: scale 1.0; +140 px: 0.45; +300 px and beyond: gone).
 - The Earth's night side carries a city-light layer **generated from the bundled map's own land/ocean colours**, so the glow can only sit on land that is actually drawn underneath it. It is a visual model, not a city-lights dataset, and must not be described as measured lighting.
-- The Moon is modelled as an airless body: its atmosphere shell and white limb glow are dialled down to near zero, which is what lets the photographic surface read instead of a pale halo.
 - The Mission Console can score the reaction-time `task_perf` domain after the lab API fix (`getReactionMs`).
 - `serve.py` blocks directory listings, dotfiles/underscore scratch paths, and `tests/` when exposed on a LAN; it adds `no-store` and `nosniff` headers.
 
@@ -266,6 +267,7 @@ Expected current result: **93 passed, 0 failed**. If Node is already on PATH, `n
 | Blue Marble Earth map | `assets/earth-blue-marble-1280.jpg` | 146,994 bytes | Earth/Microgravity surface map | NASA Blue Marble/MODIS, public domain; credited in `LICENSE` |
 | LROC Moon colour map | `assets/moon-lroc-color-2048.jpg` | 404,331 bytes | Moon surface map | NASA SVS CGI Moon Kit (LROC WAC), public domain; credited in `LICENSE` |
 | LOLA elevation map | `assets/moon-ldem-1024.jpg` | 106,169 bytes | Moon bump/relief map | NASA SVS CGI Moon Kit (LOLA LDEM), public domain; credited in `LICENSE` |
+| Viking Mars map | `assets/mars-viking-mdim-2048.jpg` | 716,317 bytes | Mars surface map | NASA/JPL/USGS Astrogeology MDIM 2.1, public domain; credited in `LICENSE` |
 | Three.js | `vendor/three.module.js` | vendored | WebGL engine | MIT; retain licence header |
 | Draco | `vendor/draco/` | vendored | GLB decoding | Keep decoder files and correct WASM MIME on hosts |
 
@@ -396,7 +398,7 @@ The app folder itself:
     ├── assets/models/                        NASA suit + NIH brain GLBs
     ├── assets/*.jpg                          bundled planetary surface maps —
     │                                         Blue Marble Earth, LROC Moon colour,
-    │                                         LOLA lunar elevation (bump)
+    │                                         LOLA lunar elevation (bump), Viking Mars
     ├── src/core/osi.js                       OSI metric engine
     ├── src/core/store.js                     state, bus, sensor processing
     ├── src/sensors/webcam.js                 local head-motion camera provider

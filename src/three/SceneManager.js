@@ -509,6 +509,10 @@ export class SceneManager {
     /* layer visibility per section so text stays readable */
     this._applyEnvOpacity(this._section || 'sec-hero', f.focus);
 
+    /* Narrow layouts only: see _applyNarrowBodyFade. Must run before the render,
+       and after _applyEnvOpacity so it owns the final visibility decision. */
+    this._applyNarrowBodyFade();
+
     this.renderer.render(this.scene, this.camera);
 
     /* telemetry + adaptive quality */
@@ -591,7 +595,50 @@ export class SceneManager {
    */
   _spaceAnchor(f) {
     if (!f.anchor) return null;
-    return innerWidth >= SIDE_COLUMN_MIN_W ? f.anchor : (f.anchorNarrow || f.anchor);
+    if (innerWidth >= SIDE_COLUMN_MIN_W) return f.anchor;
+    /* Below the two-column breakpoint the copy is full width, and the only space
+       the layout reserves for the body is the section's own padding-top band
+       (sections.css, same breakpoint). A fixed fraction of the viewport ignores
+       that: the band scrolls away while the aim stays put, so the body ends up
+       parked on the readout copy further down the section. Track the band. */
+    const band = this._spaceBand();
+    const base = f.anchorNarrow || f.anchor;
+    if (!band) return base;
+    return [base[0], clamp(band.centre / Math.max(1, innerHeight), 0.14, 0.46)];
+  }
+
+  /* The Space section's reserved band, in viewport pixels, read from the DOM and
+     the stylesheet every frame so the two cannot drift apart again. `presence`
+     is 1 while the band is on screen and 0 once it has scrolled fully above the
+     viewport — there is no reserved space left at that point, which is what
+     _applyNarrowBodyFade acts on. */
+  _spaceBand() {
+    if (!this._spaceSection) this._spaceSection = document.getElementById('sec-space');
+    const el = this._spaceSection;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const band = Math.max(1, parseFloat(getComputedStyle(el).paddingTop) || 0);
+    return { top: rect.top, centre: rect.top + band / 2, presence: clamp((rect.top + band) / band, 0, 1) };
+  }
+
+  /* Narrow layouts: recede the reference body as its reserved band leaves the
+     viewport, instead of letting it sit on top of the text. On a phone the copy
+     is full width below the breakpoint, so unlike the desktop column there is
+     nowhere for the body to go once the band has been scrolled past; scaling it
+     out keeps the band as the only place it appears, which is what the
+     stylesheet reserves and what the section was measured against. */
+  _applyNarrowBodyFade() {
+    const root = this.solar && this.solar.root;
+    if (!root) return;
+    let presence = 1;
+    if (innerWidth < SIDE_COLUMN_MIN_W && this._section === 'sec-space') {
+      const band = this._spaceBand();
+      if (band) presence = band.presence;
+    }
+    this._solarPresence = presence;
+    root.scale.setScalar(0.001 + 0.999 * presence);
+    const want = (SECTION_LAYERS[this._section] || SECTION_LAYERS['sec-hero']).solar;
+    root.visible = want && presence > 0.02;
   }
 
   _anchorBody([fx, fy], k, dt) {

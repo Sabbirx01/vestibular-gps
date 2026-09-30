@@ -7,7 +7,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 import * as THREE from '../../vendor/three.module.js';
-import { PAL, fresnelMaterial, atmosphereMaterial, disposeTree } from './materials.js';
+import { PAL, fresnelMaterial, atmosphereMaterial, limbDarkeningMaterial, disposeTree } from './materials.js';
 import { damp, TAU, clamp } from '../core/util.js';
 import { GRAVITIES } from '../science/content.js';
 import { BODIES, buildPlanetTextures } from './planetTextures.js';
@@ -26,11 +26,15 @@ import { BODIES, buildPlanetTextures } from './planetTextures.js';
    MOON (bump)          : the same kit's LDEM, from LRO's laser altimeter
                           (LOLA). Used as a bump map so the maria basins and
                           crater rims carry real relief instead of flat paint.
+   MARS                 : the USGS/NASA Viking MDIM 2.1 colourised global
+                          mosaic (MDIM21 ClrMosaic, 1 km), the standard
+                          photographic map of the planet.
    ─────────────────────────────────────────────────────────── */
 const SURFACE_ASSETS = {
   EARTH: 'assets/earth-blue-marble-1280.jpg',
   MICROGRAVITY: 'assets/earth-blue-marble-1280.jpg',
   MOON: 'assets/moon-lroc-color-2048.jpg',
+  MARS: 'assets/mars-viking-mdim-2048.jpg',
 };
 
 const BUMP_ASSETS = {
@@ -156,6 +160,15 @@ export class SolarSystem {
       roughness: id === 'EARTH' || id === 'MICROGRAVITY' ? 0.78 : 0.92,
       metalness: 0.02,
     });
+
+    /* Albedo scale, where a body needs it. The lunar mosaic is tuned for
+       aesthetics rather than photometry — it is far brighter than the Moon's
+       ~0.12 albedo — and on the ACES tone curve that brightness lands on the
+       shoulder, where more light buys no contrast at all (the same trap the
+       Earth's albedo ladder hit, see the notes in planetTextures.js). Scaling
+       the albedo DOWN moves the surface off the shoulder, which is what lets the
+       maria separate and the terminator read. The map file is untouched. */
+    if (spec.albedoScale) mat.color.multiplyScalar(spec.albedoScale);
 
     /* The procedural recipes cannot produce recognisable geography: the Earth
        one makes plausible continents rather than Africa and Asia, the Moon one a
@@ -291,6 +304,16 @@ export class SolarSystem {
     );
     grp.add(limb);
 
+    /* Limb darkening — airless bodies only (see limbDarkeningMaterial). Shelters
+       just outside the surface so it multiplies the disc, not the starfield. */
+    const darkness = spec.limbDarkening
+      ? new THREE.Mesh(
+          new THREE.SphereGeometry(showcaseRadius * 1.012, 56, 36),
+          limbDarkeningMaterial(spec.limbDarkening),
+        )
+      : null;
+    if (darkness) grp.add(darkness);
+
     /* No name label above the body any more.
        It was a floating chip reading EARTH / MOON / MARS / FREE FLOAT parked at
        showcaseRadius + 0.52, and in the Space section — where the camera sits
@@ -319,16 +342,21 @@ export class SolarSystem {
        brightening alone only turned the disc up and left it flat: what makes a
        planet read as a photograph rather than a sticker is the RATIO between
        the lit hemisphere and the limb, not the absolute exposure. */
-    const fill = new THREE.DirectionalLight(0x6f9fe0, 0.72);
+    const fill = new THREE.DirectionalLight(0x6f9fe0, 0.72 * (spec.fillScale ?? 1));
     fill.position.set(-spec.radius * 4, -spec.radius, -spec.radius * 2);
     grp.add(fill);
 
-    /* Touch of bounce from below — keeps the terminator readable */
-    const bounce = new THREE.DirectionalLight(0x3f6d9c, 0.30);
+    /* Touch of bounce from below — keeps the terminator readable.
+       Both this and the fill are scaled per body (`bounceScale` / `fillScale`):
+       around an airless body there is no atmosphere to scatter or bounce light
+       back, so on the Moon the fill is the main thing lifting the shadowed limb
+       off true black and flattening the disc. Cutting it is a lighting fix, not
+       an exposure one. */
+    const bounce = new THREE.DirectionalLight(0x3f6d9c, 0.30 * (spec.bounceScale ?? 1));
     bounce.position.set(0, -spec.radius * 4, spec.radius * 1.5);
     grp.add(bounce);
 
-    grp.userData = { surface, clouds, atmo, limb, spec, radius: showcaseRadius, opacity: 1 };
+    grp.userData = { surface, clouds, atmo, limb, darkness, spec, radius: showcaseRadius, opacity: 1 };
     this.root.add(grp);
     this.bodies[id] = grp;
     return grp;
@@ -446,6 +474,8 @@ export class SolarSystem {
          glowing ball rather than a lit rock. */
       if (lu.uIntensity) lu.uIntensity.value = o * limI;
       if (lu.uTime) lu.uTime.value = t;
+      const dk = b.userData.darkness && b.userData.darkness.material.uniforms;
+      if (dk && dk.uStrength) dk.uStrength.value = o * (spec.limbDarkening ?? 0);
 
       /* Night side: the city-light layer brightens as the body fades in, and is
          driven by the body's own nightGlow factor (0 for airless bodies). */

@@ -188,7 +188,16 @@ whose page was not the foreground tab: `requestAnimationFrame` was throttled, so
 the captures were stale frames and the opacity values sat frozen at baseline.
 **Never draw a visual conclusion about this scene from a backgrounded tab.**
 
-The user said Earth comes first, then Moon and Mars should also be improved. Still open:
+**Second update — same day, later pass.** Mars now carries the USGS/NASA Viking
+MDIM 2.1 colourised global mosaic too, so all four bodies use bundled
+public-domain surface maps. The Moon also got the contrast pass (limb-darkening
+shell, albedo scaled off the ACES shoulder, fill/bounce cut as an airless body;
+measured edge/centre falloff 0.903 → 0.842, core mean luminance 194 → 177), and
+the narrow-layout overlap was fixed: below 1280 px the Space section's reference
+body now tracks the reserved padding band and is scaled away once that band has
+scrolled past, instead of parking on the readout copy.
+
+Still open:
 
 1. Find suitable public-domain or clearly licensed local lunar and Mars surface maps.
 2. Prefer NASA/USGS/ESA source records with explicit reuse status.
@@ -273,8 +282,17 @@ night side carries a generated city-light layer. Both were verified from real
 foreground-tab screenshots, not from a backgrounded tab: rAF throttling there
 produces stale frames and false conclusions.
 
-Still open: Mars is procedural (give it a properly licensed local map the same
-way), and the Moon reads a little pale under the current tone mapping — a
-stronger terminator or limb darkening is the honest fix, not a brighter map.
+Done since: Mars carries the Viking MDIM 2.1 mosaic, the Moon got the
+limb-darkening/albedo contrast pass, and the narrow-layout body overlap was
+fixed. Still open: nothing on the planets themselves — the next real work is the
+submission requirements and the relevance bridge described earlier in this file.
 Keep the 93/0 tests green and report exactly what was verified.
+
+Two QA rules learned the hard way, both of which produced FALSE results today:
+1. Never judge the scene from a backgrounded tab — rAF throttling leaves stale
+   frames (this is what produced the retracted "MOON does not swap" claim).
+2. Always load `/` first and dismiss the intro BEFORE navigating to a section
+   hash. A first navigation straight to `/#sec-space` leaves the section tracker
+   on `sec-hero`, so the camera keeps the hero framing and the planet is simply
+   not in the frame — it looks exactly like a rendering bug and is not one.
 ```

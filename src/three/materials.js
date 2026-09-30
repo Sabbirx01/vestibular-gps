@@ -328,6 +328,52 @@ export function fresnelMaterial(color, { power = 2.6, intensity = 1.0, side = TH
   });
 }
 
+/* ── Limb darkening shell ────────────────────────────────
+   An airless body is brightest where you look straight down at it and falls off
+   towards the silhouette — the regolith shows almost no light back at grazing
+   angles. Without it a photographic lunar map renders as an evenly bright disc,
+   which is what "flat and pale" actually was: the map was fine, the falloff was
+   missing.
+
+   Multiply blending, because this layer can only ever darken what is already
+   drawn — additive shells (the atmosphere and the limb rim) physically cannot.
+   The shell is only 1% larger than the body so the ring of starfield it also
+   multiplies is about a pixel wide.
+   ──────────────────────────────────────────────────────── */
+export function limbDarkeningMaterial(strength = 0.4, power = 2.4) {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.MultiplyBlending,
+    side: THREE.FrontSide,
+    uniforms: {
+      uStrength: { value: strength },
+      uPower: { value: power },
+    },
+    vertexShader: /* glsl */`
+      varying vec3 vNormalW;
+      varying vec3 vViewDir;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vNormalW = normalize(mat3(modelMatrix) * normal);
+        vViewDir = normalize(cameraPosition - wp.xyz);
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform float uStrength;
+      uniform float uPower;
+      varying vec3 vNormalW;
+      varying vec3 vViewDir;
+      void main() {
+        float ndv = clamp(abs(dot(normalize(vNormalW), normalize(vViewDir))), 0.0, 1.0);
+        float dark = pow(1.0 - ndv, uPower) * uStrength;
+        gl_FragColor = vec4(vec3(1.0 - dark), 1.0);
+      }
+    `,
+  });
+}
+
 /* ── Signal pulse used along neural pathways ────────────── */
 export function signalMaterial(color, width = 0.55) {
   return new THREE.ShaderMaterial({
