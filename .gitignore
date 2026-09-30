@@ -15,3 +15,10 @@ _nih-brain*.zip
 
 # local logs
 *.log
+
+# local QA capture output — screenshots, measurement dumps and the throwaway
+# analysis scripts written next to them. One such session is ~43 MB, which is
+# noise in the repo and in every diff. Captures that were committed earlier
+# stay tracked; this only keeps NEW ones out. Use `git add -f` for a capture
+# that is actually wanted as evidence.
+qa-hero-fix/
