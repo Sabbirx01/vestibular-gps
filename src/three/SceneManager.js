@@ -25,7 +25,15 @@ const FRAMING = {
   'sec-brain':      { focus: 'wide',     dist: 12.0, height: 1.4,  look: 1.3,  env: 0.3  },
   'sec-vor':        { focus: 'astronaut',dist: 5.0,  height: 1.7, look: 1.6,  env: 0.42 },
   'sec-sensors':    { focus: 'astronaut',dist: 4.4,  height: 1.7, look: 1.6,  env: 0.5 },
-  'sec-space':      { focus: 'planet',   dist: 5.8,  height: 0.15, look: -1.0, offset: [0.0, -0.35], env: 0.72 },
+  /* The Space section is the only framing with an `anchor`: the reference body
+     has to sit inside a specific DOM gap (the open column right of the heading,
+     above the glass panel), and that gap is laid out in percent of the window
+     while the camera's vertical FOV is a constant 46 degrees. So this section's
+     aim is SOLVED in screen space every frame — see _anchorBody. `look` and
+     `offset` below are what the narrow-window fallback still uses (below 1280 px
+     the heading column reaches across the gap and the body stays out of the
+     reading column instead). */
+  'sec-space':      { focus: 'planet',   dist: 5.8,  height: 0.15, look: -1.0, offset: [0.0, -0.35], env: 0.72, anchor: [0.68, 0.35] },
   'sec-lab':        { focus: 'astronaut',dist: 5.8,  height: 1.6, look: 1.4,  env: 0.4 },
   /* Dense instrument panels: pulled far back and dimmed so nothing drifts
      behind a readout. */
@@ -55,28 +63,48 @@ const FRAMING = {
      world x 7.4 -> screen x ~1402 at 1920 (astronaut ends ~1202), radius ~57 px
    The second half of the clearance problem was vertical, and it only shows up
    on a laptop. The spec-card grid is a DOM column, so its bottom edge sits at a
-   different fraction of the viewport at every size: measured with the panel
-   visible, the grid ends near y 745 of 1080 but near y 645 of 768. At the old
-   y of -3.5 the planet fell at y ~528..618 on a 1366x768 laptop — entirely
-   inside the CANAL ARRANGEMENT card, so on a normal laptop the reference body
-   was not on screen at all. Dropping it to -5.4 clears the panel's bottom edge
-   at every size measured in a browser, page as shipped, pointer parked at both
-   extremes:
-     1920x1080   panel ends y 746   globe y 808..945   62 px clear
-     1440x900    panel ends y 655   globe y 715..820   60 px clear
-     1366x768    panel ends y 647   globe y 643..762   4 px of the globe's top
-                 sits behind the panel and it clears the viewport bottom by
-                 6 px — the tight one, on a short viewport with no other gap
-   The astronaut is 185 px away at 1920, 140 px at 1440 and 108 px at 1366, and
-   the pointer now moves the planet by <=10 px rather than a quarter of the
-   screen. Pixel boxes were read off full-resolution screenshots by eye, so
-   treat each as +/-10-15 px.
+   different fraction of the viewport at every size.
+
+   RE-MEASURED, and the previous numbers here were wrong. They were read off
+   screenshots by eye and claimed 4 px of overlap at 1366x768; measured properly
+   — DOM getBoundingClientRect for the panel, pixel analysis for the globe, at
+   y -5.4, page as shipped, pointer parked, scrollY 0 — the truth is:
+     1920x1080  panel bottom 746    globe y 867..994 (124 px)   121 px clear
+     1440x900   panel bottom 655    globe y 693..790  (97 px)    38 px clear
+     1366x768   panel bottom 647.5  globe y 608..692  (84 px)   -39 px: the
+                globe's top third is BEHIND the CANAL ARRANGEMENT card
+   So the short-viewport case was never fixed, and at 1366x768 it cannot be
+   fixed by moving the body: the DOM band between the panel bottom (0.843 of
+   height) and the viewport bottom is only 121 px while the globe needs 84 px
+   plus its own margin, so the globe has to overlap that panel at this size.
+   Recorded rather than claimed away.
+
+   y raised from -5.4 to -5.0 at the owner's request ("the Earth is hard to
+   see — move it slightly up"). Scale from the same measurement session is
+   ~59.7 px per world unit at 1920x1080, so this is ~24 px at 1920 and ~17 px at
+   768 — deliberately small. What it buys: a balanced band at 1920 (100 px clear
+   above, 107 px below instead of 121/86) and a slightly tighter 20 px clear at
+   1440. What it costs: the 1366x768 overlap deepens from 39 px to ~54 px. That
+   case is already broken and is not worsened in kind, but if a fully clear
+   globe on a 1366x768 laptop matters more than the higher placement, put this
+   back to -5.4 (or lower) — the two cannot both hold at that size.
    On phones it still falls outside the frame, and the 'planet' focus used to
    compensate for that; that branch is currently disabled (mobilePlanet is
    hard-false in updateCamera), so on a portrait phone the reference body is
    simply off-frame. Recorded here rather than left as a comment claiming a
-   behaviour the code no longer has. */
-const SOLAR_POS = [7.4, -5.4, -8.8];
+   behaviour the code no longer has.
+
+   This y is the HERO's composition only. The Space section stopped reading it
+   as its framing (see _anchorBody): that section solves its aim in screen
+   space, so the reference body can be moved for the hero without moving it on
+   screen in the Space section — which is exactly how the two sections drifted
+   apart in the first place. */
+const SOLAR_POS = [7.4, -5.0, -8.8];
+
+/* Scratch vectors for the Space section's screen-space anchor. Held at module
+   scope so the render loop allocates nothing per frame. */
+const _bodyPos = new THREE.Vector3();
+const _bodyNdc = new THREE.Vector3();
 
 /* Which 3D layers are drawn in which section. Solar bodies are hidden on text-heavy
    sections so a planet can never end up sitting on top of a paragraph. */
@@ -306,6 +334,12 @@ export class SceneManager {
     this.framing = f;
     this._section = id;
     this.framingInstant = instant;
+    /* Drop the screen-space anchor (Space section): it re-seeds from wherever
+       the body is when its section next comes up, so re-entering glides the
+       planet into the column from the previous section's pose rather than
+       snapping it to a stale fraction. */
+    this.camState.ax = undefined;
+    this.camState.ay = undefined;
     if (instant) {
       this.camState.dist = f.dist;
       this.camState.height = f.height;
@@ -407,12 +441,27 @@ export class SceneManager {
     this.camState.ox = damp(this.camState.ox ?? oxT, oxT, k, dt);
     this.camState.oy = damp(this.camState.oy ?? oyT, oyT, k, dt);
 
+    /* Seed the Space section's screen-space anchor (see _anchorBody) from where
+       the body ACTUALLY is on screen, read off the pose the previous frame
+       rendered — this has to happen before the camera is moved below, or the
+       seed would be the framing's own aim instead. The anchor then eases from
+       there, so entering the section glides the planet into its column instead
+       of teleporting it across the window. */
+    if (f.anchor && this.solar && innerWidth >= 1280 && this.camState.ax === undefined) {
+      this.solar.root.getWorldPosition(_bodyPos);
+      _bodyNdc.copy(_bodyPos).project(this.camera);
+      this.camState.ax = (_bodyNdc.x + 1) / 2;
+      this.camState.ay = (1 - _bodyNdc.y) / 2;
+    }
+
     this.camera.position.set(
       cx + Math.sin(az) * this.camState.dist,
       this.camState.height + el * 2.2 + (f.focus === 'planet' || mobilePlanet ? 1.2 : 0),
       cz + Math.cos(az) * this.camState.dist,
     );
-    this.camera.lookAt(cx + this.camState.ox, this.camState.look + this.camState.oy, cz);
+    const aimX = cx + this.camState.ox;
+    const aimY = this.camState.look + this.camState.oy;
+    this.camera.lookAt(aimX, aimY, cz);
 
     /* subtle FOV breathing on interaction — never enough to be nauseating */
     this.camera.fov = damp(this.camera.fov, 46 + (this._pointerDown ? -1.4 : 0), 4, dt);
@@ -440,6 +489,13 @@ export class SceneManager {
       );
     }
 
+    /* The Space section re-aims the camera at the body itself. It runs after
+       the orbit compensation above, because it solves against the body's world
+       position and the compensation is what finally decides that. */
+    if (f.anchor && this.solar && innerWidth >= 1280) {
+      this._anchorBody(f.anchor, k, dt);
+    }
+
     /* layer visibility per section so text stays readable */
     this._applyEnvOpacity(this._section || 'sec-hero', f.focus);
 
@@ -458,6 +514,107 @@ export class SceneManager {
         engine: { ...s.engine, calls: info.render.calls, tris: info.render.triangles, objects: this.scene.children.length, fps: this.currentFps || 60 },
       }, ['engine']);
     }
+  }
+
+  /**
+   * Aim the camera so the active solar body lands on a declared screen
+   * position. `anchor` is [x, y] as fractions of the render surface, 0,0 being
+   * the top-left corner.
+   *
+   * Why this is solved instead of hand-set: the Space section is the one place
+   * where the planet has to sit inside a specific DOM gap — the open column to
+   * the right of the heading and above the glass panel. Every world-space value
+   * that could express that gap (camera height, aim point, composition offset)
+   * maps to a different screen position on every window shape, because the DOM
+   * is laid out in percent while the camera's vertical FOV is a constant 46°.
+   * Measured as shipped: the framing's aim point sat 3.65 world units ABOVE the
+   * body, which put the disc at 0.99 of the viewport height — 1 px of clearance
+   * above the bottom edge at 1920x1080, and either behind the glass panel or
+   * below the fold at 1440x900 and 1366x768. Owner's read: "clicking Moon, Earth
+   * or Mars, the planet should appear in the empty space beside the content, but
+   * it shows far below — you cannot see it properly, it has moved under the
+   * content."
+   *
+   * The solve is closed-form, one pass, no state. Take the body's elevation and
+   * bearing as seen from the camera, then find the yaw and pitch that put it on
+   * the anchor: yaw moves it horizontally, pitch vertically, and no roll is
+   * introduced, so the horizon stays level. NDC offsets scale by tan(fov/2) *
+   * aspect horizontally and tan(fov/2) vertically — the aspect term is the whole
+   * reason a fixed world offset could not hold one screen position across window
+   * shapes.
+   *
+   * The anchor targets the ROOT, not the body: each body drifts ±0.46 units
+   * sideways and ±0.13 units vertically inside the root, so the planet keeps
+   * moving — it just cannot leave its column (that is ±74 px / ±21 px of travel
+   * at 1920x1080, still with a clear margin below). Pointer input moves the
+   * camera position instead of the aim, and the solve absorbs that exactly: the
+   * disc holds 0.68 / 0.35 for every pointer position, checked at the corners of
+   * the pointer range.
+   *
+   * Verified clearances for the LARGEST body (Earth, r ≈ 142 px at 1920x1080;
+   * Mars is ~100 px, the Moon ~60 px), DOM rects measured in the browser at the
+   * section's resting scroll position:
+   *   1920x1080  disc y 236..520   glass panel starts 566   ->  46 px clear
+   *   1440x900   disc y 215..451   glass panel starts 551   -> 100 px clear
+   *   1366x768   disc y 183..385   glass panel starts 540   -> 155 px clear
+   * and horizontally the disc clears the heading column by 119-147 px and the
+   * top-right HUD by 113-249 px.
+   *
+   * Caveat, recorded rather than claimed away: the body is anchored to the
+   * VIEWPORT, so it holds that gap at the section's resting scroll position. A
+   * further scroll brings the glass panel up across it, which nothing fixed to
+   * the viewport can avoid.
+   */
+  _anchorBody([fx, fy], k, dt) {
+    const root = this.solar && this.solar.root;
+    if (!root) return;
+
+    const eye = this.camera.position;
+    root.getWorldPosition(_bodyPos);
+
+    /* Ease toward the declared fraction. The seed is set before the camera
+       moves (update()), so a fresh section starts the ease from the body's real
+       position; once the section is settled this is a no-op every frame. */
+    this.camState.ax = damp(this.camState.ax ?? fx, fx, k, dt);
+    this.camState.ay = damp(this.camState.ay ?? fy, fy, k, dt);
+    const gx = this.camState.ax;
+    const gy = this.camState.ay;
+
+    const dx = _bodyPos.x - eye.x;
+    const dy = _bodyPos.y - eye.y;
+    const dz = _bodyPos.z - eye.z;
+    const len = Math.hypot(dx, dy, dz);
+    if (!(len > 1e-3)) return;
+
+    const elev = Math.asin(clamp(-dy / len, -1, 1));  /* body elevation, + = below */
+    const bear = Math.atan2(-dx, -dz);                /* body bearing from the camera */
+    const tanV = Math.tan((this.camera.fov * Math.PI) / 360);
+    const al = (gx * 2 - 1) * tanV * this.camera.aspect;
+    const be = (1 - gy * 2) * tanV;
+    const m2 = 1 + al * al + be * be;
+    const cv = Math.cos(elev);
+    const sv = Math.sin(elev);
+    /* how much horizontal swing is left once the anchor's horizontal offset is
+       taken out; ≤ 0 means the target cannot be reached without rolling the
+       camera, so the framing's own aim is left in place */
+    const a2 = cv * cv - (al * al) / m2;
+    if (a2 <= 1e-6) return;
+
+    const a = Math.sqrt(a2);
+    const den = m2 * (a2 + sv * sv);
+    const pitch = Math.atan2((sv + be * a) / den, (a - be * sv) / den);
+    const yawOffset = Math.asin(clamp(-al / (Math.sqrt(m2) * cv), -1, 1));
+    const yaw = bear - yawOffset;
+
+    /* unit forward for that yaw/pitch — lookAt only needs a direction, and
+       because it keeps the camera's up vector vertical this reproduces the
+       pitch exactly with no roll */
+    const cp = Math.cos(pitch);
+    this.camera.lookAt(
+      eye.x - Math.sin(yaw) * cp,
+      eye.y - Math.sin(pitch),
+      eye.z - Math.cos(yaw) * cp,
+    );
   }
 
   /** Show/hide whole 3D layers per section so nothing collides with body text. */

@@ -75,10 +75,13 @@ export class SolarSystem {
       const cloudMat = new THREE.MeshStandardMaterial({
         map: maps.cloudMap,
         transparent: true,
-        /* 0.95 with the denser deck in planetTextures: the cloud layer is what
-           carries the planet's realism, and at 0.9 the swirls washed out to a
-           flat haze over the brighter ocean. */
-        opacity: 0.95,
+        /* Now read from the body recipe. This was hardcoded 0.95 while the
+           recipe's `cloudOpacity` sat there as dead config, so the two had
+           already drifted apart. At 0.95 over a ~120 px disc the deck veiled the
+           planet into a pale grey-white ball — the owner's read was "the Earth
+           is hard to see". 0.82 keeps the swirls but lets the ocean and the
+           coastlines read through from underneath. */
+        opacity: spec.cloudOpacity ?? 0.9,
         depthWrite: false,
         roughness: 1,
         metalness: 0,
@@ -107,10 +110,13 @@ export class SolarSystem {
     );
     grp.add(atmo);
 
-    /* A thin forward-scatter shell for the sunlit limb */
+    /* A thin forward-scatter shell for the sunlit limb.
+       Raised from 0.5: the blue rim is the single most recognisable cue that a
+       sphere is a planet with air on it, and at ~120 px the old value thinned it
+       to a hard cut-out edge. */
     const limb = new THREE.Mesh(
       new THREE.SphereGeometry(showcaseRadius * 1.055, 56, 36),
-      fresnelMaterial(0xffffff, { power: 5.5, intensity: 0.5, side: THREE.FrontSide }),
+      fresnelMaterial(0xffffff, { power: 5.5, intensity: 0.62, side: THREE.FrontSide }),
     );
     grp.add(limb);
 
@@ -126,17 +132,25 @@ export class SolarSystem {
        real day/night terminator. At the old ratio the fill flattened the
        planet into an evenly lit disc, which is one of the things that made it
        read as a sticker instead of a lit world. */
-    const key = new THREE.DirectionalLight(0xfff6e8, 4.4);
+    /* 6.4: raised from 4.4 in the visibility pass, then again after the crop
+       analysis showed the visible hemisphere was mostly ambient-lit (the sun
+       direction here is up-and-right, so the camera-facing face gets little of
+       the key). */
+    const key = new THREE.DirectionalLight(0xfff6e8, 6.4);
     key.position.set(spec.radius * 4.2, spec.radius * 1.8, spec.radius * 4.2);
     grp.add(key);
 
-    /* Cool fill from the opposite side so the dark limb is not pure black */
-    const fill = new THREE.DirectionalLight(0x6f9fe0, 0.85);
+    /* Cool fill from the opposite side so the dark limb is not pure black.
+       Trimmed from 0.85 to 0.72 in the same pass that raised the key, because
+       brightening alone only turned the disc up and left it flat: what makes a
+       planet read as a photograph rather than a sticker is the RATIO between
+       the lit hemisphere and the limb, not the absolute exposure. */
+    const fill = new THREE.DirectionalLight(0x6f9fe0, 0.72);
     fill.position.set(-spec.radius * 4, -spec.radius, -spec.radius * 2);
     grp.add(fill);
 
     /* Touch of bounce from below — keeps the terminator readable */
-    const bounce = new THREE.DirectionalLight(0x3f6d9c, 0.38);
+    const bounce = new THREE.DirectionalLight(0x3f6d9c, 0.30);
     bounce.position.set(0, -spec.radius * 4, spec.radius * 1.5);
     grp.add(bounce);
 
@@ -147,10 +161,27 @@ export class SolarSystem {
   }
 
   build() {
-    this.root.add(new THREE.AmbientLight(0x46618c, 1.65));
+    /* 1.75, and the reason is a measurement rather than taste. The first pass
+       cut this from 1.65 to 1.45 to buy contrast, but a luminance analysis of
+       the hero crop then came back with the disc at median 74 and MAX 109 out of
+       255 — dim and matte, which is precisely the complaint ("the Earth is hard
+       to see"). Contrast is now bought in the ALBEDO and in the cloud deck,
+       where it costs no brightness, so the ambient sits above where it started.
+
+       VERIFIED, and the answer was NOT what that paragraph assumed. Three
+       lighting configurations were measured on the rendered hero — body key
+       4.4 / 5.6 / 6.4 against ambient 1.65 / 1.45 / 1.75 — and all three came
+       back median 74, max 109. The hero renderer runs ACESFilmicToneMapping at
+       exposure 1.28, and ACES compresses hard, so once the planet is on the
+       shoulder, more light buys nothing. Treat the ambient and key values in
+       this file as approximately cosmetic for the showcase body; the control
+       that actually moves the planet's brightness is its ALBEDO (see the ocean
+       and land ladders in planetTextures.js). Kept here anyway, because they do
+       shape the terminator and the other bodies (Moon, Mars) which are darker. */
+    this.root.add(new THREE.AmbientLight(0x46618c, 1.75));
     /* A controlled key/fill pair makes the foreground planet readable against
        the starfield on both desktop and mobile, without flattening the texture. */
-    const key = new THREE.DirectionalLight(0xfff1d2, 2.2);
+    const key = new THREE.DirectionalLight(0xfff1d2, 3.4);
     key.position.set(6, 5, 8);
     this.root.add(key);
     const fill = new THREE.DirectionalLight(0x73b8ff, 0.8);
@@ -235,7 +266,7 @@ export class SolarSystem {
       const lu = b.userData.limb.material.uniforms;
       if (au.uIntensity) au.uIntensity.value = o * clamp(spec.atmoIntensity, 0, 1);
       if (au.uTime) au.uTime.value = t;
-      if (lu.uIntensity) lu.uIntensity.value = o * 0.5;
+      if (lu.uIntensity) lu.uIntensity.value = o * 0.62;
       if (lu.uTime) lu.uTime.value = t;
 
       /* city lights intensify as the terminator crosses */

@@ -90,8 +90,8 @@ export const BODIES = {
        orbit, so the atmosphere shell carries real weight here: a wider falloff
        (2.7) at a brighter intensity (1.75) than the original 3.1/1.15, which
        left the edge of the disc looking cut out. */
-    atmo: 0x6fb7ff, atmoPower: 2.7, atmoIntensity: 1.75,
-    clouds: true, cloudOpacity: 0.72, nightLights: true,
+    atmo: 0x6fb7ff, atmoPower: 3.2, atmoIntensity: 2.0,
+    clouds: true, cloudOpacity: 0.92, nightLights: true,
   },
   MOON: {
     radius: 0.44, tilt: 0.10, spin: 0.085, bump: 0.055,
@@ -106,8 +106,8 @@ export const BODIES = {
   MICROGRAVITY: {
     radius: 1.05, tilt: 0.41, spin: 0.055, bump: 0.02,
     /* MICROGRAVITY reuses the Earth look — keep the two in step. */
-    atmo: 0x6fb7ff, atmoPower: 2.7, atmoIntensity: 1.75,
-    clouds: true, cloudOpacity: 0.72, nightLights: true,
+    atmo: 0x6fb7ff, atmoPower: 3.2, atmoIntensity: 2.0,
+    clouds: true, cloudOpacity: 0.92, nightLights: true,
   },
 };
 
@@ -187,8 +187,34 @@ export function buildPlanetTextures(id, W = 512) {
              the mid-ocean where a person recognises "Earth" — clear blue, with
              the sun-glint on top of it. */
           const d = clamp01((sea - elev) / 0.22);
-          r = mix(44, 10, d); g = mix(112, 34, d); b = mix(178, 96, d);
-          roughV = 0.12 + d * 0.06;
+          /* Lifted a third time, and this is the one that actually shows up on
+             screen. The hero renderer runs ACESFilmicToneMapping at exposure
+             1.28, and ACES rolls highlights off hard: three lighting setups
+             spanning body key 4.4 -> 6.4 and ambient 1.45 -> 1.75 all measured
+             the same median 74 / max 109. Lighting is therefore the wrong dial
+             for this planet and the ALBEDO is the right one, because albedo
+             moves the input up the curve instead of pushing it deeper into the
+             shoulder. Measured median 74 is roughly ACES(0.30) — the old water
+             and land simply sat that low. */
+          /* Bright, but the brightness is spent on BLUE only. The previous
+             ladder lifted R, G and B together, which raised the median 74 -> 83
+             while saturated blue FELL 3.4 % -> 2.2 %: the disc got lighter and
+             whiter rather than bluer, and "bright grey ball" is not what anyone
+             means by "make it realistic". So R and G come down and B stays. */
+          r = mix(52, 8, d); g = mix(148, 52, d); b = mix(232, 164, d);
+          /* 0.07 rather than 0.12: a low-roughness ocean catches a specular
+             highlight from the key light, and that glint is what makes a disc
+             read as WATER rather than as a blue-grey material. */
+          roughV = 0.07 + d * 0.05;
+          /* Continental shelf: water close to a coast is shallow and reads
+             distinctly lighter than open ocean. At 120 px this is the cheapest
+             and most legible "that is a real planet" cue there is, because it
+             turns the coastline into a bright hairline instead of a hard edge
+             where blue meets green. */
+          const shelf = clamp01(1 - d / 0.28);
+          r = mix(r, 96, shelf * 0.42);
+          g = mix(g, 188, shelf * 0.42);
+          b = mix(b, 226, shelf * 0.42);
           /* sun-glint noise on the surface */
           const glint = fbm(nx * 9, ny * 9, nz * 9, 3);
           r += glint * 16; g += glint * 22; b += glint * 28;
@@ -199,12 +225,19 @@ export function buildPlanetTextures(id, W = 512) {
           const jungle = clamp01((0.52 - latIce) * 2.2);
           const desert = clamp01((arid - 0.52) * 3);
 
-          /* land, likewise lifted so the biomes separate instead of merging
-             into one dark green mass at hero scale */
-          r = mix(72, 146, e); g = mix(128, 174, e); b = mix(64, 100, e);
+          /* land, likewise lifted twice so the biomes separate instead of
+             merging into one dark green mass at hero scale */
+          /* Slightly less yellow than the previous ladder: pushed back toward
+             green/ochre so the land separates from the white deck by HUE and not
+             only by brightness. */
+          r = mix(96, 168, e); g = mix(158, 188, e); b = mix(84, 124, e);
           /* deserts push toward ochre, poles and mountains toward rock/ice */
-          r = mix(r, 186, desert * 0.75); g = mix(g, 156, desert * 0.72); b = mix(b, 104, desert * 0.7);
-          r = mix(r, 44, jungle * 0.35); g = mix(g, 96, jungle * 0.35); b = mix(b, 44, jungle * 0.35);
+          /* Biome weights raised (desert 0.75->0.85, jungle 0.35->0.5) after a
+             crop review: the visible landmass came out one flat olive-khaki tone
+             with no biome separation at all, which is a large part of why the
+             ball read as CGI rather than as a planet. */
+          r = mix(r, 186, desert * 0.85); g = mix(g, 156, desert * 0.82); b = mix(b, 104, desert * 0.8);
+          r = mix(r, 44, jungle * 0.5); g = mix(g, 96, jungle * 0.5); b = mix(b, 44, jungle * 0.5);
           const snow = clamp01((e - 0.62) / 0.3) * 0.8;
           r = mix(r, 238, snow); g = mix(g, 244, snow); b = mix(b, 250, snow);
           roughV = 0.86 - e * 0.16;
@@ -285,11 +318,31 @@ export function buildPlanetTextures(id, W = 512) {
       if (clouds) {
         /* banded cloud field — more cover at the equator and mid-latitudes */
         const band = 0.5 + 0.5 * Math.sin(v * Math.PI * 5.2 + 1.1);
-        const n = fbm(nx * 3.4, ny * 3.4, nz * 3.4, 5, 2.2, 0.55);
-        /* Slightly denser than the original 0.50/3.1: white cloud swirls over
-           blue water are what make the disc read as a living world at 120 px,
-           and the first pass left the deck thin enough to look like haze. */
-        const cover = clamp01((n * 0.72 + band * 0.28 - 0.47) * 3.2);
+        /* 4.4 rather than 3.4. Measured after the previous pass: the deck no
+           longer veiled the whole disc, but 3793 of 3897 lit pixels belonged to
+           ONE connected blob — a single cloud sheet crossed by thin blue
+           channels, which still reads as haze. The field has to be higher
+           frequency for the cover to break into separate systems. */
+        const n = fbm(nx * 4.4, ny * 4.4, nz * 4.4, 5, 2.2, 0.55);
+        /* Fourth pass, and this one is a different KIND of change, not another
+           nudge of the same dial. The old 0.72/0.28/0.485/3.0 deck gave almost
+           every pixel a small non-zero alpha, so at 0.82 deck opacity the planet
+           wore a uniform milky film: no gaps, therefore no blue ocean and no
+           coastline to read against it. That is what "it does not look
+           realistic" actually was. Weights moved onto the noise (0.86 vs 0.14
+           band) and the ramp steepened (4.2), so coverage still reaches ~70 % but
+           in DISTINCT masses with clear water between them — weather instead of
+           haze. */
+        /* Sparse but OPAQUE, which is the combination the four measured passes
+           pointed at and none of them tried. Everything before this varied the
+           deck's level (opacity up/down) while coverage stayed broad, and the
+           result was always the same object: a uniform low-contrast film, either
+           greyer (low opacity) or whiter (high opacity). What the crop lacked was
+           TONAL STRUCTURE — cloud tops at 180-220 luma sitting over blue water.
+           That needs the alpha to reach 1.0 in the cloud cores while the coverage
+           stays low, so the ramp is steepened (5.0 -> 6.5) as the threshold goes
+           up. Fewer clouds, but the ones present are actually white. */
+        const cover = clamp01((n * 0.90 + band * 0.10 - 0.60) * 6.5);
         const a = Math.round(cover * 255);
         clouds[i] = 255; clouds[i + 1] = 255; clouds[i + 2] = 255; clouds[i + 3] = a;
       }

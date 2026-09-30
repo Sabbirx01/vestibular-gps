@@ -362,11 +362,23 @@ When the user asks for another update:
 
 ```text
 F:\Nasa Project\
-├── PLAN-A-Full-Roadmap-BN.md                 master Bengali roadmap
-├── PLAN-B-Team-Summary-BN.md                team-friendly plan
-├── NASA-JUDGE-BRIEF-EN.md                   judge-facing draft and honesty gaps
-├── PLAYBOOK-FOR-TEAM-BN.md                  team script/real-vs-sim explanation
-├── research/                                 NASA evidence, prior art, competition notes
+├── VESTIBULAR GPS Webpage/     the app itself (git repo, deployment source)
+├── video-project/              video production kit (prompts, refs, VO, captions, shot list)
+├── reports/                    all analyses and plans for the project
+│   ├── deep-read/              master + 4th-pass deep reads (code + docs audits)
+│   ├── plans/                  PLAN-A/B, team playbooks, judge brief
+│   └── fix-reports/            technical / hotfix verification reports
+├── stories/                    Bengali story explainers (GOLPO-*)
+├── pdf/                        exported PDF deliverables
+├── source-materials/           prompt/ (video prompt set), script/ (scripts), research/ (evidence)
+├── assets/                     Photo/ (Mars keyframes), Videos/ (generated clips)
+├── other-projects/             DolaPanel client notes (not part of this app)
+└── _temp/                      qa/ captures, media-cache/ image cache, scratch/ dev files
+```
+
+The app folder itself:
+
+```text
 └── VESTIBULAR GPS Webpage/
     ├── README.md                             this canonical handoff
     ├── index.html                            12-section single page
