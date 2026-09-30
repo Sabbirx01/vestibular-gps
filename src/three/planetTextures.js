@@ -90,7 +90,13 @@ export const BODIES = {
        orbit, so the atmosphere shell carries real weight here: a wider falloff
        (2.7) at a brighter intensity (1.75) than the original 3.1/1.15, which
        left the edge of the disc looking cut out. */
-    atmo: 0x6fb7ff, atmoPower: 3.2, atmoIntensity: 2.0,
+    /* Widened from the original 3.2/2.0 to 2.8/2.2 for the hero: the shell term
+       is a rim falloff, so the disc's centre is untouched and the extra lands on
+       the limb, where an Earth covering ~180 px of a dark frame needs it. The
+       first pass at 2.45 was measured back down — in the close Space framing a
+       rim that strong stopped reading as atmosphere and started reading as a
+       neon ring around a marble. */
+    atmo: 0x6fb7ff, atmoPower: 2.8, atmoIntensity: 2.2,
     /* 0.70, and this number is a measurement of the finished frame rather than a
        guess. At 0.92 the sub-solar third of the disc came back a FLAT near-white
        plateau: sampling the rendered Space-view capture, the inner 0-0.2 r ring
@@ -105,11 +111,27 @@ export const BODIES = {
        the procedural deck is now only a restrained weather veil, not the opaque
        layer that used to wash the planet white. */
     clouds: true, cloudOpacity: 0.22, nightLights: true,
+    /* limbIntensity — the white forward-scatter shell around the disc. Raised
+       from the shared 0.62: on the hero the planet is small and sits in the
+       dark, and the owner's read was that it looked inert rather than lived on.
+       The rim is what carries "this world has air and people on it". */
+    limbIntensity: 0.78,
+    /* nightGlow — how hard the generated city-light layer burns on the night
+       side. 1.1 drives emissiveIntensity to ~1.2 at full opacity, which is what
+       it takes for the warm speckle to survive the ACES curve on the hero,
+       where the disc is only ~130 px across. */
+    nightGlow: 1.1,
   },
   MOON: {
     radius: 0.44, tilt: 0.10, spin: 0.085, bump: 0.055,
-    atmo: 0xb9c6d8, atmoPower: 4.2, atmoIntensity: 0.32,
-    clouds: false, nightLights: false, craters: 46,
+    /* An airless body: the atmosphere shell and the white limb glow are both
+       pulled down to near nothing. The old 0.32 shell plus the shared 0.62 limb
+       wrapped the Moon in a pale halo and flattened it into a grey ball — the
+       surface was being veiled by the very layers that sell an atmosphere. */
+    atmo: 0xb9c6d8, atmoPower: 3.4, atmoIntensity: 0.06, limbIntensity: 0.06,
+    clouds: false, nightLights: false, nightGlow: 0, craters: 46,
+    /* bumpScale for the bundled LOLA elevation map (relief, not paint). */
+    bumpScale: 0.035,
   },
   MARS: {
     radius: 0.74, tilt: 0.44, spin: 0.07, bump: 0.03,
@@ -119,9 +141,10 @@ export const BODIES = {
   MICROGRAVITY: {
     radius: 1.05, tilt: 0.41, spin: 0.055, bump: 0.02,
     /* MICROGRAVITY reuses the Earth look — keep the two in step, including the
-       0.70 deck opacity measured on the Earth render above. */
-    atmo: 0x6fb7ff, atmoPower: 3.2, atmoIntensity: 2.0,
+       cloud deck opacity, limb intensity and night glow above. */
+    atmo: 0x6fb7ff, atmoPower: 2.8, atmoIntensity: 2.2,
     clouds: true, cloudOpacity: 0.22, nightLights: true,
+    limbIntensity: 0.78, nightGlow: 0.85,
   },
 };
 

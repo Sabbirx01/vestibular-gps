@@ -169,16 +169,26 @@ Do not claim “same to same” or “NASA official rendering.” The correct wo
 
 ---
 
-## 5. Moon and Mars — next phase after Earth
+## 5. Moon and Mars — state after the surface-map pass
 
-Moon and Mars are still procedural in `src/three/planetTextures.js`:
+**Update — 30 September 2026 (same day, later pass).** The Moon is no longer
+procedural: it now uses the SVS "CGI Moon Kit" LROC WAC colour mosaic with the
+LOLA LDEM elevation map as a bump map (both bundled in `assets/`, both credited in
+`LICENSE`), the airless-body treatment is in place (atmosphere shell 0.06, white
+limb glow 0.06), and its appearance was verified from real screenshots at 1440 and
+390 px wide. Mars is still procedural.
 
-- Moon: procedural maria, craters and ray systems.
-- Mars: procedural red/orange terrain, dust variation and polar caps.
+**Retraction:** an earlier version of this handover carried a "BLOCKER" claiming
+the MOON button did not change the rendered body. That claim was wrong. Measured
+through the app's own debug surface with the page in the foreground, the swap is
+correct — `click MOON` → `activeId: MOON`, `EARTH {visible:false, opacity:0}`,
+`MOON {visible:true, opacity:1}` — and the render loop was advancing normally
+(`loopAdvanced 2.52 s` over a 2.5 s wait). The bad reading came from a QA session
+whose page was not the foreground tab: `requestAnimationFrame` was throttled, so
+the captures were stale frames and the opacity values sat frozen at baseline.
+**Never draw a visual conclusion about this scene from a backgrounded tab.**
 
-**BLOCKER — fix this before touching the Moon/Mars textures.** Clicking MOON changes the UI and both `state.mode` and `solar.activeId` become `MOON`, but the rendered disc stays the Blue Marble Earth. Verified live through the app's own debug surface (`window.VESTIBULAR_GPS` → `scene().solar`): all four bodies are built, but MOON and MARS sit roughly inside the EARTH sphere (centre separation ≈ 0.32 world units against an EARTH showcase radius of 0.924; the MOON's full extent is 0.71), the EARTH mesh is never hidden, and the sub-surface materials read `transparent: false, opacity: 1`, so the `userData.opacity` blend weight has no rendering effect. MARS is only partially visible for the same reason. Fix the body swap first — otherwise an improved lunar map can never be seen.
-
-The user said Earth comes first, then Moon and Mars should also be improved. After the body swap is fixed:
+The user said Earth comes first, then Moon and Mars should also be improved. Still open:
 
 1. Find suitable public-domain or clearly licensed local lunar and Mars surface maps.
 2. Prefer NASA/USGS/ESA source records with explicit reuse status.
@@ -257,12 +267,14 @@ GitHub Pages may take a short time to update. Do not report “live” until the
 ```text
 Take over VESTIBULAR GPS. Read NEXT-ACCOUNT-HANDOVER.md first.
 
-The current pushed baseline is 54edda2 (Earth Blue Marble, verified and live).
+Earth and the Moon now both use bundled public-domain NASA surface maps (Blue
+Marble; CGI Moon Kit LROC colour + LOLA elevation as a bump), and the Earth's
+night side carries a generated city-light layer. Both were verified from real
+foreground-tab screenshots, not from a backgrounded tab: rAF throttling there
+produces stale frames and false conclusions.
 
-Your first job is the body swap, not new textures. Clicking MOON changes the UI and
-state.mode but the rendered body stays Earth: all four bodies are built but MOON and
-MARS sit inside the EARTH sphere's volume and the Earth mesh is never hidden, so the
-Moon can never show. Fix that, verify it visually at desktop and mobile, keep the
-93/0 tests green, and only then improve Moon and Mars with properly licensed local
-texture maps. Report exactly what was verified.
+Still open: Mars is procedural (give it a properly licensed local map the same
+way), and the Moon reads a little pale under the current tone mapping — a
+stronger terminator or limb darkening is the honest fix, not a brighter map.
+Keep the 93/0 tests green and report exactly what was verified.
 ```

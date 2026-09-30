@@ -52,6 +52,9 @@ Do not describe the product as a validated clinical monitor. Describe it as a **
 - The scan reports a **coarse head pose** (yaw/pitch/roll) from the fitted region: centroid displacement, the change in the ratio of the region's two spreads, and the tilt of its principal axis. Pose is zeroed against a neutral captured by CALIBRATE and stays `null` until that neutral exists. Every published value carries `estimated: true` and a `basis` field naming the channel that is holding the lock; `basis: "structure"` means the colour rule is silent and the lock is far less certain.
 - Camera does **not** measure gaze and therefore does **not** produce VOR gain. The UI must say `UNAVAILABLE — CAMERA HAS NO EYE LANDMARKS`; do not invent eye/VOR values. The face scan does not change this: it uses no landmarks, so `eyeHead` stays null.
 - The face-scan pose is a proxy, not a goniometer: a lateral head translation moves the region exactly like a yaw, and the direction term has a dead zone (0.06 of a face width) so that noise cannot decide which way the head turned.
+- The Earth uses a locally bundled NASA Blue Marble surface map, and the Moon uses the SVS "CGI Moon Kit" LROC WAC colour mosaic with the LOLA elevation map as a bump map, so the maria and crater rims carry real relief. Both load non-blockingly over the procedural fallback and both are credited in `LICENSE`.
+- The Earth's night side carries a city-light layer **generated from the bundled map's own land/ocean colours**, so the glow can only sit on land that is actually drawn underneath it. It is a visual model, not a city-lights dataset, and must not be described as measured lighting.
+- The Moon is modelled as an airless body: its atmosphere shell and white limb glow are dialled down to near zero, which is what lets the photographic surface read instead of a pale halo.
 - The Mission Console can score the reaction-time `task_perf` domain after the lab API fix (`getReactionMs`).
 - `serve.py` blocks directory listings, dotfiles/underscore scratch paths, and `tests/` when exposed on a LAN; it adds `no-store` and `nosniff` headers.
 
@@ -260,6 +263,9 @@ Expected current result: **93 passed, 0 failed**. If Node is already on PATH, `n
 |---|---|---:|---|---|
 | NASA ACES suit | `assets/models/nasa-aces-suit.glb` | 858,408 bytes | Hero and measurement astronaut | NASA public-domain usage basis; follow NASA media guidelines |
 | NIH brain | `assets/models/nih-brain.glb` | 13,161,040 bytes | Brain section anatomical model | NIH 3D, CC-BY 4.0; attribution must remain visible |
+| Blue Marble Earth map | `assets/earth-blue-marble-1280.jpg` | 146,994 bytes | Earth/Microgravity surface map | NASA Blue Marble/MODIS, public domain; credited in `LICENSE` |
+| LROC Moon colour map | `assets/moon-lroc-color-2048.jpg` | 404,331 bytes | Moon surface map | NASA SVS CGI Moon Kit (LROC WAC), public domain; credited in `LICENSE` |
+| LOLA elevation map | `assets/moon-ldem-1024.jpg` | 106,169 bytes | Moon bump/relief map | NASA SVS CGI Moon Kit (LOLA LDEM), public domain; credited in `LICENSE` |
 | Three.js | `vendor/three.module.js` | vendored | WebGL engine | MIT; retain licence header |
 | Draco | `vendor/draco/` | vendored | GLB decoding | Keep decoder files and correct WASM MIME on hosts |
 
@@ -388,6 +394,9 @@ The app folder itself:
     ├── index.html                            12-section single page
     ├── serve.py                              no-store local server
     ├── assets/models/                        NASA suit + NIH brain GLBs
+    ├── assets/*.jpg                          bundled planetary surface maps —
+    │                                         Blue Marble Earth, LROC Moon colour,
+    │                                         LOLA lunar elevation (bump)
     ├── src/core/osi.js                       OSI metric engine
     ├── src/core/store.js                     state, bus, sensor processing
     ├── src/sensors/webcam.js                 local head-motion camera provider

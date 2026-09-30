@@ -12,6 +12,117 @@ import { damp, TAU, clamp } from '../core/util.js';
 import { GRAVITIES } from '../science/content.js';
 import { BODIES, buildPlanetTextures } from './planetTextures.js';
 
+/* ── Bundled surface maps ───────────────────────────────────
+   The procedural recipes in planetTextures.js stay as the offline fallback and
+   are on screen first; a decoded local asset replaces them when it arrives, so
+   the section never waits on a file. Every map below is public-domain NASA data
+   copied into assets/ — nothing is hotlinked, so GitHub Pages and an offline
+   localhost behave identically.
+
+   EARTH / MICROGRAVITY : NASA Blue Marble / MODIS land-ocean composite
+                          (Visible Earth image 57730), Wikimedia derivative.
+   MOON                 : NASA SVS "CGI Moon Kit" — LROC WAC colour mosaic,
+                          built from LRO Camera data (ASU) by the SVS.
+   MOON (bump)          : the same kit's LDEM, from LRO's laser altimeter
+                          (LOLA). Used as a bump map so the maria basins and
+                          crater rims carry real relief instead of flat paint.
+   ─────────────────────────────────────────────────────────── */
+const SURFACE_ASSETS = {
+  EARTH: 'assets/earth-blue-marble-1280.jpg',
+  MICROGRAVITY: 'assets/earth-blue-marble-1280.jpg',
+  MOON: 'assets/moon-lroc-color-2048.jpg',
+};
+
+const BUMP_ASSETS = {
+  MOON: 'assets/moon-ldem-1024.jpg',
+};
+
+/* ── Night-side city lights ─────────────────────────────────
+   A MODEL, not measured city-light data: the app has no night-lights dataset
+   and must not imply one. What it does have is the bundled surface map, so the
+   emissive layer is generated from that map's own pixels — which is the whole
+   point. A procedural light layer painted onto photographic continents puts
+   glow over open ocean, because the two textures are unrelated; reading the
+   map's land colours means the lights can only land on land that is actually
+   drawn underneath them.
+
+   Ocean in this composite is distinctly blue (blue above green) and ice is
+   bright and near-neutral, so land is everything that is neither. Lights are
+   placed as small clusters rather than uniform speckle, because cities clump.
+   ─────────────────────────────────────────────────────────── */
+function buildNightLights(image, { width = 1024, clusters = 620 } = {}) {
+  if (!image || !image.width) return null;
+  const w = width;
+  const h = Math.max(1, Math.round(width * (image.height / image.width)));
+
+  const src = document.createElement('canvas');
+  src.width = w; src.height = h;
+  const sctx = src.getContext('2d', { willReadFrequently: true });
+  sctx.drawImage(image, 0, 0, w, h);
+
+  let data;
+  try { data = sctx.getImageData(0, 0, w, h).data; } catch (e) { return null; }
+
+  const isLand = (x, y) => {
+    /* Polar bands are excluded outright. The Antarctica coastline is neutral
+       enough in this composite to pass the ice test, and it was drawing a line
+       of "cities" along the bottom of the map; nothing is lost by cutting both
+       caps, because the top band is above 82°N and the bottom one is inside
+       Antarctica — neither holds a settlement this layer is trying to suggest. */
+    if (y < h * 0.045 || y > h * 0.88) return false;
+    const p = (y * w + x) * 4;
+    const r = data[p], g = data[p + 1], b = data[p + 2];
+    const lum = (r + g + b) / 3;
+    if (lum < 20) return false;                       // deep shadow / space
+    if (lum > 190 && Math.abs(r - b) < 32) return false; // ice sheet
+    return !(b > g + 6);                              // ocean is blue-dominant
+  };
+
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const octx = out.getContext('2d');
+  octx.fillStyle = '#000';
+  octx.fillRect(0, 0, w, h);
+  octx.globalCompositeOperation = 'lighter';
+
+  let placed = 0;
+  for (let c = 0; c < clusters; c++) {
+    let cx = 0, cy = 0, found = false;
+    for (let attempt = 0; attempt < 24 && !found; attempt++) {
+      cx = (Math.random() * w) | 0;
+      cy = (Math.random() * h) | 0;
+      found = isLand(cx, cy);
+    }
+    if (!found) continue;
+    placed++;
+    const citySize = 1 + Math.random() * Math.random() * 6;
+    const dots = 3 + ((Math.random() * 12) | 0);
+    for (let k = 0; k < dots; k++) {
+      const a = Math.random() * Math.PI * 2;
+      const rad = Math.pow(Math.random(), 0.6) * citySize;
+      const x = cx + Math.cos(a) * rad;
+      const y = cy + Math.sin(a) * rad;
+      const alpha = 0.18 + Math.random() * 0.72;
+      const g2 = 168 + ((Math.random() * 70) | 0);
+      const b2 = 92 + ((Math.random() * 80) | 0);
+      octx.fillStyle = `rgba(255, ${g2}, ${b2}, ${alpha})`;
+      octx.beginPath();
+      octx.arc(x, y, 0.45 + Math.random() * 1.15, 0, Math.PI * 2);
+      octx.fill();
+    }
+  }
+  if (!placed) return null;
+
+  const tex = new THREE.CanvasTexture(out);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 export class SolarSystem {
   /* 768 rather than 512. Below roughly 700 the noise octaves that give
      coastlines and maria their shape start collapsing into visible blobs once
@@ -46,32 +157,64 @@ export class SolarSystem {
       metalness: 0.02,
     });
 
-    /* The procedural Earth recipe remains the offline fallback, but it cannot
-       produce the recognizable geography of a real globe — it makes plausible
-       continents, not North America, Africa and Asia. Use the NASA Blue Marble
-       land/ocean composite bundled at assets/earth-blue-marble-1280.jpg for the
-       Earth-facing states. It is an equirectangular map, so it drops directly
-       onto SphereGeometry's UVs. The load is intentionally non-blocking: the
-       procedural map is on screen immediately and the photographic map replaces
-       it as soon as the local asset is decoded; no remote request or hotlink is
-       involved, so GitHub Pages and offline localhost behave the same. */
-    if (id === 'EARTH' || id === 'MICROGRAVITY') {
-      const earthLoader = new THREE.TextureLoader();
-      earthLoader.load(
-        'assets/earth-blue-marble-1280.jpg',
+    /* The procedural recipes cannot produce recognisable geography: the Earth
+       one makes plausible continents rather than Africa and Asia, the Moon one a
+       soft grey ball rather than maria and a cratered highland. Where a bundled
+       map exists it is swapped in over the procedural base. Both maps are
+       equirectangular, so they drop straight onto SphereGeometry's UVs. The load
+       is deliberately non-blocking — the procedural body is on screen
+       immediately and the photographic one replaces it once the local asset has
+       decoded — and a failed load just keeps the fallback. */
+    const textureLoader = new THREE.TextureLoader();
+    const surfacePath = SURFACE_ASSETS[id];
+    if (surfacePath) {
+      textureLoader.load(
+        surfacePath,
         (texture) => {
           texture.colorSpace = THREE.SRGBColorSpace;
           texture.wrapS = THREE.RepeatWrapping;
           texture.wrapT = THREE.ClampToEdgeWrapping;
           texture.minFilter = THREE.LinearMipmapLinearFilter;
           texture.magFilter = THREE.LinearFilter;
-          texture.anisotropy = 4;
+          texture.anisotropy = 8;
           texture.needsUpdate = true;
           mat.map = texture;
+          if (spec.nightGlow) {
+            /* The procedural night layer was painted for the procedural
+               continents, so it is replaced rather than laid over the
+               photographic map: keeping it would put city glow in the wrong
+               hemisphere, over open ocean. */
+            const lights = buildNightLights(texture.image);
+            if (lights) {
+              mat.emissiveMap = lights;
+              mat.emissive = new THREE.Color(0xffd2a1);
+            }
+          }
           mat.needsUpdate = true;
         },
         undefined,
         () => { /* keep the deterministic procedural fallback if the asset is unavailable */ },
+      );
+    }
+
+    const bumpPath = BUMP_ASSETS[id];
+    if (bumpPath) {
+      textureLoader.load(
+        bumpPath,
+        (texture) => {
+          /* Elevation is data, not colour — it stays in linear space. */
+          texture.wrapS = THREE.RepeatWrapping;
+          texture.wrapT = THREE.ClampToEdgeWrapping;
+          texture.minFilter = THREE.LinearMipmapLinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          texture.anisotropy = 8;
+          texture.needsUpdate = true;
+          mat.bumpMap = texture;
+          mat.bumpScale = spec.bumpScale ?? 0.03;
+          mat.needsUpdate = true;
+        },
+        undefined,
+        () => { /* no relief if the DEM is missing; the colour map still reads */ },
       );
     }
     if (maps.emissiveMap) {
@@ -144,7 +287,7 @@ export class SolarSystem {
        to a hard cut-out edge. */
     const limb = new THREE.Mesh(
       new THREE.SphereGeometry(showcaseRadius * 1.055, 56, 36),
-      fresnelMaterial(0xffffff, { power: 5.5, intensity: 0.62, side: THREE.FrontSide }),
+      fresnelMaterial(0xffffff, { power: 5.5, intensity: spec.limbIntensity ?? 0.62, side: THREE.FrontSide }),
     );
     grp.add(limb);
 
@@ -295,14 +438,19 @@ export class SolarSystem {
          Guarded so a future uniform rename can never kill the render loop. */
       const au = b.userData.atmo.material.uniforms;
       const lu = b.userData.limb.material.uniforms;
+      const limI = b.userData.spec.limbIntensity ?? 0.62;
       if (au.uIntensity) au.uIntensity.value = o * clamp(spec.atmoIntensity, 0, 1);
       if (au.uTime) au.uTime.value = t;
-      if (lu.uIntensity) lu.uIntensity.value = o * 0.62;
+      /* Per body: the Moon has no atmosphere, so it gets almost no rim glow —
+         a bright rim on an airless body is the fastest way to make it read as a
+         glowing ball rather than a lit rock. */
+      if (lu.uIntensity) lu.uIntensity.value = o * limI;
       if (lu.uTime) lu.uTime.value = t;
 
-      /* city lights intensify as the terminator crosses */
+      /* Night side: the city-light layer brightens as the body fades in, and is
+         driven by the body's own nightGlow factor (0 for airless bodies). */
       if (b.userData.surface.material.emissiveIntensity !== undefined) {
-        b.userData.surface.material.emissiveIntensity = 0.30 + o * 0.25;
+        b.userData.surface.material.emissiveIntensity = 0.10 + o * (spec.nightGlow ?? 0.25);
       }
     }
 
