@@ -6,7 +6,7 @@
 
 > **এই README-টি পরের AI/Agent-এর জন্য canonical project handoff document।** নতুন কাজ শুরু করার আগে এটি, `docs/ARCHITECTURE.md`, `docs/SENSOR_API.md`, `docs/SOURCES.md`, `docs/TESTING.md`, এবং root-level `PLAN-A-Full-Roadmap-BN.md` পড়বে। অনুমান করে কোনো feature, sensor বা NASA claim যোগ করবে না।
 
-> **সাবমিশনের দুটো অতিরিক্ত ফাইল:** **`docs/AI_USE.md`** — প্রজেক্ট পেজের বাধ্যতামূলক "Use of AI" ফিল্ডের উত্তর (কোনটা AI দিয়ে বানানো, কোনটা নয়, কীভাবে লেবেল করা)। **`captions/`** — ডেমো ভিডিওর ইংরেজি সাবটাইটেল (`.srt` + `.vtt`, ২৪০s ও ৩০s), VO-র হুবহু লেখা।
+> **সাবমিশনের দুটো অতিরিক্ত ফাইল:** **`docs/AI_USE.md`** — প্রজেক্ট পেজের বাধ্যতামূলক "Use of AI" ফিল্ডের উত্তর (কোনটা AI দিয়ে বানানো, কোনটা নয়, কীভাবে লেবেল করা)। **`captions/`** — ইংরেজি সাবটাইটেল (`.srt` + `.vtt`), narration-এর হুবহু লেখা: ফাইনাল ফিল্ম `VESTIBULAR-GPS-3MIN-FINAL.mp4` (১৭৬s)-এর জন্য `VGPS-FILM-3MIN-EN.*`, আর ২৪০s কাটের জন্য `VGPS-PITCH-4MIN-EN.*` — দুটো আলাদা ভিডিও, গুলিয়ে ফেলবেন না।
 
 **Last verified:** 28 September 2026, Asia/Dhaka  
 **Code baseline verified before this README update:** `4cc0120`  
