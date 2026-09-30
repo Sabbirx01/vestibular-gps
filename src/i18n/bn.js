@@ -136,8 +136,10 @@ export const BN = {
   'Integrity statement': 'সততার বয়ান',
   'No clinical claim is made anywhere on this site. Nothing here diagnoses, screens for, or treats any condition.':
     'এই সাইটের কোথাও কোনো clinical দাবি করা হয়নি। এখানে কিছুই রোগ নির্ণয় করে না, screen করে না, চিকিৎসা করে না।',
-  'This project is inspired by publicly documented spaceflight and vestibular research. It is not affiliated with, approved by, or endorsed by NASA or any agency.':
-    'এই প্রজেক্টটি প্রকাশিত spaceflight ও vestibular গবেষণা থেকে অনুপ্রাণিত। এটি NASA বা কোনো সংস্থার সাথে সম্পৃক্ত নয়, তাদের অনুমোদিত বা endorsed নয়।',
+  'This project answers the 2026 NASA Space Apps Challenge':
+    'এই প্রজেক্টটি ২০২৬ NASA Space Apps Challenge-এর উত্তর — হেলথ মনিটরিং সফটওয়্যার, যা NASA বা কোনো সংস্থার সাথে সম্পৃক্ত নয়, অনুমোদিত বা endorsed নয়।',
+  'The source is open source under the':
+    'সোর্স কোড ওপেন সোর্স — লাইসেন্স',
   'Educational visualization built on publicly documented research. Not a medical device. No agency affiliation.':
     'প্রকাশিত গবেষণার ওপর দাঁড়ানো শিক্ষামূলক ভিজুয়ালাইজেশন। মেডিকেল ডিভাইস নয়। কোনো সংস্থার সাথে সম্পৃক্ততা নেই।',
   'Anatomical models are interactive illustrations built from procedural geometry. They are anatomically informed but not patient-derived imaging.':

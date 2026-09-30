@@ -1,8 +1,8 @@
 # VESTIBULAR GPS — AI Handoff README
 
-> **Licence: all rights reserved — this is NOT open source.** <https://github.com/Sabbirx01/vestibular-gps/blob/main/LICENSE>
-> অনুমতি ছাড়া এই কাজ কপি করা, পুনঃব্যবহার করা, বা নিজের প্রজেক্ট/সাবমিশন হিসেবে চালানো যাবে না।
-> `vendor/`-এ রাখা Three.js এর নিজের MIT লাইসেন্সে আছে — সেটি এই নোটিশের আওতার বাইরে, সেটি আলাদা।
+> **Licence: Apache-2.0 — open source.** <https://github.com/Sabbirx01/vestibular-gps/blob/main/LICENSE>
+> NASA Space Apps Challenge-এর শর্ত অনুযায়ী এই প্রজেক্ট ওপেন সোর্স: কোড দেখা, চালানো, পরিবর্তন ও পুনঃবিতরণ করা যাবে — শর্ত শুধু লাইসেন্সের অ্যাট্রিবিউশন ও নোটিশ রক্ষা করা।
+> থার্ড-পার্টি অ্যাসেট (Three.js, NASA মডেল/ম্যাপ, NIH ব্রেইন) নিজেদের লাইসেন্সেই আছে — বিস্তারিত [NOTICE](NOTICE)-এ।
 
 > **এই README-টি পরের AI/Agent-এর জন্য canonical project handoff document।** নতুন কাজ শুরু করার আগে এটি, `docs/ARCHITECTURE.md`, `docs/SENSOR_API.md`, `docs/SOURCES.md`, `docs/TESTING.md`, এবং root-level `PLAN-A-Full-Roadmap-BN.md` পড়বে। অনুমান করে কোনো feature, sensor বা NASA claim যোগ করবে না।
 
@@ -52,7 +52,7 @@ Do not describe the product as a validated clinical monitor. Describe it as a **
 - The scan reports a **coarse head pose** (yaw/pitch/roll) from the fitted region: centroid displacement, the change in the ratio of the region's two spreads, and the tilt of its principal axis. Pose is zeroed against a neutral captured by CALIBRATE and stays `null` until that neutral exists. Every published value carries `estimated: true` and a `basis` field naming the channel that is holding the lock; `basis: "structure"` means the colour rule is silent and the lock is far less certain.
 - Camera does **not** measure gaze and therefore does **not** produce VOR gain. The UI must say `UNAVAILABLE — CAMERA HAS NO EYE LANDMARKS`; do not invent eye/VOR values. The face scan does not change this: it uses no landmarks, so `eyeHead` stays null.
 - The face-scan pose is a proxy, not a goniometer: a lateral head translation moves the region exactly like a yaw, and the direction term has a dead zone (0.06 of a face width) so that noise cannot decide which way the head turned.
-- All four bodies of the Space section now carry real surface maps instead of procedural colour: the Earth and MICROGRAVITY the NASA Blue Marble composite, the Moon the SVS "CGI Moon Kit" LROC WAC colour mosaic with the LOLA elevation map as a bump map (so the maria and crater rims carry real relief, not just paint), and Mars the USGS/NASA Viking MDIM 2.1 colourised global mosaic. Every map is bundled locally, loads non-blockingly over the procedural fallback, and is credited in `LICENSE`.
+- All four bodies of the Space section now carry real surface maps instead of procedural colour: the Earth and MICROGRAVITY the NASA Blue Marble composite, the Moon the SVS "CGI Moon Kit" LROC WAC colour mosaic with the LOLA elevation map as a bump map (so the maria and crater rims carry real relief, not just paint), and Mars the USGS/NASA Viking MDIM 2.1 colourised global mosaic. Every map is bundled locally, loads non-blockingly over the procedural fallback, and is credited in `NOTICE`.
 - The Moon additionally gets an airless-body treatment that the other bodies do not: its atmosphere shell and white limb glow sit near zero, its fill and bounce lights are cut (there is no atmosphere around it to scatter light), its albedo is scaled down off the tone curve's shoulder, and a **limb-darkening shell** darkens the disc towards its edge. Measured on the rendered frame: the edge/centre falloff went from 0.903 to 0.842 and the core's mean luminance from 194 to 177, so the maria separate and the disc reads as a lit rock instead of a pale ball.
 - **Narrow layouts:** below 1280 px the Space section has no free column for the reference body, so the camera anchors it inside the padding band the stylesheet reserves above the heading, tracking that band's real position rather than a fixed fraction of the viewport. Once the band has scrolled past, the body is scaled away instead of parking on top of the readout copy — verified at 390x844 (band: scale 1.0; +140 px: 0.45; +300 px and beyond: gone).
 - **Drag a body to rotate it.** A pointer drag on a planet turns it 1:1 and keeps the impulse as angular momentum, so releasing leaves it turning; the astronaut drags the same way on yaw with a limited pitch. A drag owns the pointer while it lasts — the camera orbit is frozen, because the hand is turning the object, not swinging the camera — and a projected-disc hit test routes the drag (the astronaut wins ties, since it stands in front). Verified with real dispatched mouse events, not by calling the API directly.
@@ -268,10 +268,10 @@ Expected current result: **93 passed, 0 failed**. If Node is already on PATH, `n
 |---|---|---:|---|---|
 | NASA ACES suit | `assets/models/nasa-aces-suit.glb` | 858,408 bytes | Hero and measurement astronaut | NASA public-domain usage basis; follow NASA media guidelines |
 | NIH brain | `assets/models/nih-brain.glb` | 13,161,040 bytes | Brain section anatomical model | NIH 3D, CC-BY 4.0; attribution must remain visible |
-| Blue Marble Earth map | `assets/earth-blue-marble-1280.jpg` | 146,994 bytes | Earth/Microgravity surface map | NASA Blue Marble/MODIS, public domain; credited in `LICENSE` |
-| LROC Moon colour map | `assets/moon-lroc-color-2048.jpg` | 404,331 bytes | Moon surface map | NASA SVS CGI Moon Kit (LROC WAC), public domain; credited in `LICENSE` |
-| LOLA elevation map | `assets/moon-ldem-1024.jpg` | 106,169 bytes | Moon bump/relief map | NASA SVS CGI Moon Kit (LOLA LDEM), public domain; credited in `LICENSE` |
-| Viking Mars map | `assets/mars-viking-mdim-2048.jpg` | 716,317 bytes | Mars surface map | NASA/JPL/USGS Astrogeology MDIM 2.1, public domain; credited in `LICENSE` |
+| Blue Marble Earth map | `assets/earth-blue-marble-1280.jpg` | 146,994 bytes | Earth/Microgravity surface map | NASA Blue Marble/MODIS, public domain; credited in `NOTICE` |
+| LROC Moon colour map | `assets/moon-lroc-color-2048.jpg` | 404,331 bytes | Moon surface map | NASA SVS CGI Moon Kit (LROC WAC), public domain; credited in `NOTICE` |
+| LOLA elevation map | `assets/moon-ldem-1024.jpg` | 106,169 bytes | Moon bump/relief map | NASA SVS CGI Moon Kit (LOLA LDEM), public domain; credited in `NOTICE` |
+| Viking Mars map | `assets/mars-viking-mdim-2048.jpg` | 716,317 bytes | Mars surface map | NASA/JPL/USGS Astrogeology MDIM 2.1, public domain; credited in `NOTICE` |
 | Three.js | `vendor/three.module.js` | vendored | WebGL engine | MIT; retain licence header |
 | Draco | `vendor/draco/` | vendored | GLB decoding | Keep decoder files and correct WASM MIME on hosts |
 
