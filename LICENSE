@@ -30,11 +30,19 @@ attribution and a link back to this repository, is permitted. Nothing beyond
 that is.
 
 THIRD-PARTY COMPONENTS ARE NOT COVERED BY THIS NOTICE.
-vendor/three.module.js is Three.js (https://threejs.org), Copyright 2010-2024
+  vendor/three.module.js is Three.js (https://threejs.org), Copyright 2010-2024
 Three.js Authors, licensed under the MIT licence, vendored here unmodified
 except for the build packaged by the maintainers. It keeps its own licence and
-may be used under that licence's terms. Any other third-party dependency named
-in docs/ or package manifests keeps its own licence too.
+may be used under that licence's terms.
+
+  assets/earth-blue-marble-1280.jpg is a NASA Blue Marble / MODIS-derived
+public-domain image. Source record: NASA Visible Earth image 57730 / Blue Marble
+collection, with the local 1280px derivative downloaded from Wikimedia Commons
+file "Land shallow topo 2048.jpg" (NASA credit: Reto Stöckli / NASA GSFC,
+Robert Simmon and MODIS/USGS support teams). The NASA-derived map is included as
+an external public-domain asset and is not claimed by this proprietary notice.
+Any other third-party dependency named in docs/ or package manifests keeps its
+own licence too.
 
 NO WARRANTY. This software and its content are provided "as is", without
 warranty of any kind, express or implied, including merchantability, fitness for

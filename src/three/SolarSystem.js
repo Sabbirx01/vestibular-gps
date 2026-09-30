@@ -42,9 +42,38 @@ export class SolarSystem {
     const mat = new THREE.MeshStandardMaterial({
       map: maps.map,
       roughnessMap: maps.roughnessMap,
-      roughness: 0.92,
+      roughness: id === 'EARTH' || id === 'MICROGRAVITY' ? 0.78 : 0.92,
       metalness: 0.02,
     });
+
+    /* The procedural Earth recipe remains the offline fallback, but it cannot
+       produce the recognizable geography of a real globe — it makes plausible
+       continents, not North America, Africa and Asia. Use the NASA Blue Marble
+       land/ocean composite bundled at assets/earth-blue-marble-1280.jpg for the
+       Earth-facing states. It is an equirectangular map, so it drops directly
+       onto SphereGeometry's UVs. The load is intentionally non-blocking: the
+       procedural map is on screen immediately and the photographic map replaces
+       it as soon as the local asset is decoded; no remote request or hotlink is
+       involved, so GitHub Pages and offline localhost behave the same. */
+    if (id === 'EARTH' || id === 'MICROGRAVITY') {
+      const earthLoader = new THREE.TextureLoader();
+      earthLoader.load(
+        'assets/earth-blue-marble-1280.jpg',
+        (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.wrapS = THREE.RepeatWrapping;
+          texture.wrapT = THREE.ClampToEdgeWrapping;
+          texture.minFilter = THREE.LinearMipmapLinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          texture.anisotropy = 4;
+          texture.needsUpdate = true;
+          mat.map = texture;
+          mat.needsUpdate = true;
+        },
+        undefined,
+        () => { /* keep the deterministic procedural fallback if the asset is unavailable */ },
+      );
+    }
     if (maps.emissiveMap) {
       mat.emissiveMap = maps.emissiveMap;
       mat.emissive = new THREE.Color(0xffffff);

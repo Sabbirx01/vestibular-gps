@@ -101,7 +101,10 @@ export const BODIES = {
        worked, but the opaque deck then sat on the tone curve's shoulder, where
        more brightness buys no structure at all. The deck is what gets dialled
        back, not the surface: the deck is the layer doing the veiling. */
-    clouds: true, cloudOpacity: 0.70, nightLights: true,
+    /* The local Blue Marble base already carries the satellite-era surface colour;
+       the procedural deck is now only a restrained weather veil, not the opaque
+       layer that used to wash the planet white. */
+    clouds: true, cloudOpacity: 0.22, nightLights: true,
   },
   MOON: {
     radius: 0.44, tilt: 0.10, spin: 0.085, bump: 0.055,
@@ -118,7 +121,7 @@ export const BODIES = {
     /* MICROGRAVITY reuses the Earth look — keep the two in step, including the
        0.70 deck opacity measured on the Earth render above. */
     atmo: 0x6fb7ff, atmoPower: 3.2, atmoIntensity: 2.0,
-    clouds: true, cloudOpacity: 0.70, nightLights: true,
+    clouds: true, cloudOpacity: 0.22, nightLights: true,
   },
 };
 
