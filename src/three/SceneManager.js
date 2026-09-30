@@ -29,10 +29,19 @@ const FRAMING = {
                          edge — the "ball behind someone" read, but the ball
                          stays where it is when the astronaut is turned, because
                          the two are independent objects.
+                         Measured on the layout rather than guessed: at 1440 the
+                         figure's right edge is ~0.63 of the width and the card
+                         grid starts at ~0.67, so a body this size has no slot
+                         level with the figure — a slot that size is ~60 px wide.
+                         It therefore sits to the RIGHT and ABOVE the panels, in
+                         the one band the layout leaves free (under the topbar,
+                         right of the black hole, above the cards), which also
+                         keeps it clear of the astronaut entirely: no more mixing
+                         the two subjects together.
                          The short variants exist because a wide, short window
-                         has a much narrower column between figure and panels. */
-                      solarPos: [2.9, 1.4, -8.8], solarScale: 1.35,
-                      solarPosShort: [2.6, 1.4, -8.8], solarScaleShort: 0.95,
+                         narrows that band as well. */
+                      solarPos: [8.1, 6.4, -8.8], solarScale: 1.35,
+                      solarPosShort: [8.1, 6.4, -8.8], solarScaleShort: 0.95,
                       shortAspect: 2.05 },
   /* offset shifts the look-at target so the subject lands in the open right-hand
      column instead of centred behind the panel grid */
