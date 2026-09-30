@@ -93,6 +93,55 @@ export function mountCursor() {
 
   const ship = cursor.querySelector('.cursor-ship');
   const ghosts = cursor.querySelectorAll('.cursor-trail i');
+
+  /* ── smoke stamp ─────────────────────────────────────────
+     One 64x64 alpha stamp, generated here and handed to the stylesheet as a
+     CSS mask. Every segment used to be the same perfect ellipse in a different
+     colour, evenly spaced — the owner's read of that was "it looks like
+     bubbles", and the measurements agreed: 30 byte-identical gradients, a
+     countable dark valley between each pair. A radial gradient alone cannot fix
+     that, because a gradient is still a circle. So the shape is weathered by
+     value noise instead, and each segment samples a different crop of it (the
+     mask size and offset are per segment below), which breaks both the silhouette
+     and the repetition. Generated rather than shipped as a file: the project has
+     no image assets and this is 64x64. */
+  function valueNoise(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const h = (a, b) => {
+      let n = (a * 374761393 + b * 668265263) | 0;
+      n = (n ^ (n >> 13)) * 1274126177;
+      return (((n ^ (n >> 16)) >>> 0) % 1000) / 1000;
+    };
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = h(xi, yi), b = h(xi + 1, yi), c = h(xi, yi + 1), d = h(xi + 1, yi + 1);
+    return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
+  }
+  function buildSmokeStamp() {
+    const S = 64;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const ctx = cv.getContext('2d');
+    const img = ctx.createImageData(S, S);
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const dx = ((x + 0.5) / S) * 2 - 1;
+        const dy = ((y + 0.5) / S) * 2 - 1;
+        const d = Math.hypot(dx, dy);
+        /* soft body, then two octaves of noise: one to break the rim into wisps,
+           one to mottle the inside so it is not a flat disc of paint */
+        let a = Math.pow(Math.max(0, 1 - d * d), 1.6);
+        a *= 0.52 + 0.78 * valueNoise(dx * 2.6 + 11, dy * 2.6 - 7);
+        a *= 1 - 0.34 * valueNoise(dx * 5.5, dy * 5.5);
+        const i = (y * S + x) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+        img.data[i + 3] = Math.max(0, Math.min(255, Math.round(a * 255)));
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return cv.toDataURL('image/png');
+  }
+  cursor.style.setProperty('--trail-mask', `url(${buildSmokeStamp()})`);
   const pos = { x: innerWidth / 2, y: innerHeight / 2, tx: innerWidth / 2, ty: innerHeight / 2 };
   /* Recent path as a ring buffer of numbers, so the trail costs no
      allocations. The ghosts are simply earlier positions: the ship itself
@@ -106,8 +155,12 @@ export function mountCursor() {
      in a browser during a 700 px / 260 ms sweep, neighbouring segments sat ~88 px
      apart with 14-36 px bodies, which reads as a dotted line, not thrust. */
   const TRAIL_FIRST = 6;
-  const TRAIL_DENSE = 12;
-  const TRAIL_SPARSE_STEP = 3;
+  const TRAIL_DENSE = 6;
+  /* 2, not 3: the smoke has to overlap to read as one body. At 3 the tail puffs
+     sat a countable dark valley apart at speed, which is the other half of what
+     made them look like beads. 2 costs 18 frames of reach — the plume still runs
+     about 0.9 s behind the hull. */
+  const TRAIL_SPARSE_STEP = 2;
   const TRAIL_N = Math.max(1, ghosts.length);
   const trailBack = new Int32Array(TRAIL_N);
   for (let i = 0; i < TRAIL_N; i++) {
@@ -128,8 +181,8 @@ export function mountCursor() {
      of the ship — with three changes that make it read as thrust rather than as
      a row of beads:
 
-        1. thirty segments, reaching about 1.2 s of travel behind the hull
-           (dense near the nozzle, sparse through the smoke — see trailBack), so
+     1. eighteen segments, reaching about 0.6 s of travel behind the hull
+        (dense near the nozzle, sparse through the smoke — see trailBack), so
            a fast flick leaves a long plume rather than a stub, and the trailing
            third has room to be smoke rather than more flame;
        2. every segment is STRETCHED along its own local direction of travel, so
@@ -154,13 +207,38 @@ export function mountCursor() {
      a real frame cost, so it is the number that stays modest. */
    /* Base long-axis width per segment, kept so the frame loop can stretch a
       segment to whichever gap it has to cover (see the scale below). */
-   const trailW = new Float32Array(TRAIL_N);
-   ghosts.forEach((g, i) => {
-     const k = TRAIL_N > 1 ? i / (TRAIL_N - 1) : 0;
-     const w = 14 + k * 22;                  // long axis, aligned to travel
-     const h = 9 + k * 14;
-     trailW[i] = w;
-     g.style.width = `${w.toFixed(1)}px`;
+  const trailW = new Float32Array(TRAIL_N);
+  /* Per-segment size jitter. The ramp below is a smooth function of i, so without
+     this the plume is a row of identical shapes — which is half of why it read as
+     soap bubbles rather than smoke. Deterministic from the index, so the plume is
+     stable frame to frame; irregular, which is the part that matters. */
+  const trailJit = new Float32Array(TRAIL_N);
+  /* and a second one for how much each puff contributes, so the plume has some
+     density variation instead of an even fade */
+  const trailJit2 = new Float32Array(TRAIL_N);
+  ghosts.forEach((g, i) => {
+    const k = TRAIL_N > 1 ? i / (TRAIL_N - 1) : 0;
+    /* 20 -> 60 px rather than 14 -> 36. The decisive measurement: at a moderate
+       pointer speed the samples land ~10-12 px apart while the CORE of a 14 px
+       puff is only 6-8 px across, so there was dark sky between every pair and
+       the row stayed countable however softly each puff was drawn. A body wider
+       than the sampling pitch merges. */
+    const w = 20 + k * 40;                  // long axis, aligned to travel
+    const h = 13 + k * 26;
+    trailW[i] = w;
+    /* thicker spread than before: the jitter is what stops the row of puffs
+       reading as a row of puffs */
+    trailJit[i] = 0.74 + 0.46 * (((i * 37) % 13) / 12);
+    trailJit2[i] = 0.80 + 0.40 * (((i * 23) % 11) / 10);
+    /* a different crop and scale of the smoke stamp per segment, so no two
+       silhouettes are the same shape */
+    /* 66-145 % and 0-100 %, not the 112-133 % this started at: the stamp is
+       64 px and the elements are 20-60 px, so a crop that only slides a few
+       per cent of a 64 px stamp lands within a pixel of the last one and every
+       silhouette stays identical. */
+    g.style.setProperty('--trail-mask-size', `${66 + ((i * 29) % 80)}% ${66 + ((i * 53) % 80)}%`);
+    g.style.setProperty('--trail-mask-pos', `${(i * 41) % 100}% ${(i * 17) % 100}%`);
+    g.style.width = `${w.toFixed(1)}px`;
     g.style.height = `${h.toFixed(1)}px`;
     g.style.margin = `${(-h / 2).toFixed(1)}px 0 0 ${(-w / 2).toFixed(1)}px`;
     /* Colour goes through custom properties rather than inline background and
@@ -168,9 +246,14 @@ export function mountCursor() {
        what turns the whole trail amber while the ship is over a target — that
        state has to keep working. White core, cyan flame, amber burn, then grey
        smoke at the tail. */
-    g.style.setProperty('--trail-fill', k < 0.10 ? '#ffffff' : k < 0.34 ? '#a9ecff' : k < 0.62 ? '#ffc06a' : '#c8cdd2');
-    g.style.setProperty('--trail-glow', k < 0.5 ? 'rgba(120,235,255,.8)' : 'rgba(205,215,220,.55)');
-    g.style.setProperty('--trail-glow-size', `${(10 + k * 8).toFixed(0)}px`);
+    /* RGB channels rather than a hex fill: the stylesheet draws each puff as a
+       radial gradient that fades to nothing at the edge, and it needs the
+       channels separately to do that. */
+    g.style.setProperty('--trail-rgb', k < 0.10 ? '255,255,255' : k < 0.34 ? '169,236,255' : k < 0.62 ? '255,192,106' : '200,205,210');
+    /* Glow survives only where there is still fire. The bright coat of box-shadow
+       around every segment was the other half of the bubble read. */
+    g.style.setProperty('--trail-glow', 'rgba(120,235,255,.55)');
+    g.style.setProperty('--trail-glow-size', k < 0.34 ? `${(7 - k * 12).toFixed(0)}px` : '0px');
   });
 
   on(window, 'pointermove', (e) => {
@@ -296,7 +379,7 @@ export function mountCursor() {
          the frame-rate spread, low enough that one stale ring slot cannot paint
          an enormous streak. */
       const gapPx = Math.hypot(ddx, ddy);
-      const grow = 0.92 + k * 0.38;           // the size ramp, from the block above
+      const grow = (0.92 + k * 0.38) * trailJit[i];   // size ramp x per-segment jitter
       const stretch = Math.max(grow, Math.min(5, gapPx / (trailW[i] * 1.05)));
 
       /* The scale belongs INSIDE the transform list, after the translate.
@@ -308,8 +391,23 @@ export function mountCursor() {
          Two factors: the long axis is stretched to whatever gap this segment has
          to cover, the short axis only carries the nozzle-to-tail size ramp
          (0.92 → 1.30). It used to taper to 0.38 on both axes. */
+      /* Lateral drift and lift, both growing with age: smoke billows and rises,
+         while the recorded path of a straight pointer is a ruler. The scatter is
+         noise on the segment index, so it is smooth between neighbours (no
+         tearing) and identical every frame (no jitter). Measured criticism of the
+         previous pass: "the centres run on a dead-straight line with zero lateral
+         scatter, no curl, no widening". */
+      /* Perpendicular to the direction of travel, never along it: an along-track
+         offset changes the gap to the next sample, and measured on the first try
+         it tore 5-8 pairs of the fast plume apart by up to 144 px. The noise's
+         second axis is time, so the drift billows slowly instead of sitting there
+         as a frozen kink, while staying smooth between neighbouring segments. */
+      const scat = (valueNoise(i * 0.7, now * 0.0007 + 3.3) - 0.5) * 2 * (k * 11);
+      const perpX = -ddy / (gapPx || 1);
+      const perpY = ddx / (gapPx || 1);
+      const lift = -k * 7 + (valueNoise(9.1, i * 0.6 + now * 0.0005) - 0.5) * 2 * (k * 4);
       g.style.transform =
-        `translate3d(${(hx[at] - pos.x).toFixed(1)}px, ${(hy[at] - pos.y).toFixed(1)}px, 0)` +
+        `translate3d(${(hx[at] - pos.x + scat * perpX).toFixed(1)}px, ${(hy[at] - pos.y + scat * perpY + lift).toFixed(1)}px, 0)` +
         ` rotate(${trailDir[i].toFixed(1)}deg)` +
         /* half of whatever the stretch added, pulled back along the local +x —
            which the rotate above has just aimed down the direction of travel —
@@ -321,7 +419,9 @@ export function mountCursor() {
       const flick = 0.86 + 0.14 * Math.sin(now * 0.018 + i * 1.9);
       /* 0.98 down to 0.18 — the tail has to stay visible now that it is smoke
          rather than a hairline; it used to fall to 0.11. */
-      g.style.opacity = (0.98 * (1 - k * 0.82) * run * flick).toFixed(3);
+      /* 0.80 rather than 0.98: the bodies are twice the size now, so the same
+         alpha would stack into a solid bar instead of smoke */
+      g.style.opacity = (0.80 * (1 - k * 0.80) * run * flick * trailJit2[i]).toFixed(3);
     }
   };
   tick();

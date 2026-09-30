@@ -91,7 +91,17 @@ export const BODIES = {
        (2.7) at a brighter intensity (1.75) than the original 3.1/1.15, which
        left the edge of the disc looking cut out. */
     atmo: 0x6fb7ff, atmoPower: 3.2, atmoIntensity: 2.0,
-    clouds: true, cloudOpacity: 0.92, nightLights: true,
+    /* 0.70, and this number is a measurement of the finished frame rather than a
+       guess. At 0.92 the sub-solar third of the disc came back a FLAT near-white
+       plateau: sampling the rendered Space-view capture, the inner 0-0.2 r ring
+       had 98.3 % of its pixels at luma >= 220 with a mean RGB of (227,229,232),
+       and 75 % of everything above 220 was neutral (max-min <= 12) — cloud, not
+       ocean. That is the "white layer" the owner kept reporting on Earth. The
+       albedo ladder had been lifted to get the disc off the ACES floor and it
+       worked, but the opaque deck then sat on the tone curve's shoulder, where
+       more brightness buys no structure at all. The deck is what gets dialled
+       back, not the surface: the deck is the layer doing the veiling. */
+    clouds: true, cloudOpacity: 0.70, nightLights: true,
   },
   MOON: {
     radius: 0.44, tilt: 0.10, spin: 0.085, bump: 0.055,
@@ -105,9 +115,10 @@ export const BODIES = {
   },
   MICROGRAVITY: {
     radius: 1.05, tilt: 0.41, spin: 0.055, bump: 0.02,
-    /* MICROGRAVITY reuses the Earth look — keep the two in step. */
+    /* MICROGRAVITY reuses the Earth look — keep the two in step, including the
+       0.70 deck opacity measured on the Earth render above. */
     atmo: 0x6fb7ff, atmoPower: 3.2, atmoIntensity: 2.0,
-    clouds: true, cloudOpacity: 0.92, nightLights: true,
+    clouds: true, cloudOpacity: 0.70, nightLights: true,
   },
 };
 
@@ -344,7 +355,12 @@ export function buildPlanetTextures(id, W = 512) {
            up. Fewer clouds, but the ones present are actually white. */
         const cover = clamp01((n * 0.90 + band * 0.10 - 0.60) * 6.5);
         const a = Math.round(cover * 255);
-        clouds[i] = 255; clouds[i + 1] = 255; clouds[i + 2] = 255; clouds[i + 3] = a;
+        /* 240/244/250 rather than pure white. At 255 the cloud cores were the
+           brightest thing the renderer had, and once the albedo ladder lifted the
+           whole disc they became a flat white plateau — sampled, the lit cores sat
+           at 227 and the ACES shoulder had nothing left to give back. Slightly off
+           white keeps them reading as cloud and leaves the highlight room. */
+        clouds[i] = 240; clouds[i + 1] = 244; clouds[i + 2] = 250; clouds[i + 3] = a;
       }
     }
   }

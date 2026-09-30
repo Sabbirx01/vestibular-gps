@@ -261,19 +261,52 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
    because an inline value would outrank the target-state rule below, and that
    rule is what turns the whole plume amber over a link. */
 .cursor-trail { position: absolute; inset: 0; }
+/* A soft puff, not a bead. The fill was a solid colour and the glow a 9-18 px
+   box-shadow all the way round, which is exactly what a soap bubble looks like:
+   hard rim, bright coat, every one the same shape. Owner's read: "the exhaust
+   doesn't look real, it looks like bubbles." So the fill is a radial gradient
+   that fades to nothing at the box edge — no rim — and the glow is kept only on
+   the flame segments (chrome.js sets --trail-glow-size to 0px down the smoke),
+   where the light actually is. The colour still arrives as a custom property
+   rather than an inline background, so the target-state rule below can still win
+   over it by specificity. */
 .cursor-trail i {
   position: absolute; left: 50%; top: 50%;
   width: 10px; height: 6px; margin: -3px 0 0 -5px;
   border-radius: 50%; opacity: 0;
-  background: var(--trail-fill, var(--cyan));
-  box-shadow: 0 0 var(--trail-glow-size, 9px) var(--trail-glow, rgba(95,227,255,.85));
+  /* A flat core out to just past half the box, then a fast shoulder. The old
+     0 -> 46 % -> 100 % ramp made every puff's visible core a third of its box,
+     so even a stretched segment left dark sky between neighbours; a plateau is
+     what lets the stretch actually close the plume. */
+  background: radial-gradient(
+    closest-side,
+    rgba(var(--trail-rgb, 95,227,255), .97) 0%,
+    rgba(var(--trail-rgb, 95,227,255), .90) 54%,
+    rgba(var(--trail-rgb, 95,227,255), .34) 78%,
+    rgba(var(--trail-rgb, 95,227,255), 0) 100%
+  );
+  box-shadow: 0 0 var(--trail-glow-size, 6px) var(--trail-glow, rgba(95,227,255,.55));
+  /* the shape, which the gradient above cannot give it: a noise-weathered stamp
+     generated once in chrome.js and cropped differently by every segment, so no
+     two puffs share a silhouette. Without it every segment was the same ellipse
+     and the plume read as a row of drawn circles. */
+  -webkit-mask-image: var(--trail-mask); mask-image: var(--trail-mask);
+  -webkit-mask-size: var(--trail-mask-size, 100% 100%); mask-size: var(--trail-mask-size, 100% 100%);
+  -webkit-mask-position: var(--trail-mask-pos, 50% 50%); mask-position: var(--trail-mask-pos, 50% 50%);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
   will-change: transform, opacity, scale;
 }
 .cursor.is-target .cursor-trail i {
-  background: var(--amber);
+  background: radial-gradient(
+    closest-side,
+    rgba(255,181,71,.97) 0%,
+    rgba(255,181,71,.90) 54%,
+    rgba(255,181,71,.34) 78%,
+    rgba(255,181,71,0) 100%
+  );
   /* size from the same variable chrome.js sets per segment, so the target state
      keeps the plume's new shape instead of pinning the old 9 px blur */
-  box-shadow: 0 0 var(--trail-glow-size, 9px) rgba(255,181,71,.85);
+  box-shadow: 0 0 var(--trail-glow-size, 6px) rgba(255,181,71,.6);
 }
 
 .cursor-label {

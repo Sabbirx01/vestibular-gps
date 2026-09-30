@@ -1,5 +1,9 @@
 # VESTIBULAR GPS — AI Handoff README
 
+> **Licence: all rights reserved — this is NOT open source.** <https://github.com/Sabbirx01/vestibular-gps/blob/main/LICENSE>
+> অনুমতি ছাড়া এই কাজ কপি করা, পুনঃব্যবহার করা, বা নিজের প্রজেক্ট/সাবমিশন হিসেবে চালানো যাবে না।
+> `vendor/`-এ রাখা Three.js এর নিজের MIT লাইসেন্সে আছে — সেটি এই নোটিশের আওতার বাইরে, সেটি আলাদা।
+
 > **এই README-টি পরের AI/Agent-এর জন্য canonical project handoff document।** নতুন কাজ শুরু করার আগে এটি, `docs/ARCHITECTURE.md`, `docs/SENSOR_API.md`, `docs/SOURCES.md`, `docs/TESTING.md`, এবং root-level `PLAN-A-Full-Roadmap-BN.md` পড়বে। অনুমান করে কোনো feature, sensor বা NASA claim যোগ করবে না।
 
 **Last verified:** 28 September 2026, Asia/Dhaka  

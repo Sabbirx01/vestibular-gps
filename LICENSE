@@ -1,0 +1,50 @@
+VESTIBULAR GPS — PROPRIETARY LICENCE
+Copyright (c) 2026 Sabbir Molla (MindStellar). All rights reserved.
+
+This repository is NOT open source. It is published so that the work can be
+viewed, reviewed and evaluated — for example by judges, collaborators who have
+been given access, or a future maintainer. No other permission is granted.
+
+Without the prior written permission of the copyright holder, you may NOT:
+
+  1. copy, reproduce, mirror, scrape or archive this work, in whole or in part;
+  2. reuse or adapt it — in whole or in part, modified or unmodified — as your
+     own project, product, prototype, submission, demo or portfolio piece;
+  3. redistribute, publish, sell, sublicense or otherwise make it available to
+     anyone else;
+  4. use it commercially, or in any non-commercial project that is presented as
+     yours;
+  5. create derivative works from it, including translations, ports, rewrites,
+     reimplementations of its architecture, or extractions of its written
+     content, metric definitions or visual design;
+  6. remove, obscure or alter this notice, the copyright lines, or the project's
+     own attribution and disclaimers.
+
+This covers the whole work: the source code under src/ and tests/, the procedural
+texture and shader code, index.html, the stylesheets, the written content, the
+OSI v2.0 metric definition and its documentation under docs/, the diagram and
+media assets under assets/ and bn/, and the tools under tools/.
+
+Viewing the published site, and quoting short passages of it with a clear
+attribution and a link back to this repository, is permitted. Nothing beyond
+that is.
+
+THIRD-PARTY COMPONENTS ARE NOT COVERED BY THIS NOTICE.
+vendor/three.module.js is Three.js (https://threejs.org), Copyright 2010-2024
+Three.js Authors, licensed under the MIT licence, vendored here unmodified
+except for the build packaged by the maintainers. It keeps its own licence and
+may be used under that licence's terms. Any other third-party dependency named
+in docs/ or package manifests keeps its own licence too.
+
+NO WARRANTY. This software and its content are provided "as is", without
+warranty of any kind, express or implied, including merchantability, fitness for
+a particular purpose and non-infringement. It is an educational prototype, not a
+medical device, and not affiliated with, endorsed by, or connected to NASA.
+
+LIMITED CLAIM. This notice states the terms the copyright holder grants and
+reserves. It does not claim that technical protection exists, and it does not
+measure damages; it establishes the legal position for anyone who copies this
+work anyway.
+
+For permission, contact the copyright holder through the repository's issue
+tracker or the contact details published with the project.

@@ -81,13 +81,15 @@
        no layout. -->
   <div class="cursor-trail" id="cursorTrail">
     <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
   </div>
-  <!-- 30 segments: the plume runs about 1.1 s of travel behind the hull and the
-       trailing third of it is the smoke, so it needs both the length and the
-       count. chrome.js sizes and colours each one; an <i> per segment is what
-       keeps the whole thing compositor work. -->
+  <!-- 18 segments. Fewer and much larger than the 30 this started with: the
+       plume has to read as one mass of smoke, and a long rank of small shapes
+       reads as beads however softly each one is drawn. The length comes from
+       each segment stretching to cover the gap to the next sample (chrome.js),
+       not from counting more of them. chrome.js sizes, colours and masks each
+       one; an <i> per segment is what keeps the whole thing compositor work, and
+       18 is also what keeps it cheap. -->
   <svg class="cursor-ship" viewBox="0 0 48 48">
     <defs>
       <!-- the plume fades out along its length instead of ending in a hard tip -->
