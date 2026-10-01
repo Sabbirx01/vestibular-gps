@@ -267,6 +267,7 @@ export function mountIntegrationSection({ camera } = {}) {
        subject actually sees. */
     const cv = el('canvas', { class: 'cam-overlay', width: '640', height: '480', 'aria-label': 'Face scan overlay' });
     const video = el('video', { class: 'cam-video', autoplay: true, muted: true, playsinline: true, 'aria-label': 'Live camera preview' });
+    const eyeMap = el('canvas', { class: 'cam-eye-map', width: '640', height: '480', 'aria-label': 'Real eye landmark analysis map' });
     const verifyBox = el('div', { class: 'cam-verify' });
 
     const calState = !c ? 'NOT STARTED' : c.calibrating ? `CALIBRATING ${Math.round((c.calProgress || 0) * 100)}%` : c.calibrated ? 'CALIBRATED' : 'NOT CALIBRATED — HOLD-STILL FLOOR NOT MEASURED';
@@ -348,7 +349,10 @@ export function mountIntegrationSection({ camera } = {}) {
     }
 
     wrap.append(
-      el('div', { class: 'cam-stage cam-stage-single' }, video, cv),
+      el('div', { class: 'cam-stage cam-stage-dual' },
+        el('div', { class: 'cam-stage-single' }, video, cv),
+        eyeMap,
+      ),
       verifyBox,
       el('div', { class: 'cam-rows' }, ...Object.values(liveRows)),
       el('div', { class: 'cam-rows' },
@@ -447,6 +451,7 @@ export function mountIntegrationSection({ camera } = {}) {
     let lastChecks = null;
 
     const g = cv.getContext('2d');
+    const eg = eyeMap.getContext('2d');
     const draw = () => {
       requestAnimationFrame(draw);
       if (!c || !c.running) return;
@@ -524,8 +529,8 @@ export function mountIntegrationSection({ camera } = {}) {
         g.save();
         g.translate(pw, 0); g.scale(-1, 1);
         const pts = eye.points;
-        g.fillStyle = 'rgba(95,227,255,0.40)';
-        for (let i = 0; i < 468; i += 5) {
+        g.fillStyle = 'rgba(95,227,255,0.18)';
+        for (let i = 0; i < 468; i += 3) {
           const pt = pts[i];
           g.fillRect(mapX(pt.x) - 1, mapY(pt.y) - 1, 2, 2);
         }
@@ -545,6 +550,48 @@ export function mountIntegrationSection({ camera } = {}) {
         g.fillStyle = 'rgba(255,189,87,0.92)';
         g.font = '600 12px ui-monospace, monospace';
         g.fillText(c?.running ? 'EYE SCANNING · AWAITING REAL LANDMARKS' : 'EYE SCAN · UNAVAILABLE', 14, 48);
+      }
+
+      /* The adjacent analysis window is driven by the exact same verified
+         points. It intentionally stays blank when no landmark signal exists,
+         so it cannot be mistaken for an animated face substitute. */
+      eg.clearRect(0, 0, eyeMap.width, eyeMap.height);
+      eg.fillStyle = '#050b16'; eg.fillRect(0, 0, eyeMap.width, eyeMap.height);
+      const mapEye = state.camera?.eye;
+      if (mapEye?.available && Array.isArray(mapEye.points) && mapEye.points.length >= 478) {
+        const pts = mapEye.points;
+        const px = (pt) => pt.x * eyeMap.width;
+        const py = (pt) => pt.y * eyeMap.height;
+        /* A low-opacity real point cloud gives a deep scan appearance without
+           hiding the actual eye contours. Depth changes the dot intensity. */
+        for (let i = 0; i < 468; i += 2) {
+          const pt = pts[i];
+          const alpha = Math.max(0.08, Math.min(0.28, 0.20 - (pt.z || 0) * 1.6));
+          eg.fillStyle = `rgba(89,220,255,${alpha})`;
+          eg.fillRect(px(pt) - 1, py(pt) - 1, 2, 2);
+        }
+        const trace = (ids, colour, width = 1.5) => {
+          eg.strokeStyle = colour; eg.lineWidth = width; eg.beginPath();
+          ids.forEach((id, n) => n ? eg.lineTo(px(pts[id]), py(pts[id])) : eg.moveTo(px(pts[id]), py(pts[id])));
+          eg.closePath(); eg.stroke();
+        };
+        trace([33, 160, 158, 133, 153, 144], 'rgba(139,255,210,.95)', 2);
+        trace([362, 385, 387, 263, 373, 380], 'rgba(139,255,210,.95)', 2);
+        trace([468, 469, 470, 471, 472], 'rgba(255,190,92,.98)', 2);
+        trace([473, 474, 475, 476, 477], 'rgba(255,190,92,.98)', 2);
+        const sy = (performance.now() / 9) % eyeMap.height;
+        const band = eg.createLinearGradient(0, sy - 26, 0, sy + 26);
+        band.addColorStop(0, 'rgba(95,227,255,0)'); band.addColorStop(.5, 'rgba(95,227,255,.18)'); band.addColorStop(1, 'rgba(95,227,255,0)');
+        eg.fillStyle = band; eg.fillRect(0, sy - 26, eyeMap.width, 52);
+        eg.font = '600 16px ui-monospace, monospace'; eg.fillStyle = 'rgba(139,255,210,.96)';
+        eg.fillText('EYE SCANNING', 18, 28);
+        eg.font = '12px ui-monospace, monospace'; eg.fillStyle = 'rgba(220,245,255,.74)';
+        eg.fillText(`REAL LANDMARKS · ${Math.round((mapEye.confidence || 0) * 100)}%`, 18, 48);
+      } else {
+        eg.font = '600 16px ui-monospace, monospace'; eg.fillStyle = 'rgba(255,189,87,.9)';
+        eg.fillText('EYE SCAN UNAVAILABLE', 18, 28);
+        eg.font = '12px ui-monospace, monospace'; eg.fillStyle = 'rgba(220,245,255,.54)';
+        eg.fillText(c?.running ? 'WAITING FOR REAL FACE / IRIS LANDMARKS' : 'CAMERA IS OFF', 18, 48);
       }
 
       /* global motion vector, unchanged from the motion estimator */

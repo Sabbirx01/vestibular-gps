@@ -297,11 +297,8 @@
   gap: 12px;
   margin-top: var(--sp-3);
 }
-.cam-stage-single {
-  display: block;
-  position: relative;
-  max-width: 560px;
-}
+.cam-stage-single { display: block; position: relative; }
+.cam-stage-dual { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); max-width: 1120px; }
 .cam-video {
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -321,6 +318,15 @@
   aspect-ratio: 4 / 3;
   border-radius: 11px;
   pointer-events: none;
+}
+.cam-eye-map {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 11px;
+  border: 1px solid rgba(95, 227, 255, 0.24);
+  display: block;
+  background: #050b16;
+  box-shadow: inset 0 0 50px rgba(52, 161, 255, 0.06);
 }
 
 /* Verification readout: the verdict, then the checks it is made of. */

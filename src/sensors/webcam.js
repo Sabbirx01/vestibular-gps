@@ -217,6 +217,7 @@ export class CameraProvider extends SensorProvider {
     this._eyeLoading = null;
     this._lastEyeAt = 0;
     this._lastEyeSignal = null;
+    this._eyeSmoothPoints = null;
 
     /* ── Face-scan state ──
        `status` drives both the readout row and the overlay: 'searching' = no
@@ -530,6 +531,7 @@ export class CameraProvider extends SensorProvider {
     this.eye.points = null;
     this.eye.stableFrames = 0;
     this._lastEyeSignal = null;
+    this._eyeSmoothPoints = null;
     /* The next stream is a different camera or room, so the previous frame is
        useless as a motion reference. */
     this._lumReady = false;
@@ -598,8 +600,16 @@ export class CameraProvider extends SensorProvider {
       const widthR = Math.max(0.001, Math.abs(p[362].x - p[263].x));
       const gazeX = (((l.x - (p[33].x + p[133].x) / 2) / widthL) + ((r.x - (p[362].x + p[263].x) / 2) / widthR)) / 2;
       const gazeY = (((l.y - (p[33].y + p[133].y) / 2) / widthL) + ((r.y - (p[362].y + p[263].y) / 2) / widthR)) / 2;
+      const faceWidth = Math.abs(p[234].x - p[454].x);
+      const leftOpen = Math.abs(p[159].y - p[145].y) / widthL;
+      const rightOpen = Math.abs(p[386].y - p[374].y) / widthR;
+      const eyeSymmetry = 1 - Math.min(1, Math.abs(widthL - widthR) / Math.max(widthL, widthR));
+      const opening = Math.min(leftOpen, rightOpen);
+      const geometryQuality = Math.max(0, Math.min(1,
+        Math.min(faceWidth / 0.16, 1) * eyeSymmetry * Math.min(opening / 0.09, 1)));
       const valid = Number.isFinite(gazeX) && Number.isFinite(gazeY)
         && widthL > 0.012 && widthR > 0.012
+        && faceWidth > 0.08 && opening > 0.035 && eyeSymmetry > 0.5
         && Math.abs(gazeX) < 1.5 && Math.abs(gazeY) < 1.5;
       if (!valid) throw new Error('invalid eye geometry');
 
@@ -613,12 +623,22 @@ export class CameraProvider extends SensorProvider {
       this._lastEyeSignal = { x: gazeX, y: gazeY };
       this.eye.gazeX = gazeX;
       this.eye.gazeY = gazeY;
-      this.eye.points = p.map(({ x, y }) => ({ x, y }));
+      /* Smooth only verified real points. This removes webcam jitter while
+         keeping the overlay tied to the current physical face, not a preset
+         mesh or animated placeholder. */
+      const rawPoints = p.map(({ x, y, z }) => ({ x, y, z: z || 0 }));
+      this._eyeSmoothPoints = this._eyeSmoothPoints?.length === rawPoints.length
+        ? rawPoints.map((pt, i) => ({
+          x: this._eyeSmoothPoints[i].x + (pt.x - this._eyeSmoothPoints[i].x) * 0.36,
+          y: this._eyeSmoothPoints[i].y + (pt.y - this._eyeSmoothPoints[i].y) * 0.36,
+          z: this._eyeSmoothPoints[i].z + (pt.z - this._eyeSmoothPoints[i].z) * 0.36,
+        })) : rawPoints;
+      this.eye.points = this._eyeSmoothPoints;
       this.eye.lastAt = now;
-      this.eye.available = this.eye.stableFrames >= 3;
+      this.eye.available = this.eye.stableFrames >= 4 && geometryQuality >= 0.55;
       this.eye.status = this.eye.available ? 'tracking locally' : 'scanning for stable landmarks';
       this.eye.confidence = this.eye.available
-        ? Math.min(0.98, 0.55 + this.eye.stableFrames * 0.035) : 0;
+        ? Math.min(0.98, 0.45 + this.eye.stableFrames * 0.03 + geometryQuality * 0.2) : 0;
     } catch {
       this.eye.available = false;
       this.eye.status = 'no eye landmarks';
@@ -626,6 +646,7 @@ export class CameraProvider extends SensorProvider {
       this.eye.points = null;
       this.eye.stableFrames = 0;
       this._lastEyeSignal = null;
+      this._eyeSmoothPoints = null;
     }
   }
 
