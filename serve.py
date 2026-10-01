@@ -41,6 +41,7 @@ class NoStoreHandler(http.server.SimpleHTTPRequestHandler):
         ".json": "application/json",
         ".svg": "image/svg+xml",
         ".webmanifest": "application/manifest+json",
+        ".task": "application/octet-stream",
     }
 
     def __init__(self, *args, **kwargs):

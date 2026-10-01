@@ -200,6 +200,20 @@ export const SOURCES = {
     supports: 'Programme context for the flight research cited elsewhere on this site.',
     used: ['Research page'],
   },
+  assetMediaPipeFaceLandmarker: {
+    id: 'assetMediaPipeFaceLandmarker',
+    title: 'MediaPipe Tasks Vision / Face Landmarker (local inference engine)',
+    org: 'Google AI Edge / MediaPipe',
+    tier: 'TECH DOC',
+    url: 'https://github.com/google-ai-edge/mediapipe',
+    pub: 'Bundled locally · Apache-2.0',
+    topics: ['eye-tracking', 'assets'],
+    summary: 'On-device face and iris landmark runtime used only to derive an experimental, face-relative gaze offset from the local camera stream.',
+    supports: 'The optional eye-landmark implementation in the Integration section. It does not support clinical VOR, vHIT, diagnosis, or any NASA measurement claim.',
+    used: ['10 Integration — local experimental eye landmarks'],
+    licence: 'Apache-2.0 — https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE',
+    asset: './assets/models/face_landmarker.task',
+  },
 };
 
 export const SOURCE_LIST = Object.values(SOURCES);

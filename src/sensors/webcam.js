@@ -201,6 +201,21 @@ export class CameraProvider extends SensorProvider {
     this.noiseFloor = { energy: 0.03, jitter: 0.02, travel: 0.4 };
     this._starting = false;    // start() in flight — see the re-entry note there
 
+    /* Optional local eye-landmark provider. MediaPipe Face Landmarker is
+       bundled under vendor/ and assets/models/, so this never sends a camera
+       frame to a server. It provides eye/iris points for an EXPERIMENTAL
+       gaze-relative-to-face readout. This is intentionally NOT used as VOR
+       gain: a clinical head-impulse test needs calibrated high-speed eye and
+       head-velocity instrumentation, which a normal webcam is not. */
+    this.eye = {
+      status: 'not loaded', available: false, gazeX: null, gazeY: null,
+      neutralX: null, neutralY: null, confidence: 0,
+      method: 'local MediaPipe Face Landmarker; experimental, not clinical VOR',
+    };
+    this._eyeLandmarker = null;
+    this._eyeLoading = null;
+    this._lastEyeAt = 0;
+
     /* ── Face-scan state ──
        `status` drives both the readout row and the overlay: 'searching' = no
        face found yet, 'locked' = found in the current frame, 'lost' = had one
@@ -352,6 +367,14 @@ export class CameraProvider extends SensorProvider {
         : 'no face was visible during the hold-still window';
     }
 
+    /* The same hold-still window is also the only honest reference for the
+       optional gaze signal. It is a face-relative neutral, not a population
+       target and not a VOR calibration. */
+    if (this.eye.available) {
+      this.eye.neutralX = this.eye.gazeX;
+      this.eye.neutralY = this.eye.gazeY;
+    }
+
     this.calibrated = true;
     this.calibrating = false;
     this.calProgress = 1;
@@ -456,6 +479,10 @@ export class CameraProvider extends SensorProvider {
     this.reason = '';
     bus.emit('sensor', { id: this.id, status: this.status });
 
+    /* Deliberately non-blocking: basic local head motion begins immediately
+       even on a slow device or if the optional landmark model cannot load. */
+    this._startEyeLandmarker();
+
     const interval = 1000 / TARGET_HZ;
     this.timer = setInterval(() => this._analyse(), interval);
     return true;
@@ -494,6 +521,10 @@ export class CameraProvider extends SensorProvider {
     this.face.score = 0;
     this.face.poseNote = 'calibrate to set the neutral';
     this.faceRaw = null;
+    this.eye.available = false;
+    this.eye.status = 'not loaded';
+    this.eye.gazeX = this.eye.gazeY = null;
+    this.eye.neutralX = this.eye.neutralY = null;
     /* The next stream is a different camera or room, so the previous frame is
        useless as a motion reference. */
     this._lumReady = false;
@@ -515,6 +546,62 @@ export class CameraProvider extends SensorProvider {
       if (videoEl.readyState >= 1) play();
       else videoEl.addEventListener('loadedmetadata', play, { once: true });
       queueMicrotask(play);
+    }
+  }
+
+  async _startEyeLandmarker() {
+    if (this._eyeLandmarker || this._eyeLoading) return this._eyeLoading;
+    this.eye.status = 'loading local model';
+    this._eyeLoading = (async () => {
+      try {
+        const { FilesetResolver, FaceLandmarker } = await import('../../vendor/mediapipe/vision_bundle.mjs');
+        const vision = await FilesetResolver.forVisionTasks('./vendor/mediapipe/wasm');
+        const options = (delegate) => ({
+          baseOptions: { modelAssetPath: './assets/models/face_landmarker.task', delegate },
+          runningMode: 'VIDEO', numFaces: 1,
+          outputFaceBlendshapes: false, outputFacialTransformationMatrixes: false,
+        });
+        /* GPU is quicker on most laptops, but a software-rendered browser or
+           an older driver must not lose the feature. The exact same local model
+           is retried on CPU, then the existing head-motion fallback remains. */
+        try { this._eyeLandmarker = await FaceLandmarker.createFromOptions(vision, options('GPU')); }
+        catch { this._eyeLandmarker = await FaceLandmarker.createFromOptions(vision, options('CPU')); }
+        this.eye.status = 'ready';
+      } catch (err) {
+        this.eye.status = 'unavailable';
+        this.eye.available = false;
+        this.eye.error = String(err?.message || err).slice(0, 120);
+      }
+    })();
+    return this._eyeLoading;
+  }
+
+  _trackEyes(now) {
+    if (!this._eyeLandmarker || !this.video || now - this._lastEyeAt < 100) return;
+    this._lastEyeAt = now;
+    try {
+      const result = this._eyeLandmarker.detectForVideo(this.video, now);
+      const p = result.faceLandmarks?.[0];
+      /* 468–472 / 473–477 are iris landmarks. Eye corners give a stable
+         face-relative scale, so the reported offset survives the subject
+         moving closer to the webcam. */
+      if (!p || p.length < 478) throw new Error('iris landmarks unavailable');
+      const mean = (ids) => ids.reduce((a, i) => ({ x: a.x + p[i].x, y: a.y + p[i].y }), { x: 0, y: 0 });
+      const l = mean([468, 469, 470, 471, 472]); const r = mean([473, 474, 475, 476, 477]);
+      l.x /= 5; l.y /= 5; r.x /= 5; r.y /= 5;
+      const widthL = Math.max(0.001, Math.abs(p[33].x - p[133].x));
+      const widthR = Math.max(0.001, Math.abs(p[362].x - p[263].x));
+      const gazeX = (((l.x - (p[33].x + p[133].x) / 2) / widthL) + ((r.x - (p[362].x + p[263].x) / 2) / widthR)) / 2;
+      const gazeY = (((l.y - (p[33].y + p[133].y) / 2) / widthL) + ((r.y - (p[362].y + p[263].y) / 2) / widthR)) / 2;
+      this.eye.gazeX = Number.isFinite(gazeX) ? gazeX : null;
+      this.eye.gazeY = Number.isFinite(gazeY) ? gazeY : null;
+      this.eye.available = this.eye.gazeX !== null && this.eye.gazeY !== null;
+      this.eye.status = this.eye.available ? 'tracking locally' : 'no eye landmarks';
+      this.eye.confidence = this.eye.available ? 0.75 : 0;
+    } catch {
+      this.eye.available = false;
+      this.eye.status = 'no eye landmarks';
+      this.eye.confidence = 0;
     }
   }
 
@@ -1038,6 +1125,7 @@ export class CameraProvider extends SensorProvider {
     /* Face scan runs on this same frame, so the box, the pose and the motion
        number all describe one instant rather than three neighbouring ones. */
     this._trackFace(cur);
+    this._trackEyes(now);
 
     this.centroidX = this.centroidX + (cur.cx - this.centroidX) * 0.12;
     this.centroidY = this.centroidY + (cur.cy - this.centroidY) * 0.12;
@@ -1068,6 +1156,21 @@ export class CameraProvider extends SensorProvider {
        eye half of eye-head coordination is missing. Pose values are null until
        calibrate() stores a neutral — see _updatePose(). */
     const f = this.face;
+    const eye = {
+      status: this.eye.status,
+      available: this.eye.available,
+      gazeX: this.eye.gazeX,
+      gazeY: this.eye.gazeY,
+      neutralX: this.eye.neutralX,
+      neutralY: this.eye.neutralY,
+      confidence: this.eye.confidence,
+      method: this.eye.method,
+      /* This is a face-relative visual offset, deliberately not degrees and
+         deliberately not an eye-head/VOR score. */
+      offset: this.eye.available && this.eye.neutralX !== null
+        ? Math.hypot(this.eye.gazeX - this.eye.neutralX, this.eye.gazeY - this.eye.neutralY)
+        : null,
+    };
     const face = {
       status: f.status,
       found: f.found,
@@ -1099,7 +1202,8 @@ export class CameraProvider extends SensorProvider {
       score: +f.score.toFixed(4),
       estimated: true,
       method: f.method,
-      eyeLandmarks: false,
+      eyeLandmarks: this.eye.available,
+      eye,
       neutral: !!this.neutral,
       neutralNote: this.neutralNote,
     };
@@ -1112,6 +1216,7 @@ export class CameraProvider extends SensorProvider {
           There is no invented eye-head/VOR number in the live contract. */
        headMotion: +(travelDeg * 3 + jitterDeg * 0.7).toFixed(2),
        eyeHead: null,
+       eye,
       lateral: +((this.centroidX - 0.5) * 40).toFixed(2),
       vertical: +((this.centroidY - 0.5) * 40).toFixed(2),
       rateHz: +this.hz.mean().toFixed(1),
@@ -1139,6 +1244,7 @@ export class CameraProvider extends SensorProvider {
        rateHz: +this.hz.mean().toFixed(1),
        headMotion: +(travelDeg * 3 + jitterDeg * 0.7).toFixed(2),
        eyeHead: null,
+       eye,
        motionEnergy: +energyClean.toFixed(4),
       jitter: +jitterClean.toFixed(4),
       dx: this.dx, dy: this.dy,

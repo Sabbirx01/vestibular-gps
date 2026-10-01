@@ -10,7 +10,7 @@ Machine-readable copy: [`docs/_source-check.txt`](_source-check.txt), produced b
 
 ## Verification status
 
-All 15 registry URLs were re-checked on **2026-09-28**. **14 resolved with
+The original 15 NASA/NIH/asset registry URLs were re-checked on **2026-09-28**. **14 resolved with
 HTTP 200.** One did not at that time — see the note under NASA below. That one
 was re-checked on **2026-10-01** and **now resolves**, so all 15 are confirmed
 live. Dead links in a submission damage credibility more than missing ones, so
@@ -38,7 +38,7 @@ this list is checked rather than assumed.
 > Mission ratings. On **2026-09-28** it did not respond at all — a connection
 > timeout, not a 403 or a 404 — and it was recorded here as unconfirmed rather
 > than quietly dropped. Re-checked on **2026-10-01**, it resolves and serves
-> the risk entry with its tasks and gaps. **All 15 sources are now confirmed
+> the risk entry with its tasks and gaps. **All 15 original registry sources are now confirmed
 > live.** The failure was the host being intermittent, not the link being
 > wrong.
 >
@@ -61,6 +61,7 @@ this list is checked rather than assumed.
 |---|---|---|---|
 | 14 | **Advanced Crew Escape Suit** — NASA 3D Resources | Public domain. The repository states its assets are "free and without copyright". Usage follows the [NASA Images and Media Usage Guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media). | ✅ 200 |
 | 15 | **Detailed Human Brain Model** — NIH 3D, entry 3DPX-021161, model by Johnson J | **CC-BY 4.0** — https://creativecommons.org/licenses/by/4.0/ | ✅ 200 |
+| 16 | **MediaPipe Tasks Vision / Face Landmarker** — Google AI Edge | **Apache-2.0** — https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE | bundled locally; experimental eye landmarks only |
 
 > **Attribution for 15 is a legal obligation, not a courtesy.** It is rendered
 > on the Research page directly from the registry (`licence` and `attribution`
@@ -101,6 +102,7 @@ Honesty about the boundary matters more than the length of the list.
 | **The 6-domain weight set** | Heuristic. Stated in the UI and in the JSON record. Open to recalibration against NASA's open datasets. |
 | **The sub-score curve constant (K = 4.48)** | A design choice, documented in `osi.js`, chosen so that one SD ≈ 80 and two SD ≈ 64. |
 | **All visualisations labelled "illustration" or "conceptual"** | Simplifications, labelled in the UI at the point of display. |
+| **Webcam eye landmarks / gaze offset** | Local MediaPipe landmarks; an experimental face-relative visual offset, not VOR gain, vHIT, a clinical measurement, or a NASA measurement. |
 | **Nothing at all** | No diagnosis, no screening claim, no clinical advice, no agency affiliation or endorsement. |
 
 ---

@@ -254,7 +254,7 @@ export function mountIntegrationSection({ camera } = {}) {
       el('div', { class: 'panel-head' },
         el('p', { class: 'eyebrow', text: 'CAMERA PIPELINE' }),
         el('h3', { text: 'Face scan — head pose and head motion from the front camera' }),
-        el('p', { text: 'Runs entirely on this device. No frame is uploaded, ever. The scan searches face-shaped windows on colour, contrast, dark features and motion, locks onto the best one, and reports a coarse head pose against your own calibrated neutral. Head motion is measured separately, by block-matching consecutive frames. It does not measure gaze and it uses no facial landmarks.' }),
+        el('p', { text: 'Runs entirely on this device. No frame is uploaded, ever. The scan reports coarse head pose and head motion; an optional bundled local model can also provide experimental eye/iris landmarks and a face-relative gaze offset. It never reports clinical VOR or vHIT from a normal webcam.' }),
       ),
     );
 
@@ -284,7 +284,9 @@ export function mountIntegrationSection({ camera } = {}) {
          i.e. a healthy reading for a sensor that was off. Every other row in
          this table is gated on the live provider handle `c`; these now match. */
       head: row('LIVE HEAD MOTION', c?.running ? `${state.camera.headMotion.toFixed(2)} deg/s` : '—'),
-      vor: row('LIVE EYE–HEAD / VOR', 'UNAVAILABLE — CAMERA HAS NO EYE LANDMARKS'),
+      vor: row('CLINICAL VOR / vHIT', 'UNAVAILABLE — WEBCAM IS NOT A CLINICAL vHIT'),
+      eyes: row('EYE LANDMARKS', c?.running ? eyeText(state.camera.eye) : '—'),
+      gaze: row('GAZE OFFSET · EXPERIMENTAL', c?.running ? gazeText(state.camera.eye) : '—'),
       quality: row('SIGNAL QUALITY', c?.running ? `${Math.round(state.camera.quality * 100)}%` : '—'),
       energy: row('MOTION ENERGY (ABOVE FLOOR)', c ? Math.max(0, c.motionEnergy - (c.noiseFloor?.energy ?? 0)).toFixed(4) : '—'),
       jitter: row('JITTER (ABOVE FLOOR)', c ? Math.max(0, c.jitter - (c.noiseFloor?.jitter ?? 0)).toFixed(4) : '—'),
@@ -331,6 +333,18 @@ export function mountIntegrationSection({ camera } = {}) {
         return String(f.poseNote || 'UNAVAILABLE').toUpperCase();
       }
       return `${v > 0 ? '+' : ''}${v.toFixed(1)}°`;
+    }
+
+    function eyeText(eye) {
+      if (!eye) return 'LOADING LOCAL MODEL…';
+      if (!eye.available) return String(eye.status || 'UNAVAILABLE').toUpperCase();
+      return `TRACKING LOCALLY · ${Math.round((eye.confidence || 0) * 100)}%`;
+    }
+
+    function gazeText(eye) {
+      if (!eye?.available) return 'UNAVAILABLE';
+      if (eye.offset === null || eye.offset === undefined) return 'CALIBRATE TO SET NEUTRAL';
+      return `${eye.offset.toFixed(3)} FACE-RELATIVE UNITS`;
     }
 
     wrap.append(
@@ -394,14 +408,15 @@ export function mountIntegrationSection({ camera } = {}) {
           type: 'button', class: 'btn', text: 'STOP',
           onclick: () => { S.camera?.stop(); render(); },
         }),
-        el('span', { class: 'tag tag-info', text: 'HEAD MOTION + COARSE HEAD POSE · NOT GAZE' }),
+      el('span', { class: 'tag tag-info', text: 'HEAD MOTION + EXPERIMENTAL EYE LANDMARKS · NOT CLINICAL VOR' }),
       ),
       el('p', { class: 'caption', text: 'How the face scan works: each frame is searched for face-shaped windows on four channels — skin colour after a white balance, local contrast (structure), dark features such as eyes, brows and beard, and frame-to-frame motion — weighted by shape, position, brightness and size. Nothing is fetched and no model file ships, so the offline guarantee holds. The winning window seeds a fit by image moments, which is what gives the lock its centre and spread.' }),
       el('p', { class: 'caption', text: 'Why not just skin colour: the first real camera this scanner met had a purple cast strong enough to put the FACE outside every classic skin bound while the beige WALL sat inside them — it locked the wall. On that frame structure and dark features separate face from wall by about 3x while colour separates nothing, so colour is one channel of four and the LOCK HELD BY row above says which one is carrying the lock. A structure-held lock is far less certain than a colour-held one.' }),
-      el('p', { class: 'caption', text: 'What the pose is not: it is a coarse estimate with a few degrees of uncertainty, not a goniometer. A head that slides sideways without turning moves the region exactly like a yaw does, so the scan cannot tell those apart, and it uses no facial landmarks — which is why it cannot measure gaze and why the eye–head / VOR row above stays unavailable.' }),
+      el('p', { class: 'caption', text: 'What the pose and eye data are not: head pose is a coarse estimate with a few degrees of uncertainty, not a goniometer. A head that slides sideways without turning moves the region exactly like a yaw does, so the scan cannot tell those apart. The optional local iris signal is only a face-relative gaze offset. It does not turn this webcam into a calibrated VOR or vHIT instrument; that row stays unavailable by design.' }),
       el('p', { class: 'caption', text: 'What VERIFIED means here: a lock, a stored neutral, real evidence, and a region that has held still for 1.2 s — nothing more. It is not a biometric identity check and it does not certify that the pose is accurate; it says the scan is currently tracking a stable face. The dashed box on the preview is the neutral captured at calibration.' }),
       el('p', { class: 'caption', text: 'Why calibration matters for the motion half: every webcam has its own sensor noise (exposure, gain, compression), which reads as a small amount of "motion" even when perfectly still. CALIBRATE measures that noise floor for this specific camera and subtracts it from every subsequent reading, so a genuinely still head reports as still — not as a few degrees per second of phantom motion.' }),
-      el('p', { class: 'caption', text: 'Why not a landmark model: MediaPipe Face Mesh is roughly 3 MB of model plus WASM from a CDN, which would break the offline guarantee this project is built on. A landmark model is a documented upgrade path — the provider interface accepts one unchanged.' }),
+      el('p', { class: 'caption', text: 'Landmark implementation: the MediaPipe runtime, WASM files, and Face Landmarker model are bundled inside this site under Apache-2.0 rather than loaded from a CDN. This preserves offline operation but adds download size; if the model cannot load, the existing local head-motion tracker continues to work and the eye rows say unavailable.' }),
+      el('p', { class: 'caption', text: 'Experimental eye-landmark upgrade: this build bundles a local MediaPipe Face Landmarker model, so eye/iris landmarks are processed on this device and no camera frame is uploaded. The GAZE OFFSET is only the iris position relative to the subject’s own calibrated face-neutral. It is useful for a functional demo and data-quality check, but it is not VOR gain, a clinical vHIT result, a diagnosis, or a NASA measurement.' }),
     );
 
     /* Re-rendering this panel must not detach a live stream from the new video
@@ -600,6 +615,8 @@ export function mountIntegrationSection({ camera } = {}) {
       liveRows.samples.querySelector('b').textContent = c ? String(c.samples) : '0';
       liveRows.rate.querySelector('b').textContent = `${hz} Hz`;
       liveRows.head.querySelector('b').textContent = live?.running ? `${live.headMotion.toFixed(2)} deg/s` : '—';
+      liveRows.eyes.querySelector('b').textContent = live?.running ? eyeText(live.eye) : '—';
+      liveRows.gaze.querySelector('b').textContent = live?.running ? gazeText(live.eye) : '—';
       liveRows.quality.querySelector('b').textContent = live?.running ? `${Math.round(live.quality * 100)}%` : '—';
       liveRows.energy.querySelector('b').textContent = c ? Math.max(0, c.motionEnergy - (c.noiseFloor?.energy ?? 0)).toFixed(4) : '—';
       liveRows.jitter.querySelector('b').textContent = c ? Math.max(0, c.jitter - (c.noiseFloor?.jitter ?? 0)).toFixed(4) : '—';
