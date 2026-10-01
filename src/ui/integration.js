@@ -253,8 +253,8 @@ export function mountIntegrationSection({ camera } = {}) {
     const wrap = el('div', { class: 'glass panel' },
       el('div', { class: 'panel-head' },
         el('p', { class: 'eyebrow', text: 'CAMERA PIPELINE' }),
-        el('h3', { text: 'Face scan — head pose and head motion from the front camera' }),
-        el('p', { text: 'Runs entirely on this device. No frame is uploaded, ever. The scan reports coarse head pose and head motion; an optional bundled local model can also provide experimental eye/iris landmarks and a face-relative gaze offset. It never reports clinical VOR or vHIT from a normal webcam.' }),
+        el('h3', { text: 'Face + eye scan — real local landmarks from the front camera' }),
+        el('p', { text: 'Runs entirely on this device. No frame is uploaded, ever. The eye panel only draws when real local face/iris landmarks are detected. If detection is weak or unavailable, it shows UNAVAILABLE — never a simulated eye result. It never reports clinical VOR or vHIT from a normal webcam.' }),
       ),
     );
 
@@ -410,7 +410,7 @@ export function mountIntegrationSection({ camera } = {}) {
         }),
       el('span', { class: 'tag tag-info', text: 'HEAD MOTION + EXPERIMENTAL EYE LANDMARKS · NOT CLINICAL VOR' }),
       ),
-      el('p', { class: 'caption', text: 'How the face scan works: each frame is searched for face-shaped windows on four channels — skin colour after a white balance, local contrast (structure), dark features such as eyes, brows and beard, and frame-to-frame motion — weighted by shape, position, brightness and size. Nothing is fetched and no model file ships, so the offline guarantee holds. The winning window seeds a fit by image moments, which is what gives the lock its centre and spread.' }),
+      el('p', { class: 'caption', text: 'How the face scan works: each frame is searched for face-shaped windows on four channels — skin colour after a white balance, local contrast (structure), dark features such as eyes, brows and beard, and frame-to-frame motion — weighted by shape, position, brightness and size. A bundled local landmark model then draws the eye grid only when it sees real face/iris landmarks. Nothing is uploaded or fetched from a CDN.' }),
       el('p', { class: 'caption', text: 'Why not just skin colour: the first real camera this scanner met had a purple cast strong enough to put the FACE outside every classic skin bound while the beige WALL sat inside them — it locked the wall. On that frame structure and dark features separate face from wall by about 3x while colour separates nothing, so colour is one channel of four and the LOCK HELD BY row above says which one is carrying the lock. A structure-held lock is far less certain than a colour-held one.' }),
       el('p', { class: 'caption', text: 'What the pose and eye data are not: head pose is a coarse estimate with a few degrees of uncertainty, not a goniometer. A head that slides sideways without turning moves the region exactly like a yaw does, so the scan cannot tell those apart. The optional local iris signal is only a face-relative gaze offset. It does not turn this webcam into a calibrated VOR or vHIT instrument; that row stays unavailable by design.' }),
       el('p', { class: 'caption', text: 'What VERIFIED means here: a lock, a stored neutral, real evidence, and a region that has held still for 1.2 s — nothing more. It is not a biometric identity check and it does not certify that the pose is accurate; it says the scan is currently tracking a stable face. The dashed box on the preview is the neutral captured at calibration.' }),
@@ -515,6 +515,37 @@ export function mountIntegrationSection({ camera } = {}) {
         g.fill();
       }
       g.restore();
+
+      /* Real local landmark view — no decorative face mesh. It only appears
+         after the bundled model has produced stable face/iris landmarks. The
+         sparse point field is a pixel-like analysis grid, not a fake scan. */
+      const eye = state.camera?.eye;
+      if (eye?.available && Array.isArray(eye.points) && eye.points.length >= 478) {
+        g.save();
+        g.translate(pw, 0); g.scale(-1, 1);
+        const pts = eye.points;
+        g.fillStyle = 'rgba(95,227,255,0.40)';
+        for (let i = 0; i < 468; i += 5) {
+          const pt = pts[i];
+          g.fillRect(mapX(pt.x) - 1, mapY(pt.y) - 1, 2, 2);
+        }
+        const ring = (ids, colour) => {
+          g.strokeStyle = colour; g.lineWidth = 1.4; g.beginPath();
+          ids.forEach((id, n) => { const pt = pts[id]; n ? g.lineTo(mapX(pt.x), mapY(pt.y)) : g.moveTo(mapX(pt.x), mapY(pt.y)); });
+          g.closePath(); g.stroke();
+        };
+        ring([33, 160, 158, 133, 153, 144], 'rgba(135,255,206,0.95)');
+        ring([362, 385, 387, 263, 373, 380], 'rgba(135,255,206,0.95)');
+        [468, 473].forEach((id) => { const pt = pts[id]; g.beginPath(); g.arc(mapX(pt.x), mapY(pt.y), 4, 0, Math.PI * 2); g.strokeStyle = '#ffbd57'; g.lineWidth = 2; g.stroke(); });
+        g.restore();
+        g.fillStyle = 'rgba(135,255,206,0.95)';
+        g.font = '600 12px ui-monospace, monospace';
+        g.fillText('EYE SCANNING · REAL LOCAL LANDMARKS', 14, 48);
+      } else {
+        g.fillStyle = 'rgba(255,189,87,0.92)';
+        g.font = '600 12px ui-monospace, monospace';
+        g.fillText(c?.running ? 'EYE SCANNING · AWAITING REAL LANDMARKS' : 'EYE SCAN · UNAVAILABLE', 14, 48);
+      }
 
       /* global motion vector, unchanged from the motion estimator */
       g.strokeStyle = 'rgba(95,227,255,0.7)';

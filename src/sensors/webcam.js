@@ -209,12 +209,14 @@ export class CameraProvider extends SensorProvider {
        head-velocity instrumentation, which a normal webcam is not. */
     this.eye = {
       status: 'not loaded', available: false, gazeX: null, gazeY: null,
-      neutralX: null, neutralY: null, confidence: 0,
+      neutralX: null, neutralY: null, confidence: 0, points: null,
+      stableFrames: 0, lastAt: 0,
       method: 'local MediaPipe Face Landmarker; experimental, not clinical VOR',
     };
     this._eyeLandmarker = null;
     this._eyeLoading = null;
     this._lastEyeAt = 0;
+    this._lastEyeSignal = null;
 
     /* ── Face-scan state ──
        `status` drives both the readout row and the overlay: 'searching' = no
@@ -525,6 +527,9 @@ export class CameraProvider extends SensorProvider {
     this.eye.status = 'not loaded';
     this.eye.gazeX = this.eye.gazeY = null;
     this.eye.neutralX = this.eye.neutralY = null;
+    this.eye.points = null;
+    this.eye.stableFrames = 0;
+    this._lastEyeSignal = null;
     /* The next stream is a different camera or room, so the previous frame is
        useless as a motion reference. */
     this._lumReady = false;
@@ -593,15 +598,34 @@ export class CameraProvider extends SensorProvider {
       const widthR = Math.max(0.001, Math.abs(p[362].x - p[263].x));
       const gazeX = (((l.x - (p[33].x + p[133].x) / 2) / widthL) + ((r.x - (p[362].x + p[263].x) / 2) / widthR)) / 2;
       const gazeY = (((l.y - (p[33].y + p[133].y) / 2) / widthL) + ((r.y - (p[362].y + p[263].y) / 2) / widthR)) / 2;
-      this.eye.gazeX = Number.isFinite(gazeX) ? gazeX : null;
-      this.eye.gazeY = Number.isFinite(gazeY) ? gazeY : null;
-      this.eye.available = this.eye.gazeX !== null && this.eye.gazeY !== null;
-      this.eye.status = this.eye.available ? 'tracking locally' : 'no eye landmarks';
-      this.eye.confidence = this.eye.available ? 0.75 : 0;
+      const valid = Number.isFinite(gazeX) && Number.isFinite(gazeY)
+        && widthL > 0.012 && widthR > 0.012
+        && Math.abs(gazeX) < 1.5 && Math.abs(gazeY) < 1.5;
+      if (!valid) throw new Error('invalid eye geometry');
+
+      /* Require consecutive, physically consistent landmark frames. A single
+         detection is shown as SCANNING, never as a health or gaze result. */
+      const delta = this._lastEyeSignal
+        ? Math.hypot(gazeX - this._lastEyeSignal.x, gazeY - this._lastEyeSignal.y)
+        : 0;
+      this.eye.stableFrames = (!this._lastEyeSignal || delta < 0.18)
+        ? Math.min(12, this.eye.stableFrames + 1) : 0;
+      this._lastEyeSignal = { x: gazeX, y: gazeY };
+      this.eye.gazeX = gazeX;
+      this.eye.gazeY = gazeY;
+      this.eye.points = p.map(({ x, y }) => ({ x, y }));
+      this.eye.lastAt = now;
+      this.eye.available = this.eye.stableFrames >= 3;
+      this.eye.status = this.eye.available ? 'tracking locally' : 'scanning for stable landmarks';
+      this.eye.confidence = this.eye.available
+        ? Math.min(0.98, 0.55 + this.eye.stableFrames * 0.035) : 0;
     } catch {
       this.eye.available = false;
       this.eye.status = 'no eye landmarks';
       this.eye.confidence = 0;
+      this.eye.points = null;
+      this.eye.stableFrames = 0;
+      this._lastEyeSignal = null;
     }
   }
 
@@ -1164,6 +1188,9 @@ export class CameraProvider extends SensorProvider {
       neutralX: this.eye.neutralX,
       neutralY: this.eye.neutralY,
       confidence: this.eye.confidence,
+      points: this.eye.available ? this.eye.points : null,
+      stableFrames: this.eye.stableFrames,
+      lastAt: this.eye.lastAt,
       method: this.eye.method,
       /* This is a face-relative visual offset, deliberately not degrees and
          deliberately not an eye-head/VOR score. */
