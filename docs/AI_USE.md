@@ -1,6 +1,6 @@
 # Use of AI — disclosure
 
-**VESTIBULAR GPS** · team MindStellar · NASA Space Apps Challenge 2026
+**VESTIBULAR GPS** · team MindStaller · NASA Space Apps Challenge 2026
 Challenge: *Create Health Monitoring Software for Astronauts on Space Missions*
 
 This file exists to answer the mandatory **"Use of AI"** field on the project
@@ -33,13 +33,13 @@ open — see §5.** Do not submit this as complete until those two are filled in
 
 | What | Where it lives | AI-made? | How it is labelled |
 |---|---|---|---|
-| Application code, 3D scene, scientific content model | `src/`, `index.html`, `vendor/` | **Yes** — written with AI coding assistants, directed and reviewed by the team. `docs/MASTER-PROMPT-BN.md` is the build brief that was handed to the assistant. | Declared here. Third-party library licence in `NOTICE`. |
+| Application code, 3D scene, scientific content model | `src/`, `index.html`, `vendor/` | **Yes** — built with **Accio AI**, directed and reviewed by the team. `docs/MASTER-PROMPT-BN.md` is the build brief that was handed to the assistant. | Declared here. Third-party library licence in `NOTICE`. |
 | Documentation (`docs/*.md`, `README.md`) | `docs/` | **Yes**, same arrangement | Declared here |
 | Automated test suite and its results | `tests/` | **Yes**, code; **no**, results — the tests were executed | `tests/osi.test.result.txt` |
 | Night-side city lights on the Earth in the 3D hero | `src/three/SolarSystem.js` (`buildNightLights`) | **Yes** — synthesised from the land/ocean colours of the bundled Blue Marble map | `NOTICE` → *"GENERATED, NOT MEASURED … a visual model, not a city-lights dataset, and must not be described as measured or observed lighting."* |
 | Cinematic reference stills `R01`–`R18` | `video-project/02-references/` | **Yes** | `02-references/INDEX.md`: *"সব 16:9 · 2K · AI-generated (DRAMATIZATION)"*; the `DRAMATIZATION` tag is carried into the video |
-| Generated video shots | `video-project/veo/` | **Yes** — planned as Veo 3 generations driven by the AI stills | `veo/README.md`, `clips/PROMPTS-VEO3-ULTRA.md`; `DRAMATIZATION` on every such frame |
-| Voice-over | `video-project/04-audio-vo/vo/VO-01…16.wav` | **Yes — fully synthetic speech.** All 16 lines, including the "we are six students from Bangladesh" lines | Declared here; `04-audio-vo/samples/README.md`: *"these are good neural voices, but they are still synthetic"* |
+| Generated video shots | `video-project/veo/` | **Yes** — generated in **Google Labs / Google Flow** using the Veo 3.1 Frames-to-Video workflow documented in this project; the team also reports using **Gemini Flash** in the video workflow. | `veo/README.md`, `clips/PROMPTS-VEO3-ULTRA.md`; `DRAMATIZATION` on every such frame |
+| Voice-over | `video-project/04-audio-vo/vo/VO-01…16.wav` | **Yes — fully synthetic speech generated with ElevenLabs.** All 16 lines, including the "we are six students from Bangladesh" lines | Declared here; `04-audio-vo/samples/README.md`: *"these are good neural voices, but they are still synthetic"* |
 | Music bed | `video-project/04-audio-vo/samples/BED-ONLY.mp3` (14 s draft) | **No AI model.** Synthesised from scratch with ffmpeg, so there is nothing to license and nothing to credit | `04-audio-vo/samples/README.md` §3, `veo/ASSETS-AND-EDIT.md` §7 |
 | Motion graphics (the OSI diagram, "what's next") | `video-project/06-generated-clips/` | **No** — built in the editor from our own data | screen text |
 | Team portraits | `video-project/03-team-placeholders/processed/` | **Photographs are real; faces untouched.** Backgrounds were normalised, a photographer's watermark and store lettering were removed | `03-team-placeholders/README.md` §1 — faces, skin, hair, teeth, clothing and pose were deliberately not retouched, and earlier AI-generated placeholder faces were deleted |
@@ -94,12 +94,15 @@ are *missing* rather than filled in:
 
 ## 5. Open items — do not submit until these are closed
 
-1. **Name the AI coding assistant** used for the code and documentation (product
-   and, if known, model/version). The repository records the *brief* it was given
-   (`docs/MASTER-PROMPT-BN.md`) but not the product name. *Team to fill in.*
-2. **Name the image/video generator** behind `R01`–`R18` and the Veo clip plan —
-   `veo/README.md` §2 lists this as an open question too, together with what
-   "Gemini Flash" was for. *Team to fill in.*
+1. **Record exact AI account evidence.** The team reports using Accio AI for code,
+   Google Labs / Google Flow (Veo 3.1 workflow and Gemini Flash) for video, and
+   ElevenLabs for synthetic voice. Before submission, save a screenshot or export
+   of the relevant generation history/receipt, plus plan/version where shown. Do
+   not guess a model version that the account does not display.
+2. **Identify the generator for reference stills `R01`–`R18`.** The video workflow
+   is now named, but the original still generator is not conclusively identified
+   by the repository. Record its product/model if those stills appear in the final
+   video; otherwise omit the stills from the final asset list.
 
 Two more things worth deciding before you submit, because a judge may ask:
 

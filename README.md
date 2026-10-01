@@ -20,7 +20,7 @@
 
 - **Name:** VESTIBULAR GPS
 - **Tagline:** Navigate the space between motion, balance and the brain.
-- **Team:** MindStellar (check the official Space Apps team page for the exact registered spelling before submission; older planning files contain a spelling mismatch).
+- **Team:** MindStaller (check the official Space Apps team page for the exact registered spelling before submission; older planning files contain a spelling mismatch).
 - **Challenge:** NASA Space Apps — “Create Health Monitoring Software for Astronauts on Space Missions.”
 - **Product type:** Offline-first, browser-based educational visualization and health-monitoring software prototype for astronaut sensorimotor readiness.
 - **Core product:** **Mission Console, section 09 (`#sec-console`)**, powered by the OSI v2.0 metric engine.

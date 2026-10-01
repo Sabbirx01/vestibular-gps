@@ -1,7 +1,7 @@
 # Competition compliance pack — VESTIBULAR GPS
 
 **Prepared:** 2026-10-01 (Asia/Dhaka)
-**Project:** VESTIBULAR GPS / MindStellar
+**Project:** VESTIBULAR GPS / MindStaller
 **Purpose:** an honest pre-submission evidence pack. It does not grant eligibility,
 replace the official rules, or guarantee acceptance.
 
