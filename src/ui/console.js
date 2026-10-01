@@ -235,6 +235,36 @@ export function mountConsoleSection(ctx = {}) {
     return S.osi;
   }
 
+  /**
+   * A compact, live declaration of what is actually driving this session.
+   * This deliberately describes the active source rather than claiming that
+   * every OSI domain is live just because one browser sensor is available.
+   */
+  function sourceStatus() {
+    const cameraRunning = Boolean(state.camera?.running);
+    const cameraCalibrated = Boolean(state.camera?.calibrated);
+    const motion = state.perms?.motion === 'granted';
+    const orientation = state.perms?.orientation === 'granted';
+    const available = Object.values(S.provenance || {}).filter((p) => p && !String(p).startsWith('unavailable')).length;
+
+    if (state.source === 'REPLAY') {
+      return { kind: 'info', title: 'REPLAY SESSION', detail: `${available}/${DOMAINS.length} channels from an on-device recording — not live data.` };
+    }
+    if (state.source === 'SIMULATION') {
+      return { kind: 'warn', title: 'SIMULATION', detail: `${available}/${DOMAINS.length} channels active. Generated values are for demonstration, never live measurement.` };
+    }
+    if (cameraRunning && cameraCalibrated) {
+      return { kind: 'ok', title: 'LIVE CAMERA · HEAD MOTION ONLY', detail: `${available}/${DOMAINS.length} channels active. Camera estimates head motion locally; eye–head/VOR remains unavailable without eye landmarks.` };
+    }
+    if (cameraRunning) {
+      return { kind: 'warn', title: 'LIVE CAMERA · CALIBRATION NEEDED', detail: `${available}/${DOMAINS.length} channels active. Head-motion estimate is running locally but its noise floor is not calibrated.` };
+    }
+    if (motion || orientation) {
+      return { kind: 'ok', title: 'LIVE DEVICE SENSOR', detail: `${available}/${DOMAINS.length} channels active. Browser orientation/motion drives available channels; it is not a force-plate or eye-tracking instrument.` };
+    }
+    return { kind: 'warn', title: 'NO LIVE SENSOR', detail: `${available}/${DOMAINS.length} channels active. Start SIMULATION, grant a device sensor, run the reaction task, or use an instrument payload.` };
+  }
+
   /* ── Actions ─────────────────────────────────────────── */
   function captureSession() {
     const { values } = readChannels();
@@ -317,6 +347,13 @@ export function mountConsoleSection(ctx = {}) {
   function renderIndex() {
     const o = S.osi;
     const wrap = el('div', { class: 'glass panel console-index' });
+    const source = sourceStatus();
+    const liveSource = el('div', { class: 'console-hint', role: 'status' },
+      el('p', {},
+        el('span', { class: `tag tag-${source.kind}`, text: source.title }),
+        document.createTextNode(` ${source.detail}`),
+      ),
+    );
 
     if (!o?.ok) {
       wrap.append(
@@ -341,6 +378,7 @@ export function mountConsoleSection(ctx = {}) {
             document.createTextNode('run the sensor simulator from section 06, or connect the camera in section 10, then press CAPTURE BASELINE SESSION. Each click stores one session and the counter above moves.')),
           el('p', { class: 'caption', text: 'Channels with no live source are stored as null, never as zero, so the reference never contains a fabricated value.' }),
         ),
+        liveSource,
       );
       return wrap;
     }
@@ -381,6 +419,7 @@ export function mountConsoleSection(ctx = {}) {
         el('p', { text: 'Not a NASA metric and not a diagnosis. The domain structure is mapped from NASA\'s published Sensorimotor Risk DAG; the weights are declared heuristics.' }),
       ),
       hero,
+      liveSource,
     );
     return wrap;
   }
@@ -650,6 +689,10 @@ export function mountConsoleSection(ctx = {}) {
     const out = $('#consoleSymptomsOut');
     if (out) out.textContent = `${S.symptoms}/10`;
     save();
+    /* Symptoms are a real self-report channel. Reflect the crew's new value
+       immediately in the provisional/live reading rather than waiting for the
+       two-second refresh timer or the next unrelated sensor event. */
+    recompute();
   });
   on($('#consoleTask'), 'change', (e) => {
     S.upcomingTask = e.target.value;

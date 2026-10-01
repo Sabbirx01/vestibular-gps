@@ -91,9 +91,12 @@ The local QA server may be running in a background process, but the environment 
 
 ### Licence
 
-- `LICENSE` is proprietary/all-rights-reserved for the project’s own code, written content, visual design and architecture.
+- `LICENSE` is the Apache License, Version 2.0, for the project’s own code,
+  written content, visual design and architecture. This is the effective licence;
+  an older handover note and a historical commit message used the word
+  "proprietary" incorrectly.
 - Three.js in `vendor/three.module.js` retains its own MIT licence.
-- The NASA-derived Earth image added in the current uncommitted work is public-domain/external and must not be claimed by the proprietary project licence. Keep its attribution explicit.
+- The NASA-derived Earth image added in the current uncommitted work is public-domain/external and must not be claimed by the project licence. Keep its attribution explicit.
 - A public GitHub repository cannot technically stop copying. The licence records the legal terms; making the repository private would be the technical access restriction, but that may conflict with public GitHub Pages or competition requirements.
 
 ---
@@ -202,7 +205,7 @@ Still open:
 1. Find suitable public-domain or clearly licensed local lunar and Mars surface maps.
 2. Prefer NASA/USGS/ESA source records with explicit reuse status.
 3. Bundle local assets under `assets/`; do not hotlink external images in the runtime.
-4. Keep third-party attribution separate from the proprietary project licence.
+4. Keep third-party attribution separate from the project's Apache-2.0 licence.
 5. Add the same non-blocking local-texture fallback pattern, or make the asset loading strategy consistent for all bodies.
 6. Verify each button at desktop and mobile sizes before pushing.
 
@@ -264,7 +267,7 @@ GitHub Pages may take a short time to update. Do not report “live” until the
 - Do not rename or move files referenced by docs, deployment or language sync.
 - Do not edit `bn/index.html` directly; it is generated from the main page.
 - Do not hotlink textures or silently import copyrighted reference images.
-- Keep NASA/Three.js/other third-party attribution separate from the proprietary project notice.
+- Keep NASA/Three.js/other third-party attribution separate from the project notice.
 - Before any visual claim, capture at least one real browser screenshot at the relevant viewport.
 - If a browser tab is backgrounded/minimized, treat pointer/rAF plume measurements as invalid and repeat with the tab frontmost.
 - The user asked for Earth first. Do not spend time polishing Moon/Mars until the Earth map has been visibly verified and accepted.

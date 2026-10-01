@@ -85,7 +85,7 @@ are *missing* rather than filled in:
 | Claim | Evidence |
 |---|---|
 | The engine's automated checks pass | `tests/osi.test.result.txt` — `2026-09-30T16:02:49.650Z`, `passed : 93`, `failed : 0`, `ALL TESTS PASSED` |
-| Sources are live, not assumed | `docs/SOURCES.md` — 15 registry URLs re-checked **2026-09-28**; 14 resolved HTTP 200; **source 1 is explicitly marked unconfirmed** (connection timeout, not 404) |
+| Sources are live, not assumed | `docs/SOURCES.md` — the registry was re-checked on **2026-10-01**; all 15 source URLs are recorded as resolved. The earlier 2026-09-28 timeout for source 1 remains documented there as a historical availability issue. |
 | The licence is real and OSI-compatible | `LICENSE` — full Apache-2.0 text; `NOTICE` — attribution record |
 | Attribution cannot silently disappear | The NIH brain model's CC-BY attribution is rendered on the Research page *from the registry*, so it cannot be dropped from the UI (`docs/SOURCES.md`) |
 | Third-party licences | Three.js `r169`, MIT, vendored unmodified (`vendor/three.module.js`; `NOTICE`) · NASA ACES suit, public domain · NIH 3D `3DPX-021161` by Johnson J, **CC-BY 4.0** · NASA Blue Marble, LROC WAC/LOLA, Viking MDIM 2.1, all public domain · the city-lights layer is ours and generated |

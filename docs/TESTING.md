@@ -7,7 +7,7 @@ on screen, so "it renders" is not treated as evidence anywhere below.
 
 ---
 
-## 1. Engine validation — 87 assertions
+## 1. Engine validation — 93 assertions
 
 ```bash
 node tests/osi.test.mjs
