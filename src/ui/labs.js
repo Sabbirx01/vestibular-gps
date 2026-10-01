@@ -1312,7 +1312,7 @@ export function mountResearchSection() {
   function render() {
     btns.forEach((b, k) => b.classList.toggle('is-on', k === active));
     const list = SOURCE_LIST.filter((s) => active === 'all' || s.topics.includes(active));
-    if (count) count.textContent = `${list.length} of ${SOURCE_LIST.length} sources shown · registry last verified ${'2026-09-28'}`;
+    if (count) count.textContent = `${list.length} of ${SOURCE_LIST.length} sources/assets shown · NASA/NIH registry verified 2026-10-01`;
     grid.innerHTML = '';
     list.forEach((s) => {
       const tier = TIER_LABEL[s.tier] || { text: s.tier, cls: '' };

@@ -44,6 +44,7 @@ open — see §5.** Do not submit this as complete until those two are filled in
 | Motion graphics (the OSI diagram, "what's next") | `video-project/06-generated-clips/` | **No** — built in the editor from our own data | screen text |
 | Team portraits | `video-project/03-team-placeholders/processed/` | **Photographs are real; faces untouched.** Backgrounds were normalised, a photographer's watermark and store lettering were removed | `03-team-placeholders/README.md` §1 — faces, skin, hair, teeth, clothing and pose were deliberately not retouched, and earlier AI-generated placeholder faces were deleted |
 | Third-party 3D models and maps | `assets/` | **No** — someone else's published assets, unmodified in substance | `NOTICE`, with the licence for each |
+| Local eye-landmark engine | `vendor/mediapipe/`, `assets/models/face_landmarker.task` | **No** — third-party Apache-2.0 runtime/model, run locally in the browser | `NOTICE`, `docs/SOURCES.md`; it provides experimental face-relative gaze offset only, never clinical VOR/vHIT |
 | Scientific figures and the source registry | `docs/SOURCES.md`, `src/science/content.js` | **No.** Values are published results; the registry URLs were opened and re-checked by hand on 2026-09-28 | `docs/SOURCES.md`, `docs/_source-check.txt` |
 
 The one thing we want to be unambiguous about: **the narration is synthetic
