@@ -528,6 +528,7 @@ export function mountNav({ hub, scene }) {
   const nav = $('#nav');
   const menuBtn = $('#menuToggle');
   const topbar = $('#topbar');
+  let ambient = null;
 
   on(menuBtn, 'click', () => {
     const open = nav.classList.toggle('is-open');
@@ -561,10 +562,44 @@ export function mountNav({ hub, scene }) {
     await hub.switchTo(next);
   });
 
-  /* sound is off by default and only ever procedural — no autoplay, no files */
+  /* Sound is intentionally procedural, local, and opt-in. The earlier control
+     only changed a label/state flag, so it looked enabled while producing no
+     sound. This tiny two-oscillator engine is created inside the user click,
+     which satisfies browser autoplay policy and gives the button a real job. */
+  const startAmbient = async () => {
+    const Audio = window.AudioContext || window.webkitAudioContext;
+    if (!Audio) throw new Error('Web Audio is not supported by this browser');
+    if (!ambient) {
+      const context = new Audio();
+      const master = context.createGain();
+      master.gain.value = 0.026;
+      master.connect(context.destination);
+      const low = context.createOscillator();
+      low.type = 'sine'; low.frequency.value = 55;
+      const high = context.createOscillator();
+      high.type = 'sine'; high.frequency.value = 82.5;
+      const highGain = context.createGain(); highGain.gain.value = 0.24;
+      low.connect(master); high.connect(highGain); highGain.connect(master);
+      low.start(); high.start();
+      ambient = { context, master, low, high };
+    }
+    await ambient.context.resume();
+  };
+  const stopAmbient = async () => {
+    if (!ambient) return;
+    await ambient.context.suspend();
+  };
   const soundBtn = $('#soundToggle');
-  on(soundBtn, 'click', () => {
+  on(soundBtn, 'click', async () => {
     const next = !state.sound;
+    try {
+      if (next) await startAmbient();
+      else await stopAmbient();
+    } catch (error) {
+      console.warn('[sound]', error);
+      toast('SOUND UNAVAILABLE', 'This browser could not start its local audio engine.', 'warn', 5200);
+      return;
+    }
     set({ sound: next }, ['sound']);
     soundBtn.textContent = next ? 'SOUND ON' : 'SOUND OFF';
     soundBtn.setAttribute('aria-pressed', String(next));

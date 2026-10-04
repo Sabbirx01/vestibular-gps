@@ -384,6 +384,39 @@
 .mission-answer .mission-answer-title { margin-bottom: 9px; color: var(--cyan); font: 700 var(--fs-xs) var(--font-mono); letter-spacing: var(--ls-label); }
 .mission-answer .mission-answer-meta { margin-top: 16px; color: var(--faint); font: var(--fs-2xs) var(--font-mono); letter-spacing: .04em; }
 
+/* The assistant is a persistent, on-demand tool. It is not content that makes
+   the Integration page longer: the top-bar AI button opens this fixed window. */
+.chip-ai { color: var(--cyan) !important; border-color: rgba(95, 227, 255, .36) !important; box-shadow: inset 0 0 18px rgba(95, 227, 255, .05); }
+.chip-ai[aria-expanded='true'] { background: rgba(95, 227, 255, .15) !important; box-shadow: 0 0 18px rgba(95, 227, 255, .18); }
+.mission-popover {
+  position: fixed;
+  z-index: 240;
+  top: calc(var(--topbar-h) + 14px);
+  right: clamp(14px, 3vw, 38px);
+  width: min(460px, calc(100vw - 28px));
+  max-height: min(670px, calc(100svh - var(--topbar-h) - 28px));
+  overflow: auto;
+  border: 1px solid rgba(95, 227, 255, .42);
+  border-radius: 18px;
+  background: rgba(4, 10, 23, .96);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, .54), 0 0 46px rgba(38, 156, 214, .14);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.mission-popover[hidden] { display: none !important; }
+.mission-popover-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--line); color: var(--cyan); font: 700 var(--fs-2xs) var(--font-mono); letter-spacing: .12em; }
+.mission-close { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--text-2); font: 400 23px/1 sans-serif; cursor: pointer; }
+.mission-close:hover, .mission-close:focus-visible { color: var(--white); border-color: var(--cyan); outline: none; }
+.mission-popover .mission-assistant { padding: 16px; border: 0; background: transparent; box-shadow: none; }
+.mission-popover .panel-head { margin-bottom: 0; }
+.mission-popover .panel-head h3 { font-size: var(--fs-h3); }
+.mission-popover .panel-head p { font-size: var(--fs-sm); }
+.mission-popover .mission-grid { grid-template-columns: 1fr; gap: 10px; margin-top: 14px; }
+.mission-popover .mission-questions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.mission-popover .mission-question { min-height: 48px; padding: 9px 10px; font-size: 10px; }
+.mission-popover .mission-answer { min-height: 132px; padding: 14px; }
+.mission-popover .caption { margin-top: 13px; font-size: var(--fs-2xs); }
+
 /* ── Ingest ─────────────────────────────────────────────── */
 .ingest-box {
   width: 100%;
@@ -423,6 +456,7 @@
   .cam-readout-grid, .cam-verify { grid-template-columns: 1fr; }
   .cam-verify-head { grid-column: auto; }
   .mission-grid { grid-template-columns: 1fr; }
+  .mission-popover .mission-questions { grid-template-columns: 1fr; }
   .flow-step { grid-template-columns: 34px 1fr; }
   .flow-step span { grid-column: 2; }
   .matrix { display: block; overflow-x: auto; white-space: nowrap; }

@@ -393,7 +393,7 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
   .sec-space .stage-canvas { min-height: 400px; }
   .topbar { padding: 0 var(--sp-3); gap: var(--sp-3); }
   .brand-text small { display: none; }
-  .topbar-tools .chip-ghost:not(#menuToggle) { display: none; }
+  .topbar-tools .chip-ghost:not(#menuToggle):not(#assistantToggle) { display: none; }
   .topbar-tools .chip { padding: 6px 10px; }
   .hero-specs { grid-template-columns: minmax(0,1fr); }
   .spec-v { font-size: 1.6rem; }

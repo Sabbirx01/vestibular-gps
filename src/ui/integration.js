@@ -130,6 +130,7 @@ export function mountIntegrationSection({ camera } = {}) {
   if (!root) return null;
 
   const S = { lastIngest: null, camera };
+  let assistantShell = null;
 
   function render() {
     root.replaceChildren(
@@ -138,7 +139,6 @@ export function mountIntegrationSection({ camera } = {}) {
       renderTransports(),
       renderHardware(),
       renderCamera(),
-      renderMissionAssistant(),
       renderIngest(),
     );
   }
@@ -811,6 +811,35 @@ export function mountIntegrationSection({ camera } = {}) {
     }
   }
 
+  function mountFloatingMissionAssistant() {
+    /* The assistant belongs to the product shell, not to a long scrolled
+       integration panel. Its answers still use exactly the same live state;
+       only the presentation moves to a compact, on-demand chat window. */
+    if (document.getElementById('missionAssistant')) return;
+    const trigger = $('#assistantToggle');
+    const close = el('button', { type: 'button', class: 'mission-close', text: '×', 'aria-label': 'Close mission assistant' });
+    assistantShell = el('aside', {
+      id: 'missionAssistant', class: 'mission-popover', role: 'dialog',
+      'aria-label': 'Local Mission Assistant', 'aria-modal': 'false', hidden: true,
+    },
+    el('div', { class: 'mission-popover-top' },
+      el('span', { text: '● LOCAL AI · LIVE DATA ONLY' }), close,
+    ),
+    renderMissionAssistant(),
+    );
+    document.body.append(assistantShell);
+
+    const setOpen = (open) => {
+      assistantShell.hidden = !open;
+      assistantShell.classList.toggle('is-open', open);
+      trigger?.setAttribute('aria-expanded', String(open));
+      if (open) assistantShell.querySelector('.mission-question')?.focus();
+    };
+    on(trigger, 'click', () => setOpen(assistantShell.hidden));
+    on(close, 'click', () => setOpen(false));
+    on(document, 'keydown', (e) => { if (e.key === 'Escape' && !assistantShell.hidden) setOpen(false); });
+  }
+
   /* ── 7. Live ingest ──────────────────────────────────── */
   function renderIngest() {
     const ta = el('textarea', {
@@ -923,5 +952,6 @@ export function mountIntegrationSection({ camera } = {}) {
   /* ── Boot ────────────────────────────────────────────── */
   bus.on('sensor', () => render());
   render();
+  mountFloatingMissionAssistant();
   return { render, get state() { return S; } };
 }
