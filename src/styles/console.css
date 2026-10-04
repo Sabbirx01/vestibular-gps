@@ -333,19 +333,23 @@
 .cam-verify {
   margin-top: var(--sp-3);
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
   border-radius: 11px;
   overflow: hidden;
 }
-.cam-verify-head { background: var(--panel-solid); }
+.cam-verify-head { grid-column: 1 / -1; background: var(--panel-solid); }
 .cam-verify-head span:first-child { color: var(--white); letter-spacing: 0.08em; }
 
 .cam-rows { display: grid; gap: 1px; margin-top: var(--sp-3); background: var(--line); border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
 .cam-row { display: flex; justify-content: space-between; gap: 14px; padding: 10px 14px; background: var(--panel-solid); font-size: var(--fs-sm); }
 .cam-row span { color: var(--faint); font-family: var(--font-mono); font-size: var(--fs-xs); }
 .cam-row b { color: var(--cyan); font-family: var(--font-mono); font-size: var(--fs-xs); }
+.cam-readout-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cam-readout-grid .cam-row, .cam-verify .cam-row { min-width: 0; padding: 8px 10px; }
+.cam-readout-grid .cam-row b, .cam-verify .cam-row b { max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 
 /* ── Ingest ─────────────────────────────────────────────── */
 .ingest-box {
@@ -383,6 +387,8 @@
 @media (max-width: 900px) {
   .osi-hero { grid-template-columns: 1fr; }
   .cam-stage { grid-template-columns: 1fr; }
+  .cam-readout-grid, .cam-verify { grid-template-columns: 1fr; }
+  .cam-verify-head { grid-column: auto; }
   .flow-step { grid-template-columns: 34px 1fr; }
   .flow-step span { grid-column: 2; }
   .matrix { display: block; overflow-x: auto; white-space: nowrap; }

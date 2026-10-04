@@ -354,7 +354,7 @@ export function mountIntegrationSection({ camera } = {}) {
         eyeMap,
       ),
       verifyBox,
-      el('div', { class: 'cam-rows' }, ...Object.values(liveRows)),
+      el('div', { class: 'cam-rows cam-readout-grid' }, ...Object.values(liveRows)),
       el('div', { class: 'cam-rows' },
         el('div', { class: 'cam-row' }, el('span', { text: 'CALIBRATION' }),
           el('span', { class: `tag tag-${calColour}`, text: calState })),
@@ -505,7 +505,10 @@ export function mountIntegrationSection({ camera } = {}) {
         const locked = f.status === 'locked';
         g.strokeStyle = locked ? 'rgba(95,227,255,0.95)' : 'rgba(255,189,87,0.9)';
         g.lineWidth = 1.5;
-        g.strokeRect(x, y, w, h);
+        g.beginPath();
+        if (g.roundRect) g.roundRect(x, y, w, h, Math.min(16, w * 0.1, h * 0.1));
+        else g.rect(x, y, w, h);
+        g.stroke();
         const arm = Math.max(8, Math.min(18, w * 0.22, h * 0.22));
         g.lineWidth = 3;
         g.beginPath();
@@ -566,9 +569,9 @@ export function mountIntegrationSection({ camera } = {}) {
            hiding the actual eye contours. Depth changes the dot intensity. */
         for (let i = 0; i < 468; i += 2) {
           const pt = pts[i];
-          const alpha = Math.max(0.08, Math.min(0.28, 0.20 - (pt.z || 0) * 1.6));
+          const alpha = Math.max(0.07, Math.min(0.23, 0.16 - (pt.z || 0) * 1.25));
           eg.fillStyle = `rgba(89,220,255,${alpha})`;
-          eg.fillRect(px(pt) - 1, py(pt) - 1, 2, 2);
+          eg.fillRect(px(pt) - 1.5, py(pt) - 1.5, 3, 3);
         }
         const trace = (ids, colour, width = 1.5) => {
           eg.strokeStyle = colour; eg.lineWidth = width; eg.beginPath();
