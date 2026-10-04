@@ -138,6 +138,7 @@ export function mountIntegrationSection({ camera } = {}) {
       renderTransports(),
       renderHardware(),
       renderCamera(),
+      renderMissionAssistant(),
       renderIngest(),
     );
   }
@@ -722,7 +723,95 @@ export function mountIntegrationSection({ camera } = {}) {
     }
   }
 
-  /* ── 6. Live ingest ──────────────────────────────────── */
+  /* ── 6. Local, evidence-grounded mission assistant ────
+     This is deliberately not an online LLM and it never invents a medical
+     conclusion. A click evaluates the state that is actually available in
+     this browser at that moment: camera telemetry, the captured baseline and
+     the console's current advisory. It is a useful mission UI pattern for a
+     comm-limited setting, and it stays honest when a channel is absent. */
+  function renderMissionAssistant() {
+    const answer = el('div', { class: 'mission-answer', role: 'status', 'aria-live': 'polite' },
+      el('p', { class: 'mission-answer-title', text: 'SELECT A QUESTION' }),
+      el('p', { text: 'This local assistant will check the signals currently available in this browser. It does not use an online AI service and does not make a diagnosis.' }),
+    );
+
+    const questions = [
+      ['Is the camera ready?', () => {
+        const c = state.camera;
+        if (!c?.running) return report('CAMERA NOT RUNNING', 'No live camera signal is available. Start Camera Scan before relying on face, head-motion, or eye-landmark readouts.');
+        const lock = c.face?.status === 'locked';
+        return report(lock ? 'CAMERA SIGNAL ACTIVE' : 'CAMERA SIGNAL LIMITED', `Camera is running at ${Number(c.rateHz || 0).toFixed(1)} Hz. Face lock is ${lock ? 'currently held' : 'not currently held'}, and signal quality is ${Math.round((c.quality || 0) * 100)}%.`);
+      }],
+      ['Are eye landmarks available?', () => {
+        const eye = state.camera?.eye;
+        if (!state.camera?.running) return report('EYE SIGNAL UNAVAILABLE', 'The camera is off, so no eye landmarks can be checked.');
+        if (!eye?.available) return report('EYE SIGNAL UNAVAILABLE', `No stable local face/iris landmarks are available right now (${String(eye?.status || 'waiting for a face')}). No gaze value is being inferred.`);
+        return report('LOCAL EYE LANDMARKS ACTIVE', `The bundled on-device model has stable eye/iris landmarks with ${Math.round((eye.confidence || 0) * 100)}% confidence. This is an experimental face-relative signal, not VOR gain or clinical vHIT.`);
+      }],
+      ['Do I need calibration?', () => {
+        const c = state.camera;
+        if (!c?.running) return report('CALIBRATION UNAVAILABLE', 'Start the camera first. A calibration requires a live, still-camera interval.');
+        if (!c.calibrated) return report('CALIBRATION NEEDED', 'Noise floor and your neutral reference have not been measured. Hold still and use CALIBRATE before interpreting motion or pose changes.');
+        if (!c.neutral) return report('CALIBRATION PARTIAL', 'A noise floor was measured, but no reliable neutral face reference was captured. Improve lighting, face the camera, then calibrate again.');
+        return report('CALIBRATION PRESENT', 'A personal noise floor and neutral reference are stored for this live camera session. Recalibrate if lighting, camera position, or the subject changes.');
+      }],
+      ['What is live right now?', () => {
+        const c = state.camera;
+        const pieces = [];
+        if (c?.running) pieces.push(`camera head motion (${Number(c.headMotion || 0).toFixed(2)} deg/s)`);
+        if (c?.eye?.available) pieces.push('local eye/iris landmarks');
+        if (state.perms?.orientation === 'granted') pieces.push('device orientation');
+        if (state.perms?.motion === 'granted') pieces.push('device motion');
+        if (!pieces.length) return report('NO LIVE SIGNAL', 'No browser sensor channel is active. You can start the camera, grant a device sensor, or ingest a documented instrument payload.');
+        return report('LIVE SIGNALS', `Available now: ${pieces.join(', ')}. Other mission domains remain unavailable until their real instrument data is connected or ingested.`);
+      }],
+      ['Can this measure VOR?', () => report('CLINICAL VOR UNAVAILABLE', 'No. A normal webcam cannot produce clinical VOR gain or a vHIT result. This project needs validated high-frame-rate eye/head instrumentation for that channel. The local eye display is only an experimental face-relative landmark check.')],
+      ['Is the readiness index ready?', () => {
+        const con = window.__VGPS_CONSOLE__?.state;
+        const count = con?.sessions?.length || 0;
+        if (count < 3) return report('REFERENCE NOT READY', `${count}/3 baseline sessions are captured. Capture at least three real sessions before treating the personal reference as stable.`);
+        if (!con?.osi?.ok) return report('INDEX UNAVAILABLE', `A baseline exists (${count} sessions), but the current index cannot be reported: ${con?.osi?.reason || 'insufficient compatible live channels'}.`);
+        return report('READINESS INDEX AVAILABLE', `Current OSI is ${con.osi.value} with ${con.osi.domainsAvailable}/${con.osi.domainsExpected} domains available. Read the confidence and advisory beside the index; it is an operational trend, not a diagnosis.`);
+      }],
+      ['What should I do next?', () => {
+        const con = window.__VGPS_CONSOLE__?.state;
+        const c = state.camera;
+        if (!c?.running) return report('NEXT STEP', 'Start Camera Scan, keep your face in frame, then calibrate while still. This gives the browser its only currently supported local live signal.');
+        if (!c.calibrated || !c.neutral) return report('NEXT STEP', 'Hold still and calibrate. The system needs this camera’s noise floor and your own neutral reference before comparing motion.');
+        if ((con?.sessions?.length || 0) < 3) return report('NEXT STEP', `Capture baseline sessions after a valid setup. ${con?.sessions?.length || 0}/3 are stored; three or more establish the personal reference.`);
+        return report('NEXT STEP', con?.adv?.detail || 'Review the current advisory and repeat the relevant real measurement if a change needs confirmation.');
+      }],
+    ];
+
+    const ask = (label, getAnswer) => el('button', {
+      type: 'button', class: 'mission-question', text: label,
+      onclick: () => answer.replaceChildren(...getAnswer()),
+    });
+
+    return el('div', { class: 'glass panel mission-assistant' },
+      el('div', { class: 'panel-head' },
+        el('p', { class: 'eyebrow', text: 'LOCAL MISSION ASSISTANT' }),
+        el('h3', { text: 'Ask the instrument, not the internet' }),
+        el('p', { text: 'Tap a common question. The answer is generated locally from the current browser signals and the project’s own safety rules—no server, cloud AI, camera upload, or fabricated result.' }),
+      ),
+      el('div', { class: 'mission-grid' },
+        el('div', { class: 'mission-questions' }, ...questions.map(([label, fn]) => ask(label, fn))),
+        answer,
+      ),
+      el('p', { class: 'caption', text: 'Scope: this assistant explains only the telemetry that is truly present in this session. It cannot diagnose, replace a flight surgeon, or turn webcam landmarks into a clinical vestibular test.' }),
+    );
+
+    function report(title, text) {
+      const source = state.camera?.running ? 'LIVE BROWSER DATA' : 'NO LIVE CAMERA DATA';
+      return [
+        el('p', { class: 'mission-answer-title', text: title }),
+        el('p', { text }),
+        el('p', { class: 'mission-answer-meta', text: `${source} · checked ${new Date().toLocaleTimeString()}` }),
+      ];
+    }
+  }
+
+  /* ── 7. Live ingest ──────────────────────────────────── */
   function renderIngest() {
     const ta = el('textarea', {
       class: 'ingest-box', spellcheck: 'false', rows: '12',

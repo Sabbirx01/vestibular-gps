@@ -351,6 +351,39 @@
 .cam-readout-grid .cam-row, .cam-verify .cam-row { min-width: 0; padding: 8px 10px; }
 .cam-readout-grid .cam-row b, .cam-verify .cam-row b { max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 
+/* ── Local mission assistant ───────────────────────────── */
+.mission-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, .82fr) minmax(0, 1.18fr);
+  gap: 12px;
+  margin-top: var(--sp-3);
+}
+.mission-questions { display: grid; gap: 7px; align-content: start; }
+.mission-question {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(8, 17, 33, .76);
+  color: var(--text-2);
+  text-align: left;
+  font: 600 var(--fs-xs) var(--font-mono);
+  letter-spacing: .025em;
+  cursor: pointer;
+  transition: border-color .18s ease, background .18s ease, color .18s ease;
+}
+.mission-question:hover, .mission-question:focus-visible { border-color: var(--cyan); background: rgba(45, 177, 220, .11); color: var(--white); outline: none; }
+.mission-answer {
+  min-height: 182px;
+  padding: 18px;
+  border: 1px solid rgba(95, 227, 255, .28);
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgba(19, 56, 84, .38), rgba(6, 12, 25, .84));
+}
+.mission-answer p { margin: 0; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.65; }
+.mission-answer .mission-answer-title { margin-bottom: 9px; color: var(--cyan); font: 700 var(--fs-xs) var(--font-mono); letter-spacing: var(--ls-label); }
+.mission-answer .mission-answer-meta { margin-top: 16px; color: var(--faint); font: var(--fs-2xs) var(--font-mono); letter-spacing: .04em; }
+
 /* ── Ingest ─────────────────────────────────────────────── */
 .ingest-box {
   width: 100%;
@@ -389,6 +422,7 @@
   .cam-stage { grid-template-columns: 1fr; }
   .cam-readout-grid, .cam-verify { grid-template-columns: 1fr; }
   .cam-verify-head { grid-column: auto; }
+  .mission-grid { grid-template-columns: 1fr; }
   .flow-step { grid-template-columns: 34px 1fr; }
   .flow-step span { grid-column: 2; }
   .matrix { display: block; overflow-x: auto; white-space: nowrap; }
