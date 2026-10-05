@@ -823,13 +823,18 @@ export function mountIntegrationSection({ camera } = {}) {
         const irisRing = (ids) => {
           const cx = ids.reduce((sum, id) => sum + px(pts[id]), 0) / ids.length;
           const cy = ids.reduce((sum, id) => sum + py(pts[id]), 0) / ids.length;
-          const radius = Math.max(4.2, ...ids.map((id) => Math.hypot(px(pts[id]) - cx, py(pts[id]) - cy))) * 1.18;
-          eg.save(); eg.shadowColor = 'rgba(255,194,92,1)'; eg.shadowBlur = 16;
-          eg.fillStyle = 'rgba(255,188,82,.15)'; eg.beginPath(); eg.arc(cx, cy, radius, 0, Math.PI * 2); eg.fill();
-          eg.strokeStyle = 'rgba(255,209,128,1)'; eg.lineWidth = 2; eg.stroke();
-          eg.shadowBlur = 6; eg.beginPath(); eg.arc(cx, cy, radius * .48, 0, Math.PI * 2); eg.strokeStyle = 'rgba(255,239,202,.85)'; eg.lineWidth = 1; eg.stroke();
+          const measured = Math.max(...ids.map((id) => Math.hypot(px(pts[id]) - cx, py(pts[id]) - cy)));
+          /* Iris points surround the visible iris, but drawing their full
+             radius looked like oversized goggles. A smaller ring marks the
+             pupil/iris centre at a natural scale while remaining tied to the
+             measured landmark centroid. */
+          const radius = Math.max(2.15, measured * .58);
+          eg.save(); eg.shadowColor = 'rgba(255,194,92,.9)'; eg.shadowBlur = 9;
+          eg.fillStyle = 'rgba(255,188,82,.10)'; eg.beginPath(); eg.arc(cx, cy, radius, 0, Math.PI * 2); eg.fill();
+          eg.strokeStyle = 'rgba(255,214,145,.92)'; eg.lineWidth = 1.25; eg.stroke();
+          eg.shadowBlur = 3; eg.beginPath(); eg.arc(cx, cy, radius * .38, 0, Math.PI * 2); eg.strokeStyle = 'rgba(255,242,215,.72)'; eg.lineWidth = .75; eg.stroke();
           eg.restore();
-          eg.fillStyle = 'rgba(255,251,237,.98)'; eg.beginPath(); eg.arc(cx, cy, 1.5, 0, Math.PI * 2); eg.fill();
+          eg.fillStyle = 'rgba(255,251,237,.98)'; eg.beginPath(); eg.arc(cx, cy, .9, 0, Math.PI * 2); eg.fill();
         };
         irisRing([468, 469, 470, 471, 472]);
         irisRing([473, 474, 475, 476, 477]);

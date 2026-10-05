@@ -1450,7 +1450,7 @@ function mountResearchEvidence() {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const panel = root.querySelector('.research-evidence');
   const stage = root.querySelector('.evidence-stage');
-  const transitionMs = 760;
+  const transitionMs = 900;
 
   /* Warm the next two source screenshots before they are needed. This removes
      the first-slide hitch caused by lazy decoding a large full-page capture at
@@ -1481,7 +1481,7 @@ function mountResearchEvidence() {
   };
   const restart = () => {
     clearInterval(timer);
-    if (!reduce) timer = setInterval(() => move(1), 6800);
+    if (!reduce) timer = setInterval(() => move(1), 5100);
   };
   prev.addEventListener('click', () => { move(-1); restart(); });
   next.addEventListener('click', () => { move(1); restart(); });
