@@ -298,35 +298,17 @@
   margin-top: var(--sp-3);
 }
 .cam-stage-single { display: block; position: relative; }
-/* A live scanline texture over the whole preview, so the feed reads as an
-   instrument view rather than a plain video element. Presentation only: it
-   carries no data, and it freezes under reduced motion. */
-.cam-stage-single::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 11px;
-  pointer-events: none;
-  background:
-    radial-gradient(120% 90% at 50% 0%, rgba(95,227,255,0.05), transparent 62%),
-    repeating-linear-gradient(0deg, rgba(95,227,255,0.045) 0 1px, transparent 1px 3px);
-  opacity: 0.75;
-  animation: cam-scan 9s linear infinite;
-}
-@keyframes cam-scan { to { background-position: 0 0, 0 24px; } }
-html[data-reduced-motion="true"] .cam-stage-single::after { animation: none; }
 .cam-stage-dual { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); max-width: 1120px; }
 .cam-video {
   width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: 11px;
-  border: 1px solid rgba(95, 227, 255, 0.26);
+  border: 1px solid var(--line);
   background: #03060e;
   object-fit: cover;
   display: block;
   transform: scaleX(-1);
   opacity: 0.96;
-  box-shadow: 0 0 26px -12px rgba(95, 227, 255, 0.5);
 }
 .cam-overlay {
   position: absolute;
@@ -341,14 +323,20 @@ html[data-reduced-motion="true"] .cam-stage-single::after { animation: none; }
   width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: 11px;
-  border: 1px solid rgba(95, 227, 255, 0.30);
+  border: 1px solid rgba(95, 227, 255, 0.34);
   display: block;
   background: #050b16;
   box-shadow:
-    inset 0 0 50px rgba(52, 161, 255, 0.08),
+    inset 0 0 60px rgba(52, 161, 255, 0.10),
     0 0 0 1px rgba(95, 227, 255, 0.10),
-    0 0 30px -10px rgba(95, 227, 255, 0.55);
+    0 0 34px -12px rgba(95, 227, 255, 0.60);
+  animation: eye-map-breathe 2.8s ease-in-out infinite;
 }
+@keyframes eye-map-breathe {
+  0%, 100% { border-color: rgba(95, 227, 255, 0.30); box-shadow: inset 0 0 60px rgba(52,161,255,.10), 0 0 0 1px rgba(95,227,255,.10), 0 0 34px -12px rgba(95,227,255,.52); }
+  50% { border-color: rgba(139,255,210,.70); box-shadow: inset 0 0 72px rgba(52,161,255,.18), 0 0 0 1px rgba(139,255,210,.24), 0 0 48px -9px rgba(95,227,255,.82); }
+}
+@media (prefers-reduced-motion: reduce) { .cam-eye-map { animation: none; } }
 
 /* Verification readout: the verdict, then the checks it is made of. */
 .cam-verify {
