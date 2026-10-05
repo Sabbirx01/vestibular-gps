@@ -637,6 +637,23 @@ export function mountIntegrationSection({ camera } = {}) {
         halo.addColorStop(1, 'rgba(52,161,255,0)');
         eg.fillStyle = halo; eg.fillRect(0, 0, mw, mh);
 
+        /* Soft eye sockets add depth under the brows. These are shaded around
+           the live eye-landmark centroids—not a painted replacement face. */
+        const socket = (ids) => {
+          const cx = ids.reduce((sum, id) => sum + px(pts[id]), 0) / ids.length;
+          const cy = ids.reduce((sum, id) => sum + py(pts[id]), 0) / ids.length;
+          const rx = Math.max(12, Math.abs(px(pts[ids[0]]) - px(pts[ids[3]])) * .95);
+          eg.save(); eg.translate(cx, cy); eg.scale(rx, rx * .52);
+          const shade = eg.createRadialGradient(0, .15, .04, 0, 0, 1);
+          shade.addColorStop(0, 'rgba(1,7,18,.52)');
+          shade.addColorStop(.58, 'rgba(4,21,41,.24)');
+          shade.addColorStop(1, 'rgba(4,12,25,0)');
+          eg.fillStyle = shade; eg.fillRect(-1.15, -1.15, 2.3, 2.3);
+          eg.restore();
+        };
+        socket([33, 160, 158, 133, 153, 144]);
+        socket([362, 385, 387, 263, 373, 380]);
+
         /* the model: every landmark as a pixel, coloured and sized by its own
            measured depth (violet far, cyan near) so the face reads as a form */
         let z0 = Infinity, z1 = -Infinity;
@@ -685,11 +702,13 @@ export function mountIntegrationSection({ camera } = {}) {
           eg.shadowColor = colour; eg.shadowBlur = 7;
           return () => eg.restore();
         };
-        /* Full cranium boundary: top/back of head plus the measured jaw/front. */
+        /* The cranium is only an upper-head arc. Keeping the display shell out
+           of the cheeks and chin lets the actual landmark jaw shape win, so it
+           reads as a human face rather than a round helmet. */
         let restore = wire('#74eaff', .62, 1.25);
         eg.beginPath();
         for (let i = 0; i <= 42; i++) {
-          const p = headPoint(Math.PI * 1.08 + (Math.PI * 1.83 * i / 42));
+          const p = headPoint(Math.PI + (Math.PI * i / 42));
           i ? eg.lineTo(p.x, p.y) : eg.moveTo(p.x, p.y);
         }
         eg.stroke(); restore();
@@ -697,7 +716,7 @@ export function mountIntegrationSection({ camera } = {}) {
         /* Horizontal and vertical wireframe curves make the outline read as a
            complete head volume, while keeping the live face landmarks clear. */
         restore = wire('rgba(103,221,255,.75)', .42, .65);
-        [-.62, -.31, 0, .31, .62].forEach((lat) => {
+        [-.68, -.42, -.16, .10].forEach((lat) => {
           const yy = hcY + lat * headRY;
           const half = headRX * Math.sqrt(Math.max(0.06, 1 - lat * lat));
           eg.beginPath();
@@ -711,7 +730,7 @@ export function mountIntegrationSection({ camera } = {}) {
         [-.72, -.42, -.14, .14, .42, .72].forEach((lon) => {
           const xx = hcX + lon * headRX;
           const top = hcY - headRY * Math.sqrt(Math.max(0.06, 1 - lon * lon));
-          const bottom = hcY + headRY * Math.sqrt(Math.max(0.06, 1 - lon * lon));
+          const bottom = Math.min(hcY + headRY * .30, hcY + headRY * Math.sqrt(Math.max(0.06, 1 - lon * lon)));
           eg.beginPath();
           for (let i = 0; i <= 20; i++) {
             const yy = top + (bottom - top) * i / 20;
@@ -787,8 +806,8 @@ export function mountIntegrationSection({ camera } = {}) {
         openTrace([336, 296, 334, 293, 300], brow, 1.3, 6);
         openTrace([6, 197, 195, 5, 4], 'rgba(130,208,255,0.74)', 1.05, 5);
         openTrace([98, 97, 2, 326, 327], 'rgba(130,208,255,0.74)', 1.05, 5);
-        trace([61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146], 'rgba(172,124,255,0.88)', 1.3, 7);
-        trace([78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 42, 183], 'rgba(185,148,255,0.55)', .75, 4);
+        trace([61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146], 'rgba(106,213,255,0.76)', 1.25, 7);
+        trace([78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 42, 183], 'rgba(156,235,255,0.42)', .72, 4);
         openTrace([234, 93, 132, 58], 'rgba(100,213,255,0.45)', .8, 3);
         openTrace([454, 323, 361, 288], 'rgba(100,213,255,0.45)', .8, 3);
         /* Sparse real-point links imply a premium wire mesh, without filling
