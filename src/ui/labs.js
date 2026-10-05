@@ -1289,6 +1289,7 @@ export function mountResearchSection() {
   if (!grid) return;
 
   mountResearchEvidence();
+  mountSpaceAppsLinks();
 
   const TIER_LABEL = {
     INSTITUTE: { text: 'NIH', cls: 'is-live' },
@@ -1422,6 +1423,92 @@ function mountResearchEvidence() {
   root.querySelector('.research-evidence').addEventListener('pointerenter', () => clearInterval(timer));
   root.querySelector('.research-evidence').addEventListener('pointerleave', restart);
   render(); restart();
+}
+
+/* ── NASA Space Apps participation links ─────────────────────
+   These are deliberately separate from SOURCES: they are event, local
+   registration and team-workflow resources, not scientific evidence for a
+   vestibular claim.  Keeping that boundary visible makes the citation list
+   more honest for judges. */
+function mountSpaceAppsLinks() {
+  const root = $('#spaceAppsLinks');
+  if (!root) return;
+  const links = [
+    {
+      label: 'OFFICIAL GLOBAL',
+      title: 'NASA Space Apps Challenge 2026',
+      detail: 'Account creation, event selection, team formation and final project submission.',
+      url: 'https://www.spaceappschallenge.org/2026/',
+      official: true,
+    },
+    {
+      label: 'OFFICIAL TERMS',
+      title: '2026 Participant Terms and Conditions',
+      detail: 'Eligibility, submission and participation conditions for the global challenge.',
+      url: 'https://www.spaceappschallenge.org/legal/',
+      official: true,
+    },
+    {
+      label: 'LOCAL REGISTRATION',
+      title: 'NASA Space Apps Challenge Bangladesh',
+      detail: 'Bangladesh local-event registration and organiser information.',
+      url: 'https://www.nasaspaceappsbd.com/registration',
+      official: false,
+    },
+    {
+      label: 'PARTICIPANT GUIDE',
+      title: '2026 Participant Guide',
+      detail: 'Shared organiser/participant reference supplied by the team.',
+      url: 'https://docs.google.com/document/d/1mSOxplyht5kii8GcCnFaGA-vMHIAVypjl4N6PobnaYQ/edit?usp=sharing',
+      official: false,
+    },
+    {
+      label: 'FAQ NOTEBOOK',
+      title: 'Participant Guide FAQ',
+      detail: 'NotebookLM companion resource supplied by the team; verify any rule against the official site.',
+      url: 'https://notebook.google.com/notebook/44e5e9a3-5387-4191-8687-b44766aee09e',
+      official: false,
+    },
+    {
+      label: 'BUILD WORKFLOW',
+      title: '2026 Space Apps Build Guide',
+      detail: 'Team-supplied build-planning reference; not an official NASA rulebook.',
+      url: 'https://claude.ai/artifact/PUnJNpKuEXRbvKafSgU6fA',
+      official: false,
+    },
+    {
+      label: 'COMMUNITY',
+      title: 'Participants WhatsApp Group 1',
+      detail: 'Community coordination link supplied by the team. Join only if you recognise the organiser.',
+      url: 'https://chat.whatsapp.com/Hw5P1SXKyYB1BJ0zVN607M?mode=gi_t',
+      official: false,
+    },
+    {
+      label: 'COMMUNITY',
+      title: 'Participants WhatsApp Group 2',
+      detail: 'Community coordination link supplied by the team. Join only if you recognise the organiser.',
+      url: 'https://chat.whatsapp.com/DF7VS6T3QTH4clY1zenCko',
+      official: false,
+    },
+  ];
+  const cards = links.map((item) => el('a', {
+    class: `spaceapps-link ${item.official ? 'is-official' : ''}`,
+    href: item.url,
+    target: '_blank',
+    rel: 'noopener noreferrer',
+  },
+  el('span', { class: 'spaceapps-kind', text: item.label }),
+  el('h4', { text: item.title }),
+  el('p', { text: item.detail }),
+  el('span', { class: 'spaceapps-open', text: 'OPEN LINK ↗' })));
+  root.replaceChildren(el('section', { class: 'glass panel spaceapps-links reveal is-in' },
+    el('div', { class: 'panel-head' },
+      el('p', { class: 'eyebrow', text: 'NASA SPACE APPS 2026 · PARTICIPATION RESOURCES' }),
+      el('h3', { text: 'Build, register, and submit with the right references' }),
+      el('p', { text: 'Official challenge links are marked separately. Community and team-supplied guides are useful navigation aids, but the official Global site and Terms control eligibility and submission rules.' }),
+    ),
+    el('div', { class: 'spaceapps-grid' }, ...cards),
+  ));
 }
 
 /* ═══════════════════════════════════════════════════════════
