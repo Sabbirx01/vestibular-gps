@@ -359,6 +359,14 @@
 .cam-readout-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .cam-readout-grid .cam-row, .cam-verify .cam-row { min-width: 0; padding: 8px 10px; }
 .cam-readout-grid .cam-row b, .cam-verify .cam-row b { max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.cam-methods { margin-top: var(--sp-3); border:1px solid var(--line); border-radius:10px; background:rgba(7,16,31,.50); }
+.cam-methods summary { padding:10px 13px; color:var(--cyan); cursor:pointer; list-style:none; font:700 var(--fs-2xs) var(--font-mono); letter-spacing:.08em; }
+.cam-methods summary::-webkit-details-marker { display:none; }
+.cam-methods summary::after { content:'+'; float:right; color:var(--faint); font-size:1rem; line-height:.8; }
+.cam-methods[open] summary { border-bottom:1px solid var(--line); }
+.cam-methods[open] summary::after { content:'–'; }
+.cam-methods-copy { display:grid; gap:9px; padding:12px 13px 14px; }
+.cam-methods-copy p { color:var(--muted); font-size:var(--fs-xs); line-height:1.55; }
 
 /* ── Local mission assistant ───────────────────────────── */
 .mission-grid {
@@ -472,11 +480,22 @@
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 900px) {
   .osi-hero { grid-template-columns: 1fr; }
-  .cam-stage { grid-template-columns: 1fr; }
-  .cam-readout-grid, .cam-verify { grid-template-columns: 1fr; }
-  .cam-verify-head { grid-column: auto; }
+  /* Keep the instrument's desktop two-screen relationship on tablets and
+     phones. Type and controls reduce instead of moving the scan below video. */
+  .cam-stage { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap:8px; }
+  .cam-readout-grid, .cam-verify { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .cam-verify-head { grid-column: 1 / -1; }
   .mission-grid { grid-template-columns: 1fr; }
   .flow-step { grid-template-columns: 34px 1fr; }
   .flow-step span { grid-column: 2; }
   .matrix { display: block; overflow-x: auto; white-space: nowrap; }
+}
+@media (max-width: 600px) {
+  .cam-stage { gap:6px; }
+  .cam-row { gap:5px; padding:6px 7px; }
+  .cam-row span, .cam-row b { font-size:9px; }
+  .cam-readout-grid .cam-row b, .cam-verify .cam-row b { max-width:58%; }
+  .cam-methods summary { padding:9px 10px; font-size:9px; }
+  .cam-methods-copy { padding:10px; }
+  .cam-methods-copy p { font-size:11px; }
 }
