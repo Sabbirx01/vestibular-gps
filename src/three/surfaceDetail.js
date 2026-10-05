@@ -109,9 +109,10 @@ function weaveHeight(u, v, {
    Public generators
    ═══════════════════════════════════════════════════════════ */
 
-/** Woven fabric: normal + roughness. */
+/** Woven fabric: subtle albedo, normal, and roughness maps. */
 export function makeFabricMaps({ size = 512, repeat = 1, threads = 96, strength = 1.0, baseRough = 0.72 } = {}) {
   const W = size, H = size;
+  const col = new Uint8ClampedArray(W * H * 4);
   const nrm = new Uint8ClampedArray(W * H * 4);
   const rgh = new Uint8ClampedArray(W * H * 4);
   const h = (x, y) => weaveHeight(x / W, y / H, { threads });
@@ -119,6 +120,16 @@ export function makeFabricMaps({ size = 512, repeat = 1, threads = 96, strength 
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4;
+
+      /* A suit fabric is not an evenly painted white.  This is deliberately
+         subtle: the thread crowns catch a little more light, while broad low
+         frequency variation reads as handling/pressing rather than dirt or a
+         videogame noise texture.  It is a neutral multiplier, so the material
+         rule remains the authority for the garment's actual colour. */
+      const threadTone = Math.min(1, Math.max(0, h(x, y)));
+      const clothTone = 0.900 + threadTone * 0.065 + (fbm2(x / W * 3.2, y / H * 3.2, 811, 3) - 0.5) * 0.030;
+      const cv = Math.round(Math.min(1, Math.max(0, clothTone)) * 255);
+      col[i] = cv; col[i + 1] = cv; col[i + 2] = Math.min(255, cv + 1); col[i + 3] = 255;
 
       /* central differences give the surface gradient */
       const hx = h(x + 1, y) - h(x - 1, y);
@@ -145,6 +156,7 @@ export function makeFabricMaps({ size = 512, repeat = 1, threads = 96, strength 
   }
 
   return {
+    colorMap: makeTexture(col, W, H, { srgb: true, repeat }),
     normalMap: makeTexture(nrm, W, H, { repeat }),
     roughnessMap: makeTexture(rgh, W, H, { repeat }),
   };
@@ -250,6 +262,10 @@ export function applySurface(material, kind, { repeat = 1, normalScale = 0.55, r
   const maps = getSurfaceMaps(kind, { repeat, ...(kind === 'fabric' ? { threads: Math.round(96 * repeat) } : {}) });
   if (!maps) return material;
 
+  /* The NASA GLB has no authored texture maps.  Do not replace a map if a
+     future source model supplies one; the procedural cloth is a fallback for
+     the textureless asset, not a licence to overwrite source artwork. */
+  if (maps.colorMap && !material.map) material.map = maps.colorMap;
   material.normalMap = maps.normalMap;
   material.normalScale = new THREE.Vector2(normalScale, normalScale);
 

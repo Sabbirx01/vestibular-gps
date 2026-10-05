@@ -146,7 +146,7 @@ const SUIT_RULES = [
   { key: 'aceshelme.007', roughness: 0.22, metalness: 0.06, env: 1.5, clearcoat: 0.65, surface: 'metal', repeat: 2, normalScale: 0.14 },
   /* near-white outer shell — the target look is a clean white EVA suit,
      not the source asset's warm room-show palette. */
-  { key: 'lambert4S', tint: 0xf5f7fa, roughness: 0.3, metalness: 0.08, env: 1.3, surface: 'metal', repeat: 2, normalScale: 0.12 },
+  { key: 'lambert4S', tint: 0xf0f1ee, roughness: 0.36, metalness: 0.05, env: 1.15, surface: 'metal', repeat: 2, normalScale: 0.10 },
   /* dark interior / dark fittings — rubberised */
   { key: 'lambert6S', tint: 0x101722, roughness: 0.72, metalness: 0.05, env: 0.9, surface: 'rubber', repeat: 4, normalScale: 0.5 },
   /* grey metal hardware — brushed */
@@ -155,8 +155,8 @@ const SUIT_RULES = [
   /* Main fabric body — the source GLB labels this material blinn3SG and
      ships it orange. Recolour it to the white pressure-garment fabric while
      preserving geometry, seams and generated weave detail. */
-  { key: 'anisotrop', tint: 0xd9e0e8, roughness: 0.86, metalness: 0.0, env: 0.8, aniso: 0.7, surface: 'fabric', repeat: 2.4, normalScale: 1.35 },
-  { key: 'blinn3SG', tint: 0xe9eef4, roughness: 0.72, metalness: 0.02, env: 0.85, surface: 'fabric', repeat: 2.2, normalScale: 1.25 },
+  { key: 'anisotrop', tint: 0xdedfdc, roughness: 0.82, metalness: 0.0, env: 0.72, aniso: 0.45, surface: 'fabric', repeat: 2.4, normalScale: 0.72 },
+  { key: 'blinn3SG', tint: 0xe7e6e1, roughness: 0.77, metalness: 0.01, env: 0.78, surface: 'fabric', repeat: 2.2, normalScale: 0.68 },
   /* orange safety bands and high-visibility hardware */
   { key: 'lambert3S', tint: 0xf27a22, roughness: 0.72, metalness: 0.02, env: 0.85, surface: 'fabric', repeat: 2.2, normalScale: 1.25 },
   { key: 'lambert8S', tint: 0xf27a22, roughness: 0.7, metalness: 0.03, env: 0.85, surface: 'fabric', repeat: 5, normalScale: 0.5 },
@@ -351,17 +351,19 @@ function groupBounds(mesh, pattern, space) {
 }
 
 /**
- * Add the details that make the suit read as a real suit:
- * a mirrored visor, helmet work lights, a chest status cluster and a
- * grounding rim so the figure separates from the starfield.
+ * Add restrained optical detail on top of the source suit mesh. The default
+ * is a smoked visor only, so the public-domain suit reads as a photographed
+ * pressure garment rather than a science-fiction game prop. Optional
+ * instrument overlays remain available for non-hero scenes.
  *
  * @returns {{visor:boolean, front:number, tris:number}}
  */
 export function decorateSuit(carrier, {
-   visorColour = 0xffbd57,
-   visorTint = 0x2a1a06,
+   visorColour = 0x101820,
+   visorTint = 0x05080d,
    lampColour = 0xbfe9ff,
    accentColour = 0x5fe3ff,
+   instrumentOverlay = false,
  } = {}) {
   const meshes = [];
   carrier.traverse((o) => { if (o.isMesh) meshes.push(o); });
@@ -423,14 +425,15 @@ export function decorateSuit(carrier, {
     const lens = new THREE.Mesh(
       new THREE.SphereGeometry(Math.max(vs.x, vs.y) * 0.62, 40, 28),
       new THREE.MeshPhysicalMaterial({
-        /* For a METAL, the base colour IS the reflectance. Setting it dark and
-           tinting the specular instead produced a black glossy dome, because
-           at metalness 1.0 the environment reflection is multiplied by this
-           colour. A gold visor needs a gold albedo. */
+        /* Smoked polycarbonate: dark enough to conceal the interior in the
+           hero, but still reflective like the reference ACES visor rather than
+           a gold game prop. */
         color: new THREE.Color(visorColour),
-        metalness: 1.0,
-        roughness: 0.055,
-        envMapIntensity: 4.2,
+        metalness: 0.35,
+        roughness: 0.105,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.06,
+        envMapIntensity: 2.5,
       }),
     );
     /* flatten into a lens and push it just proud of the recess */
@@ -443,7 +446,7 @@ export function decorateSuit(carrier, {
   }
 
   /* ── Helmet work lights ───────────────────────────────── */
-  if (shellBox) {
+  if (instrumentOverlay && shellBox) {
     const ss = new THREE.Vector3();
     shellBox.getSize(ss);
     shellBox.getCenter(centre);
@@ -492,7 +495,7 @@ export function decorateSuit(carrier, {
   }
 
   /* ── Chest status cluster ─────────────────────────────── */
-  {
+  if (instrumentOverlay) {
     const unit = bodySize.y;
     const chestY = bodyBox.min.y + bodySize.y * 0.66;
 
@@ -549,7 +552,7 @@ export function decorateSuit(carrier, {
   }
 
   /* ── Grounding rim ────────────────────────────────────── */
-  {
+  if (instrumentOverlay) {
     const rim = new THREE.Mesh(
       new THREE.CylinderGeometry(bodySize.x * 0.34, bodySize.x * 0.34, bodySize.y * 0.004, 40, 1, true),
       new THREE.MeshBasicMaterial({
