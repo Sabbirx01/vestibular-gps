@@ -334,6 +334,7 @@
 .evidence-copy .eyebrow { margin:0; color:var(--cyan); }
 .evidence-copy h3 { margin:0; color:var(--white); font-size:clamp(1.15rem,2vw,1.75rem); line-height:1.2; }
 .evidence-copy > p:not(.eyebrow) { margin:0; color:var(--text-2); font-size:var(--fs-sm); line-height:1.65; }
+.evidence-finding { margin:2px 0 0; padding:10px 12px; border-left:2px solid var(--cyan); background:rgba(95,227,255,.055); color:var(--text-2); font-size:var(--fs-xs); line-height:1.55; }
 .evidence-foot { display:flex; justify-content:space-between; gap:12px; align-items:flex-end; padding-top:14px; margin-top:4px; border-top:1px solid var(--line); }
 .evidence-foot span { color:var(--faint); font:var(--fs-2xs) var(--font-mono); letter-spacing:.05em; line-height:1.45; }
 .evidence-foot a { color:var(--cyan); white-space:nowrap; font:700 var(--fs-xs) var(--font-mono); }
