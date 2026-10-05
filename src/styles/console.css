@@ -392,6 +392,17 @@
 .mission-answer p { margin: 0; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.65; }
 .mission-answer .mission-answer-title { margin-bottom: 9px; color: var(--cyan); font: 700 var(--fs-xs) var(--font-mono); letter-spacing: var(--ls-label); }
 .mission-answer .mission-answer-meta { margin-top: 16px; color: var(--faint); font: var(--fs-2xs) var(--font-mono); letter-spacing: .04em; }
+.mission-chat { display: grid; gap: 12px; margin-top: var(--sp-3); }
+.mission-question-deck { overflow: hidden; padding: 11px 0 3px; border-top: 1px solid var(--line); }
+.mission-question-label { margin: 0 0 8px 14px; color: var(--faint); font: 700 var(--fs-2xs) var(--font-mono); letter-spacing: .12em; }
+.mission-question-rail { overflow: hidden; margin: 6px -2px; mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); }
+.mission-question-track { display: flex; width: max-content; gap: 8px; padding: 0 4px; animation: mission-marquee-left 28s linear infinite; }
+.mission-question-track.to-right { animation-name: mission-marquee-right; animation-duration: 33s; }
+.mission-question-rail:hover .mission-question-track, .mission-question-rail:focus-within .mission-question-track { animation-play-state: paused; }
+.mission-question-track .mission-question { width: auto; flex: 0 0 auto; min-height: 38px; padding: 9px 12px; border-radius: 999px; white-space: nowrap; font-size: 10px; }
+@keyframes mission-marquee-left { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes mission-marquee-right { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .mission-question-track { animation: none; flex-wrap: wrap; width: auto; } }
 
 /* The assistant is a persistent, on-demand tool. It is not content that makes
    the Integration page longer: the top-bar AI button opens this fixed window. */
@@ -420,9 +431,9 @@
 .mission-popover .panel-head { margin-bottom: 0; }
 .mission-popover .panel-head h3 { font-size: var(--fs-h3); }
 .mission-popover .panel-head p { font-size: var(--fs-sm); }
-.mission-popover .mission-grid { grid-template-columns: 1fr; gap: 10px; margin-top: 14px; }
-.mission-popover .mission-questions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.mission-popover .mission-chat { gap: 10px; margin-top: 14px; }
 .mission-popover .mission-question { min-height: 48px; padding: 9px 10px; font-size: 10px; }
+.mission-popover .mission-question-track .mission-question { min-height: 38px; }
 .mission-popover .mission-answer { min-height: 132px; padding: 14px; }
 .mission-popover .caption { margin-top: 13px; font-size: var(--fs-2xs); }
 
@@ -465,7 +476,6 @@
   .cam-readout-grid, .cam-verify { grid-template-columns: 1fr; }
   .cam-verify-head { grid-column: auto; }
   .mission-grid { grid-template-columns: 1fr; }
-  .mission-popover .mission-questions { grid-template-columns: 1fr; }
   .flow-step { grid-template-columns: 34px 1fr; }
   .flow-step span { grid-column: 2; }
   .matrix { display: block; overflow-x: auto; white-space: nowrap; }

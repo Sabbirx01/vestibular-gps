@@ -161,6 +161,7 @@ const EVID_SKIN = 0.20;                    // evidence mask thresholds, for the 
 const EVID_STRUCT = 0.25;
 const EVID_BRIGHT = 0.55;
 const FACE_LOST_MS = 900;                  // no detection for this long -> LOST
+const LANDMARK_LOCK_HOLD_MS = 1400;        // stable local landmark face may bridge brief raw-detector misses
 const YAW_PER_SHRINK = 150;                // deg per unit of horizontal narrowing
 const PITCH_PER_SHRINK = 120;              // deg per unit of vertical shortening
 const YAW_PER_SHIFT = 40;                  // deg per face-width of lateral centroid travel
@@ -1019,6 +1020,37 @@ export class CameraProvider extends SensorProvider {
     this._updatePose(f);
   }
 
+  /* A stable MediaPipe landmark set is stronger evidence of a face than the
+   * lightweight colour/structure window alone. It is still local inference on
+   * this same camera frame. Use it to refine (not fabricate) the live lock so
+   * unusual lighting or a textured background does not make the overlay jump
+   * away from the actual face. */
+  _assistFaceLockFromLandmarks(now) {
+    const pts = this.eye?.points;
+    if (!this.eye?.available || !Array.isArray(pts) || pts.length < 468) return;
+    const oval = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    oval.forEach((id) => { x0 = Math.min(x0, pts[id].x); x1 = Math.max(x1, pts[id].x); y0 = Math.min(y0, pts[id].y); y1 = Math.max(y1, pts[id].y); });
+    const w0 = Math.max(0.03, x1 - x0), h0 = Math.max(0.03, y1 - y0);
+    const padX = w0 * 0.13, padY = h0 * 0.12;
+    const x = clamp(x0 - padX, 0, 1), y = clamp(y0 - padY, 0, 1);
+    const w = clamp(w0 + 2 * padX, 0.03, 1 - x), h = clamp(h0 + 2 * padY, 0.03, 1 - y);
+    const f = this.face;
+    const a = f.found ? 0.48 : 1;
+    f.x += (x - f.x) * a; f.y += (y - f.y) * a;
+    f.w += (w - f.w) * a; f.h += (h - f.h) * a;
+    f.cx += ((x + w / 2) - f.cx) * a; f.cy += ((y + h / 2) - f.cy) * a;
+    f.sigX = Math.max(.01, w / 3); f.sigY = Math.max(.01, h / 3);
+    f.found = true; f.status = 'locked';
+    f.basis = 'local landmarks';
+    f.score = Math.max(f.score || 0, FACE_MIN_SCORE + (this.eye.confidence || .55) * .45);
+    f.confidence = +Math.min(.99, Math.max(f.confidence || 0, .55 + (this.eye.confidence || 0) * .4)).toFixed(3);
+    this.faceSeenAt = now;
+    this._landmarkLockUntil = now + LANDMARK_LOCK_HOLD_MS;
+    this.faceRaw = { cx: f.cx, cy: f.cy, sigX: f.sigX, sigY: f.sigY, rollRaw: f.rollRaw || 0, coverage: w * h, basis: f.basis };
+    this._updatePose(f);
+  }
+
   /**
    * Coarse head pose from the face region, relative to the calibrated neutral.
    *
@@ -1171,6 +1203,7 @@ export class CameraProvider extends SensorProvider {
        number all describe one instant rather than three neighbouring ones. */
     this._trackFace(cur);
     this._trackEyes(now);
+    this._assistFaceLockFromLandmarks(now);
 
     this.centroidX = this.centroidX + (cur.cx - this.centroidX) * 0.12;
     this.centroidY = this.centroidY + (cur.cy - this.centroidY) * 0.12;

@@ -817,8 +817,22 @@ export function mountIntegrationSection({ camera } = {}) {
         });
         trace([33, 160, 158, 133, 153, 144], 'rgba(139,255,210,1)', 2.2, 14);
         trace([362, 385, 387, 263, 373, 380], 'rgba(139,255,210,1)', 2.2, 14);
-        trace([468, 469, 470, 471, 472], 'rgba(255,190,92,1)', 2.2, 16);
-        trace([473, 474, 475, 476, 477], 'rgba(255,190,92,1)', 2.2, 16);
+        /* Iris landmarks form a small polygon, but the human pupil/iris is
+           circular. Use their real centroid and measured radius to render a
+           smooth circular ring rather than a diamond-shaped outline. */
+        const irisRing = (ids) => {
+          const cx = ids.reduce((sum, id) => sum + px(pts[id]), 0) / ids.length;
+          const cy = ids.reduce((sum, id) => sum + py(pts[id]), 0) / ids.length;
+          const radius = Math.max(4.2, ...ids.map((id) => Math.hypot(px(pts[id]) - cx, py(pts[id]) - cy))) * 1.18;
+          eg.save(); eg.shadowColor = 'rgba(255,194,92,1)'; eg.shadowBlur = 16;
+          eg.fillStyle = 'rgba(255,188,82,.15)'; eg.beginPath(); eg.arc(cx, cy, radius, 0, Math.PI * 2); eg.fill();
+          eg.strokeStyle = 'rgba(255,209,128,1)'; eg.lineWidth = 2; eg.stroke();
+          eg.shadowBlur = 6; eg.beginPath(); eg.arc(cx, cy, radius * .48, 0, Math.PI * 2); eg.strokeStyle = 'rgba(255,239,202,.85)'; eg.lineWidth = 1; eg.stroke();
+          eg.restore();
+          eg.fillStyle = 'rgba(255,251,237,.98)'; eg.beginPath(); eg.arc(cx, cy, 1.5, 0, Math.PI * 2); eg.fill();
+        };
+        irisRing([468, 469, 470, 471, 472]);
+        irisRing([473, 474, 475, 476, 477]);
 
         /* the sweep: a gradient tail plus a glowing core line */
         const sy = (performance.now() / 9) % mh;
@@ -1048,15 +1062,28 @@ export function mountIntegrationSection({ camera } = {}) {
       onclick: () => answer.replaceChildren(...getAnswer()),
     });
 
+    const questionRail = (direction) => el('div', { class: 'mission-question-rail', 'aria-label': 'Common questions' },
+      el('div', { class: `mission-question-track ${direction}` },
+        /* Duplicate once so the CSS marquee can loop without a blank gap. The
+           buttons are still real controls; each answer is computed locally at
+           the instant it is clicked. */
+        ...questions.concat(questions).map(([label, fn]) => ask(label, fn)),
+      ),
+    );
+
     return el('div', { class: 'glass panel mission-assistant' },
       el('div', { class: 'panel-head' },
         el('p', { class: 'eyebrow', text: 'LOCAL MISSION ASSISTANT' }),
         el('h3', { text: 'Ask the instrument, not the internet' }),
         el('p', { text: 'Tap a common question. The answer is generated locally from the current browser signals and the project’s own safety rules—no server, cloud AI, camera upload, or fabricated result.' }),
       ),
-      el('div', { class: 'mission-grid' },
-        el('div', { class: 'mission-questions' }, ...questions.map(([label, fn]) => ask(label, fn))),
+      el('div', { class: 'mission-chat' },
         answer,
+        el('div', { class: 'mission-question-deck' },
+          el('p', { class: 'mission-question-label', text: 'COMMON QUESTIONS · TAP TO ASK' }),
+          questionRail('to-left'),
+          questionRail('to-right'),
+        ),
       ),
       el('p', { class: 'caption', text: 'Scope: this assistant explains only the telemetry that is truly present in this session. It cannot diagnose, replace a flight surgeon, or turn webcam landmarks into a clinical vestibular test.' }),
     );
