@@ -255,7 +255,7 @@ export function mountIntegrationSection({ camera } = {}) {
       el('div', { class: 'panel-head' },
         el('p', { class: 'eyebrow', text: 'CAMERA PIPELINE' }),
         el('h3', { text: 'Face + eye scan — real local landmarks from the front camera' }),
-        el('p', { text: 'Runs entirely on this device. No frame is uploaded, ever. The eye panel only draws when real local face/iris landmarks are detected. If detection is weak or unavailable, it shows UNAVAILABLE — never a simulated eye result. It never reports clinical VOR or vHIT from a normal webcam.' }),
+        el('p', { text: 'Runs entirely on this device. No frame is uploaded, ever. The eye LANDMARK layer only draws when real local face/iris landmarks are detected; when detection is weak or unavailable it says so — never a simulated eye result. The analysis window additionally shows the live 64×48 buffer the estimator itself works on, labelled on screen as not a landmark scan, so the panel stays live even when the landmark model cannot start. It never reports clinical VOR or vHIT from a normal webcam.' }),
       ),
     );
 
@@ -268,7 +268,7 @@ export function mountIntegrationSection({ camera } = {}) {
        subject actually sees. */
     const cv = el('canvas', { class: 'cam-overlay', width: '640', height: '480', 'aria-label': 'Face scan overlay' });
     const video = el('video', { class: 'cam-video', autoplay: true, muted: true, playsinline: true, 'aria-label': 'Live camera preview' });
-    const eyeMap = el('canvas', { class: 'cam-eye-map', width: '640', height: '480', 'aria-label': 'Real eye landmark analysis map' });
+    const eyeMap = el('canvas', { class: 'cam-eye-map', width: '640', height: '480', 'aria-label': 'Live face analysis map' });
     const verifyBox = el('div', { class: 'cam-verify' });
 
     const calState = !c ? 'NOT STARTED' : c.calibrating ? `CALIBRATING ${Math.round((c.calProgress || 0) * 100)}%` : c.calibrated ? 'CALIBRATED' : 'NOT CALIBRATED — HOLD-STILL FLOOR NOT MEASURED';
@@ -288,6 +288,7 @@ export function mountIntegrationSection({ camera } = {}) {
       head: row('LIVE HEAD MOTION', c?.running ? `${state.camera.headMotion.toFixed(2)} deg/s` : '—'),
       vor: row('CLINICAL VOR / vHIT', 'UNAVAILABLE — WEBCAM IS NOT A CLINICAL vHIT'),
       eyes: row('EYE LANDMARKS', c?.running ? eyeText(state.camera.eye) : '—'),
+      eyemodel: row('EYE MODEL', eyeModelText(c?.running ? state.camera.eye : null)),
       gaze: row('GAZE OFFSET · EXPERIMENTAL', c?.running ? gazeText(state.camera.eye) : '—'),
       quality: row('SIGNAL QUALITY', c?.running ? `${Math.round(state.camera.quality * 100)}%` : '—'),
       energy: row('MOTION ENERGY (ABOVE FLOOR)', c ? Math.max(0, c.motionEnergy - (c.noiseFloor?.energy ?? 0)).toFixed(4) : '—'),
@@ -341,6 +342,16 @@ export function mountIntegrationSection({ camera } = {}) {
       if (!eye) return 'LOADING LOCAL MODEL…';
       if (!eye.available) return String(eye.status || 'UNAVAILABLE').toUpperCase();
       return `TRACKING LOCALLY · ${Math.round((eye.confidence || 0) * 100)}%`;
+    }
+
+    /* Why the local landmark model is not running. A bare "UNAVAILABLE" cannot
+       distinguish a model that failed to START from a face that was not
+       detected, and those need completely different fixes — so the error the
+       provider captured is surfaced here instead of being swallowed. */
+    function eyeModelText(eye) {
+      if (!eye) return '—';
+      const base = String(eye.status || 'UNAVAILABLE').toUpperCase();
+      return eye.error ? `${base} — ${String(eye.error)}` : base;
     }
 
     function gazeText(eye) {
@@ -453,11 +464,120 @@ export function mountIntegrationSection({ camera } = {}) {
 
     const g = cv.getContext('2d');
     const eg = eyeMap.getContext('2d');
+
+    /* ── Cosmetic scan-effect layer ────────────────────────────
+       Everything the drawing code below adds is PRESENTATION: a sweep, a glow,
+       a reticle, a survey grid. None of it is a measurement, and none of it can
+       invent geometry. The only real content is the landmark/region data the
+       provider actually returned — with no points, nothing is drawn (see the
+       guards below). Under reduced motion the animated parts are frozen rather
+       than faked into motion. */
+    const scanT0 = performance.now();
+    /* Real FaceMesh contour topology. It is applied ONLY to the points the
+       bundled local model returned, so it traces an actual detected face; it is
+       not a stored mesh that would draw a face when none is present. */
+    const MESH_OUTLINE = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
+      397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93,
+      234, 127, 162, 21, 54, 103, 67, 109];
+    const MESH_DETAIL = [
+      [70, 63, 105, 66, 107], [336, 296, 334, 293, 300],
+      [168, 6, 197, 195, 5, 4, 1], [98, 97, 2, 326, 327],
+      [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185],
+    ];
+    const LID_L = [33, 160, 158, 133, 153, 144];
+    const LID_R = [362, 385, 387, 263, 373, 380];
+    const IRIS_L = [468, 469, 470, 471, 472];
+    const IRIS_R = [473, 474, 475, 476, 477];
+
+    /* Trace a contour of REAL landmark ids through a projector.
+       `px`/`py` take a COORDINATE (a number), not a point — both call sites
+       follow that contract. A projector that expects a point instead returns
+       NaN for every vertex, the path collapses and the contour disappears with
+       no error, which is exactly how the analysis panel once lost its face
+       outline and eye rings. So a non-finite projection is reported once. */
+    const traceContour = (ctx, pts, ids, px, py, closed = true) => {
+      ctx.beginPath();
+      let started = false;
+      ids.forEach((id) => {
+        const pt = pts[id];
+        if (!pt) return;
+        const X = px(pt.x), Y = py(pt.y);
+        if (!Number.isFinite(X) || !Number.isFinite(Y)) {
+          if (!traceContour.warned) {
+            traceContour.warned = true;
+            console.warn('[cam] face/eye contour projector returned a non-finite coordinate — px/py must take a number, not a point.');
+          }
+          return;
+        }
+        if (started) ctx.lineTo(X, Y);
+        else { ctx.moveTo(X, Y); started = true; }
+      });
+      if (closed) ctx.closePath();
+      ctx.stroke();
+    };
+
+    /* Corner brackets — the instrument-lock motif, reused in three places. */
+    const brackets = (ctx, x, y, w, h, arm, colour, width) => {
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(x, y + arm); ctx.lineTo(x, y); ctx.lineTo(x + arm, y);
+      ctx.moveTo(x + w - arm, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + arm);
+      ctx.moveTo(x + w, y + h - arm); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - arm, y + h);
+      ctx.moveTo(x + arm, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - arm);
+      ctx.stroke();
+    };
+
+    /* The analysis field is drawn through a 64x48 offscreen canvas: the
+       estimator's buffers are already that size, so the upscale is an exact 10x
+       with smoothing off — cheap, and the chunky-pixel look the panel wants.
+       The ImageData is allocated once and rewritten in place every frame. */
+    const FIELD_W = 64, FIELD_H = 48;
+    const fieldCanvas = document.createElement('canvas');
+    fieldCanvas.width = FIELD_W; fieldCanvas.height = FIELD_H;
+    const fieldCtx = fieldCanvas.getContext('2d');
+    const fieldImg = fieldCtx.createImageData(FIELD_W, FIELD_H);
+
+    /* Camera off: put the analysis window into a readable STANDBY state instead
+       of leaving a blank rectangle. It is scope furniture and a prompt, not a
+       measurement — nothing is drawn that could be mistaken for a live signal. */
+    const drawIdleScope = () => {
+      const mw0 = eyeMap.width, mh0 = eyeMap.height;
+      eg.clearRect(0, 0, mw0, mh0);
+      const bg0 = eg.createRadialGradient(mw0 / 2, mh0 * 0.46, mh0 * 0.1, mw0 / 2, mh0 * 0.5, mh0 * 0.78);
+      bg0.addColorStop(0, '#08182c');
+      bg0.addColorStop(1, '#03070f');
+      eg.fillStyle = bg0; eg.fillRect(0, 0, mw0, mh0);
+      eg.save();
+      eg.globalAlpha = 0.5;
+      eg.strokeStyle = 'rgba(95,227,255,0.09)';
+      eg.lineWidth = 1;
+      eg.beginPath();
+      for (let gx = 0; gx <= mw0; gx += 40) { eg.moveTo(gx + 0.5, 0); eg.lineTo(gx + 0.5, mh0); }
+      for (let gy = 0; gy <= mh0; gy += 40) { eg.moveTo(0, gy + 0.5); eg.lineTo(mw0, gy + 0.5); }
+      eg.stroke();
+      eg.restore();
+      brackets(eg, 10, 10, mw0 - 20, mh0 - 20, 22, 'rgba(95,227,255,0.30)', 2);
+      eg.font = '600 16px ui-monospace, monospace';
+      eg.fillStyle = 'rgba(148,180,220,.85)';
+      eg.fillText('EYE SCAN · STANDBY', 18, 30);
+      eg.font = '12px ui-monospace, monospace';
+      eg.fillStyle = 'rgba(220,245,255,.5)';
+      eg.fillText('START CAMERA SCAN TO ACQUIRE LANDMARKS', 18, 50);
+    };
+
     const draw = () => {
       requestAnimationFrame(draw);
-      if (!c || !c.running) return;
+      if (!c || !c.running) {
+        g.clearRect(0, 0, cv.width, cv.height);
+        drawIdleScope();
+        return;
+      }
       const pw = cv.width;
       const ph = cv.height;
+      /* Cosmetic clock, shared by every animated flourish in this loop. */
+      const anim = (performance.now() - scanT0) / 1000;
+      const motionOn = !state.reducedMotion;
       g.clearRect(0, 0, pw, ph);
       const f = c.face;
 
@@ -499,297 +619,506 @@ export function mountIntegrationSection({ camera } = {}) {
         g.restore();
       }
 
-      /* The tracked region, with corner brackets so it reads as an instrument
-         lock rather than a decorative rectangle. */
+      /* The tracked region. It reads as a live instrument lock rather than a
+         decorative rectangle: a soft bloom, a chase of light around the
+         perimeter, corner brackets that breathe, a scanning bar and a centre
+         reticle. The box itself is still the provider's fitted region — only
+         its presentation changed. */
       if (f?.found) {
         const x = mapX(f.x), y = mapY(f.y), w = f.w * kx * pw, h = f.h * ky * ph;
         const locked = f.status === 'locked';
-        g.strokeStyle = locked ? 'rgba(95,227,255,0.95)' : 'rgba(255,189,87,0.9)';
+        const accent = locked ? '95,227,255' : '255,189,87';
+        const rad = Math.min(16, w * 0.1, h * 0.1);
+        const pulse = motionOn ? 0.55 + 0.45 * Math.sin(anim * 2.6) : 1;
+
+        const box = () => {
+          g.beginPath();
+          if (g.roundRect) g.roundRect(x, y, w, h, rad); else g.rect(x, y, w, h);
+        };
+
+        /* soft outer bloom */
+        g.save();
+        g.shadowColor = `rgba(${accent},0.85)`;
+        g.shadowBlur = 18;
+        g.strokeStyle = `rgba(${accent},0.30)`;
+        g.lineWidth = 1;
+        box(); g.stroke();
+        g.restore();
+
+        /* perimeter, brighter at the diagonal it runs along */
+        const per = g.createLinearGradient(x, y, x + w, y + h);
+        per.addColorStop(0, `rgba(${accent},0.95)`);
+        per.addColorStop(.5, `rgba(${accent},0.28)`);
+        per.addColorStop(1, `rgba(${accent},0.95)`);
+        g.strokeStyle = per;
+        g.lineWidth = 1.5;
+        box(); g.stroke();
+
+        /* scanning bar inside the box: a thin bright line with a gradient tail */
+        if (motionOn) {
+          const sweepY = y + ((anim * 0.42) % 1) * h;
+          const tailH = Math.max(10, h * 0.16);
+          const tail = g.createLinearGradient(0, sweepY - tailH, 0, sweepY);
+          tail.addColorStop(0, `rgba(${accent},0)`);
+          tail.addColorStop(.7, `rgba(${accent},0.10)`);
+          tail.addColorStop(1, `rgba(${accent},0.28)`);
+          g.fillStyle = tail;
+          g.fillRect(x, sweepY - tailH, w, tailH);
+          g.fillStyle = `rgba(${accent},0.85)`;
+          g.fillRect(x, sweepY - 0.75, w, 1.5);
+        }
+
+        /* breathing corner brackets */
+        const arm = Math.max(10, Math.min(22, w * 0.24, h * 0.24));
+        g.save();
+        g.shadowColor = `rgba(${accent},0.9)`;
+        g.shadowBlur = 8 + 8 * pulse;
+        brackets(g, x, y, w, h, arm, `rgba(${accent},${0.72 + 0.28 * pulse})`, 3);
+        g.restore();
+
+        /* mid-edge viewfinder ticks */
+        const tick = Math.min(9, w * 0.07, h * 0.07);
+        g.strokeStyle = `rgba(${accent},0.7)`;
         g.lineWidth = 1.5;
         g.beginPath();
-        if (g.roundRect) g.roundRect(x, y, w, h, Math.min(16, w * 0.1, h * 0.1));
-        else g.rect(x, y, w, h);
+        g.moveTo(x + w / 2, y - tick); g.lineTo(x + w / 2, y - 1);
+        g.moveTo(x + w / 2, y + h + 1); g.lineTo(x + w / 2, y + h + tick);
+        g.moveTo(x - tick, y + h / 2); g.lineTo(x - 1, y + h / 2);
+        g.moveTo(x + w + 1, y + h / 2); g.lineTo(x + w + tick, y + h / 2);
         g.stroke();
-        const arm = Math.max(8, Math.min(18, w * 0.22, h * 0.22));
-        g.lineWidth = 3;
+
+        /* centre reticle: a dot inside a breathing ring */
+        const ccx = mapX(f.cx), ccy = mapY(f.cy);
         g.beginPath();
-        g.moveTo(x, y + arm); g.lineTo(x, y); g.lineTo(x + arm, y);
-        g.moveTo(x + w - arm, y); g.lineTo(x + w, y); g.lineTo(x + w, y + arm);
-        g.moveTo(x + w, y + h - arm); g.lineTo(x + w, y + h); g.lineTo(x + w - arm, y + h);
-        g.moveTo(x + arm, y + h); g.lineTo(x, y + h); g.lineTo(x, y + h - arm);
+        g.arc(ccx, ccy, 4 + 5 * pulse, 0, Math.PI * 2);
+        g.strokeStyle = `rgba(${accent},${0.5 - 0.3 * pulse})`;
+        g.lineWidth = 1.4;
         g.stroke();
         g.beginPath();
-        g.arc(mapX(f.cx), mapY(f.cy), 3.5, 0, Math.PI * 2);
-        g.fillStyle = locked ? '#5fe3ff' : '#ffbd57';
+        g.arc(ccx, ccy, 3.5, 0, Math.PI * 2);
+        g.fillStyle = `rgb(${accent})`;
         g.fill();
+
+        /* lock plate riding the top edge. The digits are the provider's own
+           confidence, not decoration. */
+        g.font = '600 10px ui-monospace, monospace';
+        const tag = `${locked ? 'LOCK' : String(f.status || '').toUpperCase()} · ${Math.round((f.confidence || 0) * 100)}%`;
+        const tw = g.measureText(tag).width;
+        g.fillStyle = 'rgba(4,8,18,0.72)';
+        g.fillRect(x, y - 16, tw + 12, 14);
+        g.fillStyle = `rgba(${accent},0.98)`;
+        g.fillText(tag, x + 6, y - 6);
       }
       g.restore();
 
-      /* Real local landmark view — no decorative face mesh. It only appears
-         after the bundled model has produced stable face/iris landmarks. The
-         point field is the model's own landmarks, one pixel each, lit by its
-         own depth — it is a reading, not a fixed graphic. */
+      /* Real local landmark view. The contours are the landmark TOPOLOGY traced
+         through the points the bundled model actually returned — real geometry,
+         not a stored face: with no points nothing here draws. The glow and the
+         rotating reticle are presentation; the dots are the measurement. */
       const eye = state.camera?.eye;
       if (eye?.available && Array.isArray(eye.points) && eye.points.length >= 478) {
         g.save();
         g.translate(pw, 0); g.scale(-1, 1);
         const pts = eye.points;
+        const px = (n) => mapX(n), py = (n) => mapY(n);
 
-        /* the whole face, as a field of small pixels */
-        for (let i = 0; i < 468; i += 2) {
+        /* faint solved mesh: face outline, brows, nose, lips */
+        g.save();
+        g.globalAlpha = 0.22;
+        g.strokeStyle = 'rgba(95,227,255,0.9)';
+        g.lineWidth = 1;
+        traceContour(g, pts, MESH_OUTLINE, px, py);
+        MESH_DETAIL.forEach((ids) => traceContour(g, pts, ids, px, py, false));
+        g.restore();
+
+        /* The landmark cloud: every point, as a small pixel, so the whole face
+           is covered over the video too. Kept smaller and fainter than the
+           analysis panel's cloud so the real face underneath still reads. */
+        for (let i = 0; i < 468; i++) {
           const pt = pts[i];
-          const dep = Math.max(0, Math.min(1, (pt.z || 0) * 2.4 + 0.5));
-          g.fillStyle = `rgba(140,232,255,${0.14 + (1 - dep) * 0.26})`;
-          g.fillRect(mapX(pt.x) - 0.9, mapY(pt.y) - 0.9, 1.8, 1.8);
+          const depth = Math.max(0, Math.min(1, (pt.z || 0) * 2.4 + 0.5));
+          const r = 1 + (1 - depth) * 1.1;
+          g.fillStyle = `rgba(130,230,255,${0.10 + (1 - depth) * 0.22})`;
+          g.fillRect(px(pt.x) - r / 2, py(pt.y) - r / 2, r, r);
         }
 
-        /* eyelid contours, lit */
-        const ring = (ids, colour, blur, width) => {
+        /* eyelids: a lit contour around each eye */
+        g.save();
+        g.shadowColor = 'rgba(135,255,206,0.95)';
+        g.shadowBlur = 8;
+        g.strokeStyle = 'rgba(135,255,206,0.98)';
+        g.lineWidth = 1.6;
+        traceContour(g, pts, LID_L, px, py);
+        traceContour(g, pts, LID_R, px, py);
+        g.restore();
+
+        /* irises: outer ring, inner ring, pupil dot and a slow rotating
+           reticle. The rings are drawn on the real iris landmarks; the reticle
+           is pure ornament that marks which pupil is being tracked. */
+        const iris = (ids, tilt) => {
+          const cxN = ids.reduce((a, id) => a + pts[id].x, 0) / ids.length;
+          const cyN = ids.reduce((a, id) => a + pts[id].y, 0) / ids.length;
+          const X = px(cxN), Y = py(cyN);
           g.save();
-          g.strokeStyle = colour; g.lineWidth = width;
-          g.shadowColor = colour; g.shadowBlur = blur;
+          g.shadowColor = 'rgba(255,190,92,0.95)';
+          g.shadowBlur = 10;
+          g.strokeStyle = 'rgba(255,190,92,0.98)';
+          g.lineWidth = 1.6;
+          traceContour(g, pts, ids, px, py);
+          g.beginPath(); g.arc(X, Y, 7, 0, Math.PI * 2); g.stroke();
+          g.beginPath(); g.arc(X, Y, 3.2, 0, Math.PI * 2); g.stroke();
+          g.restore();
+          g.beginPath(); g.arc(X, Y, 1.4, 0, Math.PI * 2);
+          g.fillStyle = '#ffd79a'; g.fill();
+          g.save();
+          g.translate(X, Y); g.rotate(tilt);
+          g.strokeStyle = 'rgba(255,190,92,0.75)'; g.lineWidth = 1.2;
           g.beginPath();
-          ids.forEach((id, n) => {
-            const pt = pts[id];
-            n ? g.lineTo(mapX(pt.x), mapY(pt.y)) : g.moveTo(mapX(pt.x), mapY(pt.y));
-          });
-          g.closePath(); g.stroke();
+          for (let k = 0; k < 4; k++) {
+            g.rotate(Math.PI / 2);
+            g.moveTo(10, 0); g.lineTo(14, 0);
+          }
+          g.stroke();
           g.restore();
         };
-        ring([33, 160, 158, 133, 153, 144], 'rgba(135,255,206,0.98)', 9, 1.6);
-        ring([362, 385, 387, 263, 373, 380], 'rgba(135,255,206,0.98)', 9, 1.6);
-
-        /* irises: amber disc, bright rim, pupil and a specular dot */
-        [468, 473].forEach((id) => {
-          const cx = mapX(pts[id].x), cy = mapY(pts[id].y);
-          g.save();
-          g.shadowColor = 'rgba(255,190,92,0.95)'; g.shadowBlur = 12;
-          g.beginPath(); g.arc(cx, cy, 6, 0, Math.PI * 2);
-          g.fillStyle = 'rgba(255,190,92,0.22)'; g.fill();
-          g.strokeStyle = 'rgba(255,205,130,0.98)'; g.lineWidth = 1.6; g.stroke();
-          g.beginPath(); g.arc(cx, cy, 3, 0, Math.PI * 2);
-          g.strokeStyle = 'rgba(255,228,180,0.7)'; g.lineWidth = 1; g.stroke();
-          g.restore();
-          g.beginPath(); g.arc(cx, cy, 1.4, 0, Math.PI * 2);
-          g.fillStyle = 'rgba(255,247,232,0.98)'; g.fill();
-        });
+        iris(IRIS_L, motionOn ? anim * 0.8 : 0);
+        iris(IRIS_R, motionOn ? -anim * 0.8 : 0);
         g.restore();
+
         g.fillStyle = 'rgba(135,255,206,0.95)';
         g.font = '600 12px ui-monospace, monospace';
-        g.fillText('EYE SCANNING · REAL LOCAL LANDMARKS', 14, 48);
+        g.fillText('EYE TRACKING · REAL LOCAL LANDMARKS', 14, 48);
       } else {
         g.fillStyle = 'rgba(255,189,87,0.92)';
         g.font = '600 12px ui-monospace, monospace';
         g.fillText(c?.running ? 'EYE SCANNING · AWAITING REAL LANDMARKS' : 'EYE SCAN · UNAVAILABLE', 14, 48);
       }
 
-      /* The adjacent analysis window is driven by the exact same verified
-         points. It intentionally stays blank when no landmark signal exists,
-         so it cannot be mistaken for an animated face substitute. */
+      /* The analysis window carries two layers. The bottom one is the live raw
+         64x48 analysis buffer, drawn from the estimator's own arrays and
+         labelled on screen as NOT a landmark scan, so the panel stays live even
+         when the landmark model cannot start. The landmark layer on top draws
+         only when the bundled model actually returned points — it never invents
+         a substitute face when detection fails. */
       const mw = eyeMap.width, mh = eyeMap.height;
       eg.clearRect(0, 0, mw, mh);
 
-      /* deep-scope background: a radial wash, so the panel reads as a lit
-         instrument rather than a black rectangle */
-      const bg = eg.createRadialGradient(mw / 2, mh * 0.46, mh * 0.06, mw / 2, mh * 0.5, mh * 0.8);
-      bg.addColorStop(0, '#0a1c33');
+      /* Deep-scope background: a radial wash, a survey grid with a centre
+         crosshair, and an edge tick ruler. Cosmetic furniture only — the only
+         real content is the landmark field drawn on top of it. */
+      const bg = eg.createRadialGradient(mw * 0.5, mh * 0.46, mh * 0.1, mw * 0.5, mh * 0.5, mh * 0.78);
+      bg.addColorStop(0, '#08182c');
       bg.addColorStop(1, '#03070f');
       eg.fillStyle = bg; eg.fillRect(0, 0, mw, mh);
 
-      /* Instrument-only motion: this background is deliberately independent
-         of face detection. It makes the analysis surface feel alive without
-         ever inventing a face, landmark or eye reading. The status label below
-         remains the authority for whether real landmarks exist. */
-      const scanT = performance.now() / 1000;
-      const gridStep = 32;
-      const gridOffset = (scanT * 12) % gridStep;
       eg.save();
-      eg.strokeStyle = 'rgba(95,227,255,0.075)'; eg.lineWidth = 1;
-      for (let x = -gridStep + gridOffset; x < mw + gridStep; x += gridStep) {
-        eg.beginPath(); eg.moveTo(x, 0); eg.lineTo(x, mh); eg.stroke();
+      eg.strokeStyle = 'rgba(95,227,255,0.07)';
+      eg.lineWidth = 1;
+      eg.beginPath();
+      for (let gx = 0; gx <= mw; gx += 40) { eg.moveTo(gx + 0.5, 0); eg.lineTo(gx + 0.5, mh); }
+      for (let gy = 0; gy <= mh; gy += 40) { eg.moveTo(0, gy + 0.5); eg.lineTo(mw, gy + 0.5); }
+      eg.stroke();
+      eg.strokeStyle = 'rgba(95,227,255,0.16)';
+      eg.beginPath();
+      eg.moveTo(mw / 2, 0); eg.lineTo(mw / 2, mh);
+      eg.moveTo(0, mh / 2); eg.lineTo(mw, mh / 2);
+      eg.stroke();
+      eg.strokeStyle = 'rgba(140,200,255,0.22)';
+      eg.beginPath();
+      for (let gx = 0; gx <= mw; gx += 40) {
+        const len = (gx / 40) % 5 === 0 ? 9 : 5;
+        eg.moveTo(gx + 0.5, 0); eg.lineTo(gx + 0.5, len);
+        eg.moveTo(gx + 0.5, mh); eg.lineTo(gx + 0.5, mh - len);
       }
-      for (let y = -gridStep + gridOffset; y < mh + gridStep; y += gridStep) {
-        eg.beginPath(); eg.moveTo(0, y); eg.lineTo(mw, y); eg.stroke();
+      for (let gy = 0; gy <= mh; gy += 40) {
+        const len = (gy / 40) % 5 === 0 ? 9 : 5;
+        eg.moveTo(0, gy + 0.5); eg.lineTo(len, gy + 0.5);
+        eg.moveTo(mw, gy + 0.5); eg.lineTo(mw - len, gy + 0.5);
       }
-      const radarX = mw * 0.5, radarY = mh * 0.52;
-      const radarR = mh * (0.22 + ((Math.sin(scanT * 2.1) + 1) * 0.04));
-      eg.strokeStyle = 'rgba(95,227,255,0.16)'; eg.lineWidth = 1;
-      eg.beginPath(); eg.arc(radarX, radarY, radarR, 0, Math.PI * 2); eg.stroke();
-      const angle = scanT * 1.7;
-      const ray = eg.createLinearGradient(radarX, radarY, radarX + Math.cos(angle) * radarR, radarY + Math.sin(angle) * radarR);
-      ray.addColorStop(0, 'rgba(95,227,255,0.34)'); ray.addColorStop(1, 'rgba(95,227,255,0)');
-      eg.strokeStyle = ray; eg.beginPath(); eg.moveTo(radarX, radarY); eg.lineTo(radarX + Math.cos(angle) * radarR, radarY + Math.sin(angle) * radarR); eg.stroke();
+      eg.stroke();
       eg.restore();
+
+      /* ── Live analysis field ───────────────────────────────────
+         The estimator already downsamples every frame to its own 64x48 working
+         buffer. Drawing that buffer shows the REAL signal the pipeline is
+         scoring, so this panel is live even when the landmark model is not
+         available. It is the raw downsampled frame — not a landmark scan, not
+         a 3D model and not a measurement — and the label along the bottom says
+         so. The locked face region is drawn bright and the rest of the frame
+         dim, so it still reads as a face scan rather than a camera thumbnail. */
+      const field = c.analysisField?.();
+      if (field?.lum) {
+        const L = field.lum, S = field.struct, M = field.motion;
+        const d = fieldImg.data;
+        for (let i = 0, o = 0; i < FIELD_W * FIELD_H; i++, o += 4) {
+          const v = Math.min(1, Math.max(0, (L[i] || 0) / 255));
+          const s = Math.min(1, Math.max(0, S[i] || 0));
+          const m = Math.min(1, Math.max(0, M[i] || 0));
+          d[o] = (10 + v * 46 + m * 190) | 0;
+          d[o + 1] = (28 + v * 132 + s * 70 + m * 120) | 0;
+          d[o + 2] = (52 + v * 176 + s * 40 + m * 96) | 0;
+          d[o + 3] = 255;
+        }
+        fieldCtx.putImageData(fieldImg, 0, 0);
+        eg.imageSmoothingEnabled = false;
+        eg.globalAlpha = 0.26;
+        eg.drawImage(fieldCanvas, 0, 0, mw, mh);
+        eg.globalAlpha = 1;
+        if (c.face?.found) {
+          eg.save();
+          eg.beginPath();
+          const bx = c.face.x * mw, by = c.face.y * mh;
+          const bw = c.face.w * mw, bh = c.face.h * mh;
+          if (eg.roundRect) eg.roundRect(bx, by, bw, bh, Math.min(18, bw * 0.12, bh * 0.12));
+          else eg.rect(bx, by, bw, bh);
+          eg.clip();
+          eg.drawImage(fieldCanvas, 0, 0, mw, mh);
+          eg.restore();
+        }
+      }
 
       const mapEye = state.camera?.eye;
       if (mapEye?.available && Array.isArray(mapEye.points) && mapEye.points.length >= 478) {
         const pts = mapEye.points;
-        const px = (pt) => pt.x * mw;
-        const py = (pt) => pt.y * mh;
+        /* These take a COORDINATE, matching traceContour's contract and the
+           overlay's projectors. They used to take a point (`(pt) => pt.x * mw`)
+           while the shared tracer passed `px(pt.x)`, so every contour resolved
+           to NaN and the mesh, eyelids and iris rings silently vanished from
+           this panel. Use `px(pt.x)`, never `px(pt)`. */
+        /* The camera's face crop may occupy a tiny part of the 640×480 input.
+           This right-hand panel is an instrument visualization, so fit the
+           real facial geometry into its own stable scan viewport. Without this
+           transform the head sat low and very small whenever the user was far
+           from the camera. Features remain live; only their display scale and
+           position change. */
+        const fitIds = MESH_OUTLINE;
+        let nx0 = Infinity, nx1 = -Infinity, ny0 = Infinity, ny1 = -Infinity;
+        fitIds.forEach((id) => {
+          nx0 = Math.min(nx0, pts[id].x); nx1 = Math.max(nx1, pts[id].x);
+          ny0 = Math.min(ny0, pts[id].y); ny1 = Math.max(ny1, pts[id].y);
+        });
+        const faceW = Math.max(nx1 - nx0, 1e-4);
+        const faceH = Math.max(ny1 - ny0, 1e-4);
+        const scanFaceW = mw * 0.47;
+        const scanFaceH = mh * 0.55;
+        const sxFace = scanFaceW / faceW;
+        const syFace = scanFaceH / faceH;
+        const scanFaceX = (mw - scanFaceW) / 2;
+        const scanFaceY = mh * 0.255;
+        const px = (v) => scanFaceX + (v - nx0) * sxFace;
+        const py = (v) => scanFaceY + (v - ny0) * syFace;
+        const faceLeft = scanFaceX;
+        const faceRight = scanFaceX + scanFaceW;
+        const faceTop = scanFaceY;
+        const faceBottom = scanFaceY + scanFaceH;
+        const faceCX = (faceLeft + faceRight) / 2;
 
-        /* glow behind the face, centred on the real landmark centroid */
-        let fx = 0, fy = 0;
-        for (let i = 0; i < 468; i++) { fx += px(pts[i]); fy += py(pts[i]); }
-        fx /= 468; fy /= 468;
-        const halo = eg.createRadialGradient(fx, fy, mh * 0.03, fx, fy, mh * 0.62);
-        halo.addColorStop(0, 'rgba(52,161,255,0.28)');
-        halo.addColorStop(0.6, 'rgba(52,161,255,0.10)');
+        /* Soft halo behind the face, centred on the real landmark centroid, so
+           the pixel scan sits in light instead of floating on black. Drawn
+           before the mesh so the mesh stays crisp over it. */
+        let fxs = 0, fys = 0;
+        for (let i = 0; i < 468; i++) { fxs += px(pts[i].x); fys += py(pts[i].y); }
+        const fcx = fxs / 468, fcy = fys / 468;
+        const halo = eg.createRadialGradient(fcx, fcy, mh * 0.04, fcx, fcy, mh * 0.62);
+        halo.addColorStop(0, 'rgba(52,161,255,0.22)');
+        halo.addColorStop(0.55, 'rgba(52,161,255,0.08)');
         halo.addColorStop(1, 'rgba(52,161,255,0)');
         eg.fillStyle = halo; eg.fillRect(0, 0, mw, mh);
 
-        /* the model: every landmark as a pixel, coloured and sized by its own
-           measured depth (violet far, cyan near) so the face reads as a form */
-        let z0 = Infinity, z1 = -Infinity;
-        for (let i = 0; i < 468; i++) {
-          const z = pts[i].z || 0;
-          if (z < z0) z0 = z;
-          if (z > z1) z1 = z;
-        }
-        const zspan = Math.max(z1 - z0, 1e-6);
-        for (let i = 0; i < 468; i++) {
-          const pt = pts[i];
-          const t = ((pt.z || 0) - z0) / zspan;          // 0 far, 1 near
-          const r = 1.5 + (1 - t) * 1.6;
-          const cr = Math.round(150 - 55 * t);
-          const cg = Math.round(130 + 97 * t);
-          eg.fillStyle = `rgba(${cr},${cg},255,${0.30 + t * 0.55})`;
-          eg.fillRect(px(pt) - r / 2, py(pt) - r / 2, r, r);
-        }
-
-        /* A faint contour joins only real measured landmark positions. It
-           reads as a biometric silhouette, rather than a photograph, and is
-           never drawn in the UNAVAILABLE state. */
-        const contour = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10];
+        /* Full-head visual envelope. Face landmarks are the measured geometry;
+           cranium, ears and neck are a lower-opacity display shell grown from
+           that geometry. This gives the full human head requested in the UI
+           without pretending a front webcam detects hair or the back of a
+           skull. */
+        const skullTop = mh * 0.115;
+        const skullBottom = faceBottom + mh * 0.025;
+        const skullRX = scanFaceW * 0.68;
+        const skullRY = (skullBottom - skullTop) * 0.52;
+        const skullCY = skullTop + skullRY;
+        const skullPoint = (a) => ({ x: faceCX + Math.cos(a) * skullRX, y: skullCY + Math.sin(a) * skullRY });
         eg.save();
-        eg.strokeStyle = 'rgba(112,224,255,0.42)'; eg.lineWidth = 1.1;
-        eg.shadowColor = 'rgba(95,227,255,0.55)'; eg.shadowBlur = 10;
+        eg.strokeStyle = 'rgba(112,224,255,.46)'; eg.lineWidth = 1.15;
+        eg.shadowColor = 'rgba(95,227,255,.62)'; eg.shadowBlur = 10;
         eg.beginPath();
-        contour.forEach((id, n) => n ? eg.lineTo(px(pts[id]), py(pts[id])) : eg.moveTo(px(pts[id]), py(pts[id])));
-        eg.stroke(); eg.restore();
-
-        /* MediaPipe measures the face, not hair or the neck. For a complete
-           mission-console silhouette we grow a clearly labelled visual
-           envelope from that measured face oval. It is a display boundary,
-           never an additional biometric reading. The facial features inside
-           remain the actual on-device points above. */
-        const faceOval = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        faceOval.forEach((id) => { minX = Math.min(minX, px(pts[id])); maxX = Math.max(maxX, px(pts[id])); minY = Math.min(minY, py(pts[id])); maxY = Math.max(maxY, py(pts[id])); });
-        const hcX = (minX + maxX) / 2;
-        const hcY = minY + (maxY - minY) * 0.46;
-        const headRX = (maxX - minX) * 0.72;
-        const headRY = (maxY - minY) * 0.83;
-        const headPoint = (theta) => ({ x: hcX + Math.cos(theta) * headRX, y: hcY + Math.sin(theta) * headRY });
-        const wire = (colour, alpha, lineWidth = 0.8) => {
-          eg.save(); eg.strokeStyle = colour; eg.globalAlpha = alpha; eg.lineWidth = lineWidth;
-          eg.shadowColor = colour; eg.shadowBlur = 7;
-          return () => eg.restore();
-        };
-        /* Full cranium boundary: top/back of head plus the measured jaw/front. */
-        let restore = wire('#74eaff', .62, 1.25);
-        eg.beginPath();
-        for (let i = 0; i <= 42; i++) {
-          const p = headPoint(Math.PI * 1.08 + (Math.PI * 1.83 * i / 42));
+        for (let i = 0; i <= 64; i++) {
+          const p = skullPoint(Math.PI * 1.02 + (Math.PI * 1.96 * i / 64));
           i ? eg.lineTo(p.x, p.y) : eg.moveTo(p.x, p.y);
         }
-        eg.stroke(); restore();
-
-        /* Horizontal and vertical wireframe curves make the outline read as a
-           complete head volume, while keeping the live face landmarks clear. */
-        restore = wire('rgba(103,221,255,.75)', .42, .65);
-        [-.62, -.31, 0, .31, .62].forEach((lat) => {
-          const yy = hcY + lat * headRY;
-          const half = headRX * Math.sqrt(Math.max(0.06, 1 - lat * lat));
+        eg.stroke();
+        /* Cranial latitude/longitude lines provide the cinematic wireframe
+           volume, deliberately lighter than the live feature mesh. */
+        eg.strokeStyle = 'rgba(109,204,255,.26)'; eg.lineWidth = .7;
+        [-.62, -.33, 0, .33, .62].forEach((lat) => {
+          const yy = skullCY + lat * skullRY;
+          const rx = skullRX * Math.sqrt(Math.max(.1, 1 - lat * lat));
           eg.beginPath();
-          for (let i = 0; i <= 22; i++) {
-            const dx = -half + (2 * half * i / 22);
-            const bow = (1 - Math.abs(dx / half)) * headRY * .065;
-            i ? eg.lineTo(hcX + dx, yy - bow) : eg.moveTo(hcX + dx, yy - bow);
+          for (let i = 0; i <= 24; i++) {
+            const dx = -rx + 2 * rx * i / 24;
+            const bow = (1 - Math.abs(dx / rx)) * skullRY * .06;
+            i ? eg.lineTo(faceCX + dx, yy - bow) : eg.moveTo(faceCX + dx, yy - bow);
           }
           eg.stroke();
         });
-        [-.72, -.42, -.14, .14, .42, .72].forEach((lon) => {
-          const xx = hcX + lon * headRX;
-          const top = hcY - headRY * Math.sqrt(Math.max(0.06, 1 - lon * lon));
-          const bottom = hcY + headRY * Math.sqrt(Math.max(0.06, 1 - lon * lon));
+        [-.72, -.45, -.18, .18, .45, .72].forEach((lon) => {
+          const xx = faceCX + lon * skullRX;
+          const ry = skullRY * Math.sqrt(Math.max(.1, 1 - lon * lon));
           eg.beginPath();
           for (let i = 0; i <= 20; i++) {
-            const yy = top + (bottom - top) * i / 20;
-            const bow = Math.sin(i / 20 * Math.PI) * lon * headRX * .1;
-            i ? eg.lineTo(xx - bow, yy) : eg.moveTo(xx - bow, yy);
+            const yy = skullCY - ry + 2 * ry * i / 20;
+            const curve = Math.sin(i / 20 * Math.PI) * lon * skullRX * .08;
+            i ? eg.lineTo(xx - curve, yy) : eg.moveTo(xx - curve, yy);
           }
           eg.stroke();
         });
-        restore();
-
-        /* Estimated neck envelope visually connects the full head to the scan
-           frame. Its opacity is lower than real landmark geometry on purpose. */
-        const neckTopY = hcY + headRY * .67;
-        const neckBottomY = Math.min(mh - 34, hcY + headRY * 1.46);
-        const neckL = hcX - headRX * .42, neckR = hcX + headRX * .42;
-        restore = wire('rgba(108,220,255,.7)', .38, .9);
-        eg.beginPath();
-        eg.moveTo(neckL, neckTopY); eg.bezierCurveTo(neckL - headRX * .13, neckBottomY - 25, neckL - headRX * .08, neckBottomY, hcX - headRX * .60, neckBottomY);
-        eg.moveTo(neckR, neckTopY); eg.bezierCurveTo(neckR + headRX * .13, neckBottomY - 25, neckR + headRX * .08, neckBottomY, hcX + headRX * .60, neckBottomY);
-        eg.stroke();
-        for (let i = 0; i < 5; i++) {
-          const y = neckTopY + (neckBottomY - neckTopY) * (i / 4);
-          const spread = headRX * (.40 + .2 * (i / 4));
-          eg.beginPath(); eg.moveTo(hcX - spread, y); eg.quadraticCurveTo(hcX, y + 9, hcX + spread, y); eg.stroke();
-        }
-        restore();
-
-        const trace = (ids, colour, width, blur) => {
-          eg.save();
-          eg.strokeStyle = colour; eg.lineWidth = width;
-          eg.shadowColor = colour; eg.shadowBlur = blur;
-          eg.beginPath();
-          ids.forEach((id, n) => n ? eg.lineTo(px(pts[id]), py(pts[id])) : eg.moveTo(px(pts[id]), py(pts[id])));
-          eg.closePath(); eg.stroke();
-          eg.restore();
-        };
-        trace([33, 160, 158, 133, 153, 144], 'rgba(139,255,210,1)', 2.2, 14);
-        trace([362, 385, 387, 263, 373, 380], 'rgba(139,255,210,1)', 2.2, 14);
-        trace([468, 469, 470, 471, 472], 'rgba(255,190,92,1)', 2.2, 16);
-        trace([473, 474, 475, 476, 477], 'rgba(255,190,92,1)', 2.2, 16);
-
-        /* the sweep: a gradient tail plus a glowing core line */
-        const sy = (performance.now() / 9) % mh;
-        const band = eg.createLinearGradient(0, sy - 46, 0, sy + 46);
-        band.addColorStop(0, 'rgba(95,227,255,0)');
-        band.addColorStop(0.5, 'rgba(95,227,255,0.34)');
-        band.addColorStop(1, 'rgba(95,227,255,0)');
-        eg.fillStyle = band; eg.fillRect(0, sy - 46, mw, 92);
-        eg.save();
-        eg.shadowColor = 'rgba(170,245,255,0.95)'; eg.shadowBlur = 18;
-        eg.fillStyle = 'rgba(198,249,255,0.95)';
-        eg.fillRect(0, sy - 1, mw, 2);
         eg.restore();
 
-        /* scope brackets */
-        const A = 22;
-        eg.strokeStyle = 'rgba(95,227,255,0.45)'; eg.lineWidth = 2;
-        eg.beginPath();
-        eg.moveTo(10, 10 + A); eg.lineTo(10, 10); eg.lineTo(10 + A, 10);
-        eg.moveTo(mw - 10 - A, 10); eg.lineTo(mw - 10, 10); eg.lineTo(mw - 10, 10 + A);
-        eg.moveTo(mw - 10, mh - 10 - A); eg.lineTo(mw - 10, mh - 10); eg.lineTo(mw - 10 - A, mh - 10);
-        eg.moveTo(10 + A, mh - 10); eg.lineTo(10, mh - 10); eg.lineTo(10, mh - 10 - A);
-        eg.stroke();
+        /* Ear outlines: positioned from the fitted live face boundary. */
+        const ear = (side) => {
+          const ex = side < 0 ? faceLeft - scanFaceW * .055 : faceRight + scanFaceW * .055;
+          const ey = faceTop + scanFaceH * .49;
+          const erx = scanFaceW * .085, ery = scanFaceH * .145;
+          eg.save(); eg.strokeStyle = 'rgba(104,230,255,.55)'; eg.lineWidth = 1.05;
+          eg.shadowColor = 'rgba(95,227,255,.55)'; eg.shadowBlur = 8;
+          eg.beginPath(); eg.ellipse(ex, ey, erx, ery, 0, 0, Math.PI * 2); eg.stroke();
+          eg.beginPath(); eg.ellipse(ex - side * erx * .08, ey, erx * .52, ery * .60, 0, Math.PI * .18, Math.PI * 1.82); eg.stroke();
+          eg.restore();
+        };
+        ear(-1); ear(1);
 
-        eg.font = '600 16px ui-monospace, monospace'; eg.fillStyle = 'rgba(139,255,210,.98)';
-        eg.fillText('EYE SCANNING', 18, 28);
-        eg.font = '12px ui-monospace, monospace'; eg.fillStyle = 'rgba(220,245,255,.78)';
-        eg.fillText(`REAL LANDMARKS · ${Math.round((mapEye.confidence || 0) * 100)}%`, 18, 48);
-        eg.fillStyle = 'rgba(95,227,255,.68)';
-        eg.fillText('LIVE FACE LANDMARKS · FULL-HEAD VISUAL ENVELOPE', 18, mh - 22);
+        /* Neck and shoulders: display envelope only, lower brightness so live
+           lips, eyes, nose and jaw remain the visual focus. */
+        const neckY = Math.min(mh - 35, faceBottom + mh * .27);
+        eg.save(); eg.strokeStyle = 'rgba(99,217,255,.35)'; eg.lineWidth = 1;
+        eg.shadowColor = 'rgba(95,227,255,.4)'; eg.shadowBlur = 6;
+        eg.beginPath();
+        eg.moveTo(faceLeft + scanFaceW * .26, faceBottom - 6);
+        eg.bezierCurveTo(faceLeft + scanFaceW * .20, neckY - 26, faceLeft + scanFaceW * .13, neckY - 6, faceLeft - scanFaceW * .12, neckY);
+        eg.moveTo(faceRight - scanFaceW * .26, faceBottom - 6);
+        eg.bezierCurveTo(faceRight - scanFaceW * .20, neckY - 26, faceRight - scanFaceW * .13, neckY - 6, faceRight + scanFaceW * .12, neckY);
+        eg.stroke();
+        for (let i = 0; i < 5; i++) {
+          const y = faceBottom + (neckY - faceBottom) * i / 4;
+          const spread = scanFaceW * (.23 + i * .06);
+          eg.beginPath(); eg.moveTo(faceCX - spread, y); eg.quadraticCurveTo(faceCX, y + 7, faceCX + spread, y); eg.stroke();
+        }
+        eg.restore();
+
+        /* The solved mesh over the whole face — outline, brows, nose and mouth.
+           Real topology traced through real points; it is what turns the pixel
+           field into a readable face rather than a scatter. */
+        eg.save();
+        eg.globalAlpha = 0.26;
+        eg.strokeStyle = 'rgba(95,200,255,0.9)';
+        eg.lineWidth = 1;
+        traceContour(eg, pts, MESH_OUTLINE, px, py);
+        MESH_DETAIL.forEach((ids) => traceContour(eg, pts, ids, px, py, false));
+        eg.restore();
+
+        /* FULL-FACE PIXEL SCAN. Every landmark the model returned becomes a
+           small pixel, so the whole face is covered instead of every other
+           point — nothing is interpolated or invented; it is the mesh's own
+           density that makes the face legible. Size and brightness still come
+           from each point's real depth, and the sweep line brightens the
+           pixels it crosses, so the panel reads as an acquisition pass rather
+           than a static scatter. */
+        const sweepY0 = motionOn ? ((anim * 0.28) % 1) * mh : -9999;
+        for (let i = 0; i < 468; i++) {
+          const pt = pts[i];
+          const depth = Math.max(0, Math.min(1, (pt.z || 0) * 2.4 + 0.5));
+          const near = motionOn ? Math.max(0, 1 - Math.abs(py(pt.y) - sweepY0) / 44) : 0;
+          const r = 1.2 + (1 - depth) * 1.5 + near * 1.1;
+          const a = Math.min(0.95, 0.12 + (1 - depth) * 0.26 + near * 0.55);
+          const X = px(pt.x), Y = py(pt.y);
+          eg.fillStyle = near > 0.3
+            ? `rgba(186,247,255,${a})`
+            : `rgba(89,220,255,${a})`;
+          eg.fillRect(X - r / 2, Y - r / 2, r, r);
+        }
+
+        /* lit contours: eyelids and irises */
+        const trace = (ids, colour, width = 1.5) => {
+          eg.save();
+          eg.shadowColor = colour; eg.shadowBlur = 9;
+          eg.strokeStyle = colour; eg.lineWidth = width;
+          traceContour(eg, pts, ids, px, py);
+          eg.restore();
+        };
+        trace(LID_L, 'rgba(139,255,210,.98)', 2);
+        trace(LID_R, 'rgba(139,255,210,.98)', 2);
+        trace(IRIS_L, 'rgba(255,190,92,.98)', 1.8);
+        trace(IRIS_R, 'rgba(255,190,92,.98)', 1.8);
+
+        /* expanding acquisition ring from the real iris centroid */
+        let sumX = 0, sumY = 0, n = 0;
+        IRIS_L.concat(IRIS_R).forEach((id) => { sumX += px(pts[id].x); sumY += py(pts[id].y); n += 1; });
+        const ix = sumX / n, iy = sumY / n;
+        if (motionOn) {
+          const pr = (anim * 0.9) % 1;
+          eg.beginPath();
+          eg.arc(ix, iy, 12 + pr * 90, 0, Math.PI * 2);
+          eg.strokeStyle = `rgba(95,227,255,${0.28 * (1 - pr)})`;
+          eg.lineWidth = 1.5;
+          eg.stroke();
+        }
+
+        /* twin sweep: a slow horizontal scan bar and a faster vertical one.
+           The horizontal bar is the same `sweepY0` the pixel cloud brightens
+           against, so the light and the pixels are one pass, not two. */
+        if (motionOn) {
+          const sy = sweepY0;
+          const band = eg.createLinearGradient(0, sy - 34, 0, sy + 34);
+          band.addColorStop(0, 'rgba(95,227,255,0)');
+          band.addColorStop(.5, 'rgba(95,227,255,.22)');
+          band.addColorStop(1, 'rgba(95,227,255,0)');
+          eg.fillStyle = band; eg.fillRect(0, sy - 34, mw, 68);
+          eg.fillStyle = 'rgba(170,245,255,0.60)'; eg.fillRect(0, sy - 0.5, mw, 1);
+
+          const sx = ((anim * 0.19 + 0.5) % 1) * mw;
+          const bandV = eg.createLinearGradient(sx - 30, 0, sx + 30, 0);
+          bandV.addColorStop(0, 'rgba(139,255,210,0)');
+          bandV.addColorStop(.5, 'rgba(139,255,210,.14)');
+          bandV.addColorStop(1, 'rgba(139,255,210,0)');
+          eg.fillStyle = bandV; eg.fillRect(sx - 30, 0, 60, mh);
+        }
+
+        /* vignette, so the frame edges fall away */
+        const vg = eg.createRadialGradient(mw / 2, mh / 2, mh * 0.35, mw / 2, mh / 2, mh * 0.8);
+        vg.addColorStop(0, 'rgba(0,0,0,0)');
+        vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+        eg.fillStyle = vg; eg.fillRect(0, 0, mw, mh);
+
+        /* HUD: restrained status only, leaving the scan volume uncluttered. */
+        eg.font = '600 16px ui-monospace, monospace';
+        eg.fillStyle = 'rgba(139,255,210,.98)';
+        eg.fillText('EYE SCANNING', 18, 30);
+        eg.font = '12px ui-monospace, monospace';
+        eg.fillStyle = 'rgba(220,245,255,.78)';
+        eg.fillText(`LIVE FEATURES · ${Math.round((mapEye.confidence || 0) * 100)}%`, 18, 50);
+        const conf = Math.max(0, Math.min(1, mapEye.confidence || 0));
+        eg.fillStyle = 'rgba(95,227,255,0.18)';
+        eg.fillRect(mw - 168, 22, 150, 6);
+        eg.fillStyle = 'rgba(139,255,210,0.95)';
+        eg.fillRect(mw - 168, 22, 150 * conf, 6);
+
+        /* scope corner brackets framing the whole window */
+        brackets(eg, 10, 10, mw - 20, mh - 20, 22, 'rgba(95,227,255,0.45)', 2);
       } else {
+        /* Still show the scope furniture, so the panel reads as an instrument
+           waiting for a signal rather than a broken black box. */
         eg.font = '600 16px ui-monospace, monospace'; eg.fillStyle = 'rgba(255,189,87,.9)';
-        eg.fillText('EYE SCAN UNAVAILABLE', 18, 28);
+        eg.fillText('EYE SCAN UNAVAILABLE', 18, 30);
         eg.font = '12px ui-monospace, monospace'; eg.fillStyle = 'rgba(220,245,255,.54)';
-        eg.fillText(c?.running ? 'WAITING FOR REAL FACE / IRIS LANDMARKS' : 'CAMERA IS OFF', 18, 48);
-        eg.fillStyle = 'rgba(95,227,255,.46)';
-        eg.fillText('INSTRUMENT GRID ACTIVE · NO BIOMETRIC RESULT', 18, mh - 22);
+        eg.fillText(c?.running ? 'WAITING FOR REAL FACE / IRIS LANDMARKS' : 'CAMERA IS OFF', 18, 50);
+        brackets(eg, 10, 10, mw - 20, mh - 20, 22, 'rgba(95,227,255,0.30)', 2);
       }
+
+      /* One label that is true in every state: the underlying field is the
+         live analysis buffer, while the large wireframe is a visualization. */
+      eg.font = '11px ui-monospace, monospace';
+      eg.fillStyle = 'rgba(150,210,255,.6)';
+      eg.fillText(mapEye?.available
+        ? 'LIVE FACE LANDMARKS · FULL-HEAD VISUAL ENVELOPE'
+        : 'LIVE ANALYSIS BUFFER 64×48 · NO BIOMETRIC RESULT', 18, mh - 12);
 
       /* global motion vector, unchanged from the motion estimator */
       g.strokeStyle = 'rgba(95,227,255,0.7)';
@@ -864,18 +1193,47 @@ export function mountIntegrationSection({ camera } = {}) {
       /* On-image banner: the same verdict, where the subject is already looking.
          Drawn OUTSIDE the mirror transform — text under a flip renders
          back-to-front, which is why the box is mirrored and the type is not. */
-      g.font = '600 14px ui-monospace, monospace';
       const badge = verdict === 'VERIFIED';
-      g.fillStyle = badge ? 'rgba(95,227,255,0.95)' : 'rgba(255,189,87,0.95)';
-      g.fillText(badge ? `FACE VERIFIED · ${((now - heldSince) / 1000).toFixed(1)}s` : verdict, 14, 26);
+      const accent = badge ? '95,227,255' : '255,189,87';
+      const banner = badge ? `FACE VERIFIED · ${((now - heldSince) / 1000).toFixed(1)}s` : verdict;
+      g.font = '600 14px ui-monospace, monospace';
+      const bwidth = g.measureText(banner).width + 30;
+      g.fillStyle = 'rgba(4,8,18,0.66)';
+      if (g.roundRect) { g.beginPath(); g.roundRect(10, 12, bwidth, 26, 13); g.fill(); }
+      else g.fillRect(10, 12, bwidth, 26);
+      g.save();
+      g.shadowColor = `rgba(${accent},0.9)`; g.shadowBlur = 10;
+      g.strokeStyle = `rgba(${accent},0.72)`; g.lineWidth = 1;
+      if (g.roundRect) { g.beginPath(); g.roundRect(10, 12, bwidth, 26, 13); g.stroke(); }
+      g.restore();
+      /* status lamp: a steady dot, breathing only while a verdict is held */
+      const lampR = 3.4 + (badge && motionOn ? Math.sin(anim * 4) * 0.8 : 0);
+      g.beginPath();
+      g.arc(23, 25, lampR, 0, Math.PI * 2);
+      g.fillStyle = `rgb(${accent})`;
+      g.fill();
+      g.fillStyle = `rgba(${accent},0.98)`;
+      g.fillText(banner, 33, 30);
+
+      /* scope corners on the preview, so the feed reads as a live sensor view */
+      g.save();
+      g.globalAlpha = 0.55;
+      brackets(g, 8, 8, pw - 16, ph - 16, 26, `rgba(${accent},0.85)`, 2);
+      g.restore();
 
       g.font = '11px ui-monospace, monospace';
       if (f) {
-        g.fillStyle = 'rgba(255,255,255,0.92)';
-        g.fillText(`${String(f.status).toUpperCase()}${f.basis && f.basis !== '—' ? ` VIA ${String(f.basis).toUpperCase()}` : ''} · CONF ${Math.round((f.confidence || 0) * 100)}%`, 14, ph - 30);
+        const line1 = `${String(f.status).toUpperCase()}${f.basis && f.basis !== '—' ? ` VIA ${String(f.basis).toUpperCase()}` : ''} · CONF ${Math.round((f.confidence || 0) * 100)}%`;
         const pose = (f.yaw === null || f.yaw === undefined)
           ? `POSE — ${String(f.poseNote || 'unavailable').toUpperCase()}`
           : `YAW ${f.yaw > 0 ? '+' : ''}${f.yaw.toFixed(1)}°  PITCH ${f.pitch > 0 ? '+' : ''}${f.pitch.toFixed(1)}°  ROLL ${f.roll > 0 ? '+' : ''}${f.roll.toFixed(1)}°`;
+        const plate = Math.max(g.measureText(line1).width, g.measureText(pose.slice(0, 74)).width) + 18;
+        g.fillStyle = 'rgba(4,8,18,0.58)';
+        if (g.roundRect) { g.beginPath(); g.roundRect(10, ph - 46, plate, 40, 8); g.fill(); }
+        else g.fillRect(10, ph - 46, plate, 40);
+        g.fillStyle = 'rgba(255,255,255,0.92)';
+        g.fillText(line1, 14, ph - 30);
+        g.fillStyle = 'rgba(150,210,255,0.88)';
         g.fillText(pose.slice(0, 74), 14, ph - 14);
       }
     };
@@ -891,6 +1249,11 @@ export function mountIntegrationSection({ camera } = {}) {
       liveRows.rate.querySelector('b').textContent = `${hz} Hz`;
       liveRows.head.querySelector('b').textContent = live?.running ? `${live.headMotion.toFixed(2)} deg/s` : '—';
       liveRows.eyes.querySelector('b').textContent = live?.running ? eyeText(live.eye) : '—';
+      const emEl = liveRows.eyemodel.querySelector('b');
+      emEl.textContent = live?.running ? eyeModelText(live.eye) : '—';
+      /* The row clips to one line, so carry the untruncated reason on the
+         element itself where it can still be read. */
+      emEl.title = live?.eye?.error || '';
       liveRows.gaze.querySelector('b').textContent = live?.running ? gazeText(live.eye) : '—';
       liveRows.quality.querySelector('b').textContent = live?.running ? `${Math.round(live.quality * 100)}%` : '—';
       liveRows.energy.querySelector('b').textContent = c ? Math.max(0, c.motionEnergy - (c.noiseFloor?.energy ?? 0)).toFixed(4) : '—';

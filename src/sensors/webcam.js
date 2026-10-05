@@ -578,6 +578,12 @@ export class CameraProvider extends SensorProvider {
         this.eye.status = 'unavailable';
         this.eye.available = false;
         this.eye.error = String(err?.message || err).slice(0, 120);
+        /* Drop the cached promise so STOP → START retries the load. Without
+           this the failed attempt was cached for the rest of the session and a
+           transient failure — a slow fetch, a GPU delegate that failed once —
+           became permanent: every later start just returned the same dead
+           promise and the panel never recovered. */
+        this._eyeLoading = null;
       }
     })();
     return this._eyeLoading;
@@ -714,6 +720,25 @@ export class CameraProvider extends SensorProvider {
     const cx = lumSum > 0 ? lumX / lumSum / PROC_W : 0.5;
     const cy = lumSum > 0 ? lumY / lumSum / PROC_H : 0.5;
     return { grey, lum, skin, skinCount, cx, cy };
+  }
+
+  /**
+   * Read-only view of the estimator's own working buffers, so the UI can show
+   * what the pipeline is actually looking at instead of an empty panel.
+   *
+   * These arrays are LIVE: they are rewritten in place on every analysis frame.
+   * Read them; never mutate them. This is the raw downsampled frame the
+   * detector scores — it is NOT a landmark scan, NOT a 3D model and NOT a
+   * measurement, and any UI that draws it must say so. Returns null until the
+   * first frame has been grabbed.
+   */
+  analysisField() {
+    if (!this._lumReady) return null;
+    return {
+      w: PROC_W, h: PROC_H,
+      lum: this._lum, struct: this._struct,
+      dark: this._dark, motion: this._motion, skin: this._skin,
+    };
   }
 
   /** Build a summed-area table in place. `dst` is (PROC_W+1) x (PROC_H+1). */
@@ -1203,6 +1228,11 @@ export class CameraProvider extends SensorProvider {
     const f = this.face;
     const eye = {
       status: this.eye.status,
+      /* The reason the local landmark model could not start, carried through to
+         the UI. It used to be captured and then never shown anywhere, so a
+         failed model load was indistinguishable from "no face in frame" — the
+         panel just said UNAVAILABLE with no way to tell why. */
+      error: this.eye.error || null,
       available: this.eye.available,
       gazeX: this.eye.gazeX,
       gazeY: this.eye.gazeY,
