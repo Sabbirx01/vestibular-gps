@@ -770,6 +770,32 @@ export function mountIntegrationSection({ camera } = {}) {
           eg.closePath(); eg.stroke();
           eg.restore();
         };
+
+        /* Feature topology — all index paths are MediaPipe face landmarks.
+           These clean anatomical contours turn the point cloud into a readable
+           face structure: brows, nasal bridge, lips and cheek planes. */
+        const openTrace = (ids, colour, width = 1, blur = 0, alpha = 1) => {
+          eg.save();
+          eg.strokeStyle = colour; eg.lineWidth = width; eg.globalAlpha = alpha;
+          eg.shadowColor = colour; eg.shadowBlur = blur;
+          eg.beginPath();
+          ids.forEach((id, n) => n ? eg.lineTo(px(pts[id]), py(pts[id])) : eg.moveTo(px(pts[id]), py(pts[id])));
+          eg.stroke(); eg.restore();
+        };
+        const brow = 'rgba(160,226,255,0.92)';
+        openTrace([70, 63, 105, 66, 107], brow, 1.3, 6);
+        openTrace([336, 296, 334, 293, 300], brow, 1.3, 6);
+        openTrace([6, 197, 195, 5, 4], 'rgba(130,208,255,0.74)', 1.05, 5);
+        openTrace([98, 97, 2, 326, 327], 'rgba(130,208,255,0.74)', 1.05, 5);
+        trace([61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146], 'rgba(172,124,255,0.88)', 1.3, 7);
+        trace([78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 42, 183], 'rgba(185,148,255,0.55)', .75, 4);
+        openTrace([234, 93, 132, 58], 'rgba(100,213,255,0.45)', .8, 3);
+        openTrace([454, 323, 361, 288], 'rgba(100,213,255,0.45)', .8, 3);
+        /* Sparse real-point links imply a premium wire mesh, without filling
+           the face with a fake solid mask. */
+        [[10, 70], [10, 336], [70, 33], [336, 263], [33, 1], [263, 1], [1, 13], [13, 152], [234, 61], [454, 291], [58, 17], [288, 17]].forEach(([a, b]) => {
+          openTrace([a, b], 'rgba(92,197,255,0.28)', .65, 2);
+        });
         trace([33, 160, 158, 133, 153, 144], 'rgba(139,255,210,1)', 2.2, 14);
         trace([362, 385, 387, 263, 373, 380], 'rgba(139,255,210,1)', 2.2, 14);
         trace([468, 469, 470, 471, 472], 'rgba(255,190,92,1)', 2.2, 16);
