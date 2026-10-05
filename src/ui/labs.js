@@ -1352,10 +1352,28 @@ function mountResearchEvidence() {
   if (!root) return;
   const slides = [
     {
+      source: 'nasaTechPort157166',
+      image: 'https://techport.nasa.gov/images/NASA-Logo.png',
+      kicker: 'NASA TECHPORT',
+      connection: 'NASA documents a need for unobtrusive monitoring tools, operational assessments and sensorimotor performance metrics after gravity transitions.',
+    },
+    {
+      source: 'ntrsSensorimotorCountermeasures',
+      image: 'https://www.nasa.gov/wp-content/uploads/2025/01/figure-4-8-1.png',
+      kicker: 'NASA NTRS · 2024',
+      connection: 'The public NASA technical record describes countermeasures and assessment tools for neurovestibular effects across gravity transitions.',
+    },
+    {
       source: 'nasaSensorimotorHub',
       image: 'https://www.nasa.gov/wp-content/uploads/2023/03/sensorimotor.jpeg',
       kicker: 'NASA RISK',
       connection: 'Altered gravity can affect orientation, balance, locomotion and fine motor control—especially around gravity transitions.',
+    },
+    {
+      source: 'nasaHumanPerformance',
+      image: 'https://www.nasa.gov/wp-content/uploads/2025/01/figure-4-8-1.png',
+      kicker: 'NASA-STD-3001',
+      connection: 'NASA human-performance requirements make operational readiness and explicit uncertainty more important than a cosmetic score.',
     },
     {
       source: 'nasaCipherReference',
@@ -1368,6 +1386,18 @@ function mountResearchEvidence() {
       image: 'https://www.nasa.gov/wp-content/uploads/2026/02/55065874866-7c923a326a-k-1.png',
       kicker: 'OPERATIONAL CONTEXT',
       connection: 'NASA is studying disorientation during altered-gravity transitions and its impact on manual landing and control tasks.',
+    },
+    {
+      source: 'nasaFundamentalsHumanHealth',
+      image: 'https://www.nasa.gov/wp-content/uploads/2024/02/iss070e083382.jpg',
+      kicker: 'HUMAN HEALTH',
+      connection: 'Human health and performance are mission systems: this project shows monitoring limits, not an autonomous medical conclusion.',
+    },
+    {
+      source: 'cipherVestibularHealth',
+      image: 'https://www.nasa.gov/wp-content/uploads/2022/12/cipher_argos.png',
+      kicker: 'NASA NTRS · 2023',
+      connection: 'NASA’s Neuro-Vestibular Examination records eye, head and body movement repeatedly across the mission—our camera view is experimental and not that clinical examination.',
     },
   ].map((slide) => ({ ...slide, meta: SOURCES[slide.source] }));
 

@@ -224,6 +224,18 @@ export const SOURCES = {
     supports: 'Why the project focuses on gravity-transition readiness, spatial disorientation, and critical manual-task context.',
     used: ['Research evidence carousel', 'Pitch problem framing'],
   },
+  nasaFundamentalsHumanHealth: {
+    id: 'nasaFundamentalsHumanHealth',
+    title: 'Fundamentals of Human Health',
+    org: 'NASA Office of the Chief Health and Medical Officer',
+    tier: 'AGENCY',
+    url: 'https://www.nasa.gov/reference/fundamentals-of-human-health/',
+    pub: 'Accessed 2026-10-05',
+    topics: ['spaceflight', 'risk', 'performance'],
+    summary: 'NASA overview of the human-health factors needed to sustain crew health and performance on exploration missions.',
+    supports: 'The broad human-health context for making uncertainty, monitoring limits and crew decision authority visible in this prototype.',
+    used: ['Research evidence carousel', 'Mission context'],
+  },
   nasaCipherReference: {
     id: 'nasaCipherReference',
     title: 'CIPHER: Complement of Integrated Protocols for Human Exploration Research',
