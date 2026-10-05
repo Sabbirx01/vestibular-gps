@@ -10,7 +10,7 @@ links and terms immediately before publishing.
 |---|---|---|---|
 | VESTIBULAR GPS original code/content | repository root | [Apache-2.0](../../LICENSE) | retain licence and NOTICE; confirm every contributor agrees |
 | Three.js | `vendor/three.module.js` | MIT, per [NOTICE](../../NOTICE) | retain upstream licence/header |
-| Draco decoder files | `vendor/draco/` | third-party component; verify exact upstream notice before redistributing separately | preserve bundled notices; do not invent a licence |
+| Draco decoder files | `vendor/libs/draco/gltf/` | Google Draco, [Apache-2.0](https://github.com/google/draco/blob/main/LICENSE), recorded in [NOTICE](../../NOTICE) | retain the Apache-2.0 notice; do not represent Draco as original project code |
 
 ## Models and visual maps
 
@@ -28,7 +28,7 @@ and verify the new asset's terms first.
 
 ## Scientific source register
 
-The existing site has a 15-link registry in [docs/SOURCES.md](../SOURCES.md).
+The existing site has a 16-entry registry in [docs/SOURCES.md](../SOURCES.md).
 For a competition submission, use original sources rather than a secondary blog:
 
 | Claim area | Primary/source-of-record citation |
@@ -43,11 +43,11 @@ For a competition submission, use original sources rather than a secondary blog:
 
 | Category | Known status | Must be completed before use |
 |---|---|---|
-| Code/docs | AI assistants were used, according to `docs/AI_USE.md` | name the tool/model if known; describe team review |
-| Video/stills | AI-generated/dramatization is documented | name generator, verify platform terms, add on-screen disclosure if used |
-| Narration | synthetic speech is documented | state tool/voice terms; label synthetic narration |
-| Music | current draft says made from scratch with ffmpeg | verify final music's rights; replace if not clearly licensed |
-| Team photos | real photos with edited backgrounds documented | obtain team consent and keep originals/permission evidence |
+| Code/docs | Accio AI was used with team direction and review | disclose it in the submission's AI-use field |
+| Video/stills | Google Flow / Veo footage is dramatization | retain the on-screen `DRAMATIZATION` label and generation evidence |
+| Narration | ElevenLabs synthetic voice | label it synthetic in the project disclosure |
+| Music | final bed is team-created in ffmpeg | retain the generation command/source files with the release materials |
+| Team photos | real photos with edited backgrounds | team confirms participant consent; retain originals/permission evidence privately |
 
 ## Final source check
 

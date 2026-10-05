@@ -193,24 +193,25 @@ same confidence as a colour-held one.
   The moments still drive the pose and the neutral.
 - `confidence` describes the LOCK (from the detector's score) and is published
   with or without a neutral; it is a relative score, not a probability
-- every value is an **estimate** (`estimated: true`, `eyeLandmarks: false`), not
-  a goniometer reading
+- every pose value is an **estimate** (`estimated: true`), not a goniometer
+  reading; `eyeLandmarks` reports whether the optional local landmark model is
+  presently supplying a visual-only eye signal
 
 **What it does not do:**
-- it does not measure gaze
-- therefore it **cannot compute VOR gain**, which requires eye landmarks; the
-  face scan provides none, so `eyeHead` remains `null` and the UI says so
+- it does not measure clinical gaze
+- therefore it **cannot compute VOR gain**. Local eye/iris landmarks are only
+  an experimental face-relative visual signal; without a calibrated eye/head
+  velocity protocol, `eyeHead` remains `null` and the UI says so
 - it cannot separate a head **translation** from a head **rotation** — sliding
   sideways moves the region exactly like a yaw
 
-**Why not MediaPipe Face Mesh:** roughly 3 MB of model plus WASM from a CDN,
-which would break the offline guarantee the project is built on and fail on a
-hackathon network.
+**Local landmark layer:** MediaPipe Face Landmarker and its model/WASM are
+bundled under Apache-2.0 and run on-device. They are not a clinical instrument,
+do not upload frames, and do not convert this browser camera into vHIT.
 
-**Upgrade path:** a landmark model drops in as a `SensorProvider` with the same
-interface. The `eye_head` channel would then carry a real gaze-error value
-instead of a proxy, and VOR gain becomes computable. Nothing else in the
-pipeline changes.
+**Upgrade path:** a validated eye/head instrument provider can use the same
+interface. Only that provider may populate `eye_head` or compute VOR gain;
+the browser landmark visual remains unavailable to the metric by design.
 
 ## Privacy
 

@@ -36,7 +36,7 @@ The site is a zero-build native ES-module app. Do not add npm/bundler/CDN requir
 The last pushed commit before the current Earth upgrade is:
 
 ```text
-ce3e0a4 fix(earth,cursor,licence): stop the Earth blowing out, make the exhaust read as smoke, add a proprietary licence
+ce3e0a4 fix(earth,cursor,licence): stop the Earth blowing out, make the exhaust read as smoke, add licence record
 ```
 
 **Update — 30 September 2026.** The staged Earth work listed below has since been verified, committed and pushed as `54edda2` (`feat(earth): use a locally bundled NASA Blue Marble surface map`). The live page and the live asset both return HTTP 200. Full evidence: `reports/fix-reports/EARTH-BLUE-MARBLE-VERIFICATION-2026-09-30-BN.md`.

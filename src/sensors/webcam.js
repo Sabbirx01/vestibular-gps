@@ -1,11 +1,11 @@
 /* ═══════════════════════════════════════════════════════════
    CameraProvider — head-motion tracking from the front camera.
 
-   WHY THIS SHAPE AND NOT MEDIAPIPE
-   The roadmap's §2.5 wants webcam head/eye tracking. The obvious route is
-   MediaPipe Face Mesh, but that pulls a ~3 MB model plus WASM from a CDN —
-   which breaks the offline guarantee the whole project is built on, and
-   fails on a hackathon network.
+   WHY THIS SHAPE
+   The motion estimator is deliberately self-contained, and the optional
+   MediaPipe Face Landmarker model is bundled locally with its WASM runtime.
+   Nothing is loaded from a CDN, so both paths work after the site is cached
+   and no camera frame leaves the device.
 
    So this is a self-contained estimator instead. It does real measurement,
    not decoration:
@@ -19,10 +19,10 @@
        slow lateral/vertical drift signal
 
     HONEST SCOPE — this is stated in the UI as well:
-      This measures HEAD MOTION. It does not measure gaze, and it cannot
-      compute VOR gain, because VOR gain needs eye landmarks. A landmark
-      model is a documented upgrade path (see docs/SENSOR_API.md); when one
-      is present the same provider interface accepts it unchanged.
+      This measures HEAD MOTION. The optional local landmarks can provide an
+      experimental face-relative eye/gaze visualization, but cannot compute
+      VOR gain: validated vHIT requires calibrated eye/head velocity and an
+      imposed head-impulse protocol that a normal webcam does not provide.
 
     FACE SCAN — what it does, and what it deliberately does not
       The provider also locates the FACE REGION in each analysed frame and
@@ -49,9 +49,10 @@
       inside it (skin OR structure), by image moments, which is what gives a
       centre and a spread that actually move when the head turns.
 
-      It uses NO facial landmarks. So:
-        • it cannot measure gaze, eye position, or VOR gain, and `eyeHead`
-          stays null. The UI keeps saying so, in those words.
+      The coarse detector itself uses NO facial landmarks. The optional local
+      landmark model is a separate visual layer. So:
+        • it cannot measure clinical gaze, eye position, or VOR gain, and
+          `eyeHead` stays null for the metric. The UI keeps saying so.
         • every pose number is an ESTIMATE with a few degrees of uncertainty,
           not a goniometer reading. Published values carry `estimated: true`,
           a `basis` field naming the channel holding the lock, and a method
@@ -1228,11 +1229,11 @@ export class CameraProvider extends SensorProvider {
     const jitterDeg = jitterClean * 18;                 // deg-equivalent scale
     const travelDeg = travelClean * 1.1;
 
-    /* Face scan, published alongside the motion number. `eyeLandmarks: false`
-       is part of the payload rather than a comment because it is the reason
-       `eyeHead` below is null: a consumer should never have to guess why the
-       eye half of eye-head coordination is missing. Pose values are null until
-       calibrate() stores a neutral — see _updatePose(). */
+    /* Face scan, published alongside the motion number. `eyeLandmarks` reports
+       whether the optional local visual landmark layer is available. `eyeHead`
+       remains null even when it is: the browser does not have a validated
+       eye/head-velocity protocol. Pose values are null until calibrate() stores
+       a neutral — see _updatePose(). */
     const f = this.face;
     const eye = {
       status: this.eye.status,

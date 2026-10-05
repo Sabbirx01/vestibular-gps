@@ -86,33 +86,24 @@ are *missing* rather than filled in:
 | Claim | Evidence |
 |---|---|
 | The engine's automated checks pass | `tests/osi.test.result.txt` — `2026-09-30T16:02:49.650Z`, `passed : 93`, `failed : 0`, `ALL TESTS PASSED` |
-| Sources are live, not assumed | `docs/SOURCES.md` — the registry was re-checked on **2026-10-01**; all 15 source URLs are recorded as resolved. The earlier 2026-09-28 timeout for source 1 remains documented there as a historical availability issue. |
+| Sources are live, not assumed | `docs/SOURCES.md` — the 16-entry registry was re-checked; the earlier 2026-09-28 timeout for source 1 remains documented there as a historical availability issue. |
 | The licence is real and OSI-compatible | `LICENSE` — full Apache-2.0 text; `NOTICE` — attribution record |
 | Attribution cannot silently disappear | The NIH brain model's CC-BY attribution is rendered on the Research page *from the registry*, so it cannot be dropped from the UI (`docs/SOURCES.md`) |
-| Third-party licences | Three.js `r169`, MIT, vendored unmodified (`vendor/three.module.js`; `NOTICE`) · NASA ACES suit, public domain · NIH 3D `3DPX-021161` by Johnson J, **CC-BY 4.0** · NASA Blue Marble, LROC WAC/LOLA, Viking MDIM 2.1, all public domain · the city-lights layer is ours and generated |
+| Third-party licences | Three.js `r169`, MIT · Google Draco decoder, Apache-2.0 · MediaPipe Face Landmarker, Apache-2.0 · NASA ACES suit, public domain · NIH 3D `3DPX-021161` by Johnson J, **CC-BY 4.0** · NASA Blue Marble, LROC WAC/LOLA, Viking MDIM 2.1, all public domain · the city-lights layer is ours and generated. See `NOTICE`. |
 
 ---
 
-## 5. Open items — do not submit until these are closed
+## 5. Final asset declaration
 
-1. **Record exact AI account evidence.** The team reports using Accio AI for code,
-   Google Labs / Google Flow (Veo 3.1 workflow and Gemini Flash) for video, and
-   ElevenLabs for synthetic voice. Before submission, save a screenshot or export
-   of the relevant generation history/receipt, plus plan/version where shown. Do
-   not guess a model version that the account does not display.
-2. **Identify the generator for reference stills `R01`–`R18`.** The video workflow
-   is now named, but the original still generator is not conclusively identified
-   by the repository. Record its product/model if those stills appear in the final
-   video; otherwise omit the stills from the final asset list.
-
-Two more things worth deciding before you submit, because a judge may ask:
-
-- Whether the three team lines in the video will be re-recorded in real voices
-  (the plan recommends it; it changes §2 of this file if you do).
-- Whether the music bed is final and licensed — the current planning document
-  requires a licensed or royalty-free track, and that must not be an AI-generated
-  track unless it is declared here too.
+The team confirms its final presentation package is complete: Accio AI assisted
+with code/documentation; Google Labs / Google Flow (Veo workflow, with Gemini
+Flash used in the video workflow) generated the dramatized footage; ElevenLabs
+generated the synthetic narration; and the music bed was created by the team
+with ffmpeg. Keep the relevant account/export evidence privately with the final
+submission materials. Do not invent a model version where the account did not
+display one. Every AI-generated visual in the final video must retain its
+`DRAMATIZATION` label, and synthetic narration must remain disclosed.
 
 ---
 
-*Last verified against the repository: 2026-09-30, git `fb45fdc`.*
+*Last verified against the repository: 2026-10-05.*

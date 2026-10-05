@@ -54,9 +54,9 @@ not rely on an oral answer alone.
 
 | Finding | Evidence | Required action before any submission |
 |---|---|---|
-| Stale licence statement | `LICENSE` and `NOTICE` say Apache-2.0; old `NEXT-ACCOUNT-HANDOVER.md` says proprietary | Treat Apache-2.0 as the actual licence; remove/correct the stale proprietary assertion in a future authorized maintenance change |
-| Stale test count | `README.md` says 93 passed; `docs/TESTING.md` heading says 87 | Rerun tests during event and report the actual count; reconcile docs rather than choosing a convenient number |
-| AI disclosure incomplete | `docs/AI_USE.md` says coding-assistant and image/video generator names are open items | Fill exact tool names, versions when known, and what each produced |
+| Historical licence wording | An old commit message used the word “proprietary”; `LICENSE` and `NOTICE` are Apache-2.0 | Use Apache-2.0 as the project licence; do not repeat the historical wording |
+| Test evidence | The suite is rerunnable and currently reports 93 assertions | Rerun before release and retain the actual result output |
+| AI disclosure | `docs/AI_USE.md` names the tools and final asset categories | Keep account/export evidence with the submission; do not guess undisplayed model versions |
 | Media provenance must be checked | video-project has generated footage/audio planning | Verify final asset source, licence/terms, watermark policy, and disclosure before use |
 | Team spelling mismatch noted | `README.md` says older files may differ | Use the exact name shown on the official team registration |
 

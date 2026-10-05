@@ -8,7 +8,7 @@
 
 > **সাবমিশনের দুটো অতিরিক্ত ফাইল:** **`docs/AI_USE.md`** — প্রজেক্ট পেজের বাধ্যতামূলক "Use of AI" ফিল্ডের উত্তর (কোনটা AI দিয়ে বানানো, কোনটা নয়, কীভাবে লেবেল করা)। **`captions/`** — ইংরেজি সাবটাইটেল (`.srt` + `.vtt`), narration-এর হুবহু লেখা: ফাইনাল ফিল্ম `VESTIBULAR-GPS-3MIN-FINAL.mp4` (১৭৬s)-এর জন্য `VGPS-FILM-3MIN-EN.*`, আর ২৪০s কাটের জন্য `VGPS-PITCH-4MIN-EN.*` — দুটো আলাদা ভিডিও, গুলিয়ে ফেলবেন না।
 
-**Last verified:** 28 September 2026, Asia/Dhaka  
+**Last verified:** 5 October 2026, Asia/Dhaka
 **Code baseline:** the `tests/osi.test.result.txt` in this repository is regenerated on every test run, and its timestamp is the authority on when the suite last passed. A hard-coded commit hash here went stale once and was misread as a code state, so it is not repeated.  
 **Live site:** <https://sabbirx01.github.io/vestibular-gps/>  
 **Repository:** <https://github.com/Sabbirx01/vestibular-gps>  
@@ -52,7 +52,7 @@ Do not describe the product as a validated clinical monitor. Describe it as a **
 - The face scan searches face-shaped windows on the 64x48 buffer and scores each on four channels — skin colour after a grey-world white balance, local structure (gradient), dark features, and frame-difference motion — multiplied by shape, position, brightness and size priors. Statistics come from summed-area tables. The winning window seeds a fit by image moments, which supplies the region's centre and spread.
 - It is **not** a skin-colour blob finder, and that is the point: the first version was, and it locked a wall on the first real camera it met, because that video's purple cast put the face outside every classic skin bound while the beige wall sat inside them. Face vs wall on that frame: structure 4.95 vs 1.49, dark-fraction 0.28 vs 0.02, colour 0.00 vs 0.00.
 - The scan reports a **coarse head pose** (yaw/pitch/roll) from the fitted region: centroid displacement, the change in the ratio of the region's two spreads, and the tilt of its principal axis. Pose is zeroed against a neutral captured by CALIBRATE and stays `null` until that neutral exists. Every published value carries `estimated: true` and a `basis` field naming the channel that is holding the lock; `basis: "structure"` means the colour rule is silent and the lock is far less certain.
-- Camera does **not** measure gaze and therefore does **not** produce VOR gain. The UI must say `UNAVAILABLE — CAMERA HAS NO EYE LANDMARKS`; do not invent eye/VOR values. The face scan does not change this: it uses no landmarks, so `eyeHead` stays null.
+- Camera runs a bundled, on-device experimental face/eye-landmark model and therefore may show a **face-relative gaze offset**. It still does **not** produce VOR gain or clinical vHIT: the required calibrated head-velocity protocol and validation are absent, so `eyeHead` remains unavailable to the OSI metric.
 - The face-scan pose is a proxy, not a goniometer: a lateral head translation moves the region exactly like a yaw, and the direction term has a dead zone (0.06 of a face width) so that noise cannot decide which way the head turned.
 - All four bodies of the Space section now carry real surface maps instead of procedural colour: the Earth and MICROGRAVITY the NASA Blue Marble composite, the Moon the SVS "CGI Moon Kit" LROC WAC colour mosaic with the LOLA elevation map as a bump map (so the maria and crater rims carry real relief, not just paint), and Mars the USGS/NASA Viking MDIM 2.1 colourised global mosaic. Every map is bundled locally, loads non-blockingly over the procedural fallback, and is credited in `NOTICE`.
 - The Moon additionally gets an airless-body treatment that the other bodies do not: its atmosphere shell and white limb glow sit near zero, its fill and bounce lights are cut (there is no atmosphere around it to scatter light), its albedo is scaled down off the tone curve's shoulder, and a **limb-darkening shell** darkens the disc towards its edge. Measured on the rendered frame: the edge/centre falloff went from 0.903 to 0.842 and the core's mean luminance from 194 to 177, so the maria separate and the disc reads as a lit rock instead of a pale ball.
@@ -78,7 +78,7 @@ Do not describe the product as a validated clinical monitor. Describe it as a **
 
 - Camera motion values are an estimator output, not clinically calibrated head displacement.
 - Face-scan head pose is an estimator output from a skin-tone region, not a goniometer reading; it has not been compared against any real head-tracking instrument, and it has only been verified against a synthetic video stream, never against a real camera and a real person.
-- No eye landmarks, gaze tracking, or true VOR gain in the current camera provider.
+- Experimental local eye/iris landmarks are available for visualization only; no true VOR gain or clinical gaze measurement is claimed.
 
 ### Language layer (`/bn/`)
 
@@ -210,7 +210,7 @@ state.lab        // active lab and results
 - Face scan (same buffer, same frame): grey-world white balance → graded YCbCr skin, luminance gradient, dark-feature mask, frame-difference motion → summed-area tables → search over ~1500 face-shaped windows scored on those four channels plus shape/position/brightness/size priors → the winning window seeds a moment fit for the region box, centre and spread. Outputs status (`searching` / `locked` / `lost`), the box, centre, spreads, coverage, `basis`, `score`, and a coarse yaw/pitch/roll relative to the calibrated neutral. No model file, nothing fetched.
 - Verified against a still frame of the real camera that broke v1: the lock lands at `[0.31, 0.19, 0.73, 0.89]` (the face) instead of v1's `[0.00, 0.49, 0.37, 0.90]` (the wall). Not yet verified against live human motion on a real camera.
 - The neutral used for the pose is the **median of the raw (un-smoothed) detections** in the hold-still window; sampling the smoothed box would bake a not-yet-converged ratio into the baseline and produce a phantom turn for the whole session. At least 8 raw frames are required, otherwise no neutral is stored and the pose readouts stay blank with the reason shown.
-- It cannot calculate eye-head coordination or VOR gain without eye landmarks, and the face scan does not provide them: `eyeHead` stays `null`.
+- It cannot calculate clinical eye-head coordination or VOR gain. Local eye/iris landmarks supply only an experimental face-relative visual offset; `eyeHead` stays `null` for the OSI metric.
 - Calibration holds still for about 2.2 seconds, subtracts the device's p95 noise floor **and** captures the neutral head pose. Its sampler runs on a timer, not `requestAnimationFrame`, so a backgrounded tab cannot starve it.
 - If camera is stopped/denied/stale, the UI must show that state; it must not convert absence into a fake zero or fake healthy value.
 
@@ -224,7 +224,7 @@ state.lab        // active lab and results
 
 | Domain id | Meaning | Unit | Weight | Current real source status |
 |---|---|---:|---:|---|
-| `eye_head` | Eye–head coordination | ° | 0.25 | Requires eye landmarks/vHIT; current camera must leave unavailable |
+| `eye_head` | Eye–head coordination | ° | 0.25 | Requires a validated vHIT/eye-head instrument; browser landmarks remain unavailable by design |
 | `body_control` | Postural control/sway | mm | 0.25 | Ingest/IMU/force plate contract; not physical-tested |
 | `task_perf` | Timed task performance | ms | 0.20 | Lab reaction-time task works |
 | `symptoms` | Motion symptoms self-report | /10 | 0.15 | In-app/manual path |

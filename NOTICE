@@ -21,6 +21,12 @@ vendor/three.module.js
   MIT licence. Vendored unmodified except for the build packaged by the
   maintainers.
 
+vendor/libs/draco/gltf/
+  Draco geometry decoder, Google / Draco Authors.
+  Apache License 2.0 (https://github.com/google/draco/blob/main/LICENSE).
+  The bundled JavaScript and WebAssembly decoder files are used only to decode
+  the locally stored Draco-compressed GLB; no decoder is fetched from a CDN.
+
 assets/models/nasa-aces-suit.glb
   NASA ACES suit 3D model. Public domain (NASA) —
   https://www.nasa.gov/nasa-brand-center/images-and-media

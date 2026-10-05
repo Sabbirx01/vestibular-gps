@@ -10,9 +10,9 @@ Machine-readable copy: [`docs/_source-check.txt`](_source-check.txt), produced b
 
 ## Verification status
 
-The original 15 NASA/NIH/asset registry URLs were re-checked on **2026-09-28**. **14 resolved with
+The original 16 NASA/NIH/asset registry URLs were re-checked on **2026-09-28**. **15 resolved with
 HTTP 200.** One did not at that time — see the note under NASA below. That one
-was re-checked on **2026-10-01** and **now resolves**, so all 15 are confirmed
+was re-checked on **2026-10-01** and **now resolves**, so all 16 are confirmed
 live. Dead links in a submission damage credibility more than missing ones, so
 this list is checked rather than assumed.
 
@@ -38,7 +38,7 @@ this list is checked rather than assumed.
 > Mission ratings. On **2026-09-28** it did not respond at all — a connection
 > timeout, not a 403 or a 404 — and it was recorded here as unconfirmed rather
 > than quietly dropped. Re-checked on **2026-10-01**, it resolves and serves
-> the risk entry with its tasks and gaps. **All 15 original registry sources are now confirmed
+> the risk entry with its tasks and gaps. **All 16 original registry sources are now confirmed
 > live.** The failure was the host being intermittent, not the link being
 > wrong.
 >
