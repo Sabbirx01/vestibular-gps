@@ -13,7 +13,7 @@ import { installTranslator, t } from './i18n/index.js';
 import { SensorHub } from './sensors/providers.js';
 import { SceneManager } from './three/SceneManager.js';
 import {
-  mountIntro, mountCursor, mountMicrogravityField, mountNav,
+  mountIntro, mountCursor, mountMobileDesktopView, mountMicrogravityField, mountNav,
   mountJourney, mountHud, mountToasts, mountReveal, mountDebug, mountQualityControl,
 } from './ui/chrome.js';
 import { mountBodySection, mountSensorSection, mountSpaceSection } from './ui/panels.js';
@@ -194,6 +194,7 @@ async function main() {
     mountJourney();
     mountMicrogravityField();
     mountCursor();
+    mountMobileDesktopView();
     mountHud();
     mountToasts();
     mountReveal();

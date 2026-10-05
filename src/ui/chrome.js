@@ -70,8 +70,7 @@ export function mountCursor() {
      cursor back while the overlay was still drawn. That was the reported bug:
      hold still or touch, and the PC cursor kept returning. See base.css. */
   const coarse = matchMedia('(pointer: coarse)');
-  const sync = () => {
-    const custom = !coarse.matches;
+  const setCursorMode = (custom) => {
     /* data-cursor-MODE, not data-cursor: this file also reads `data-cursor`
        and `data-cursor-target` off hovered elements to label the cursor, and
        `closest('[data-cursor]')` walks UP the tree — so putting data-cursor on
@@ -82,6 +81,7 @@ export function mountCursor() {
     document.body.classList.toggle('vg-custom-cursor', custom);
     cursor.classList.toggle('is-on', custom);
   };
+  const sync = () => setCursorMode(!coarse.matches);
   /* Decided ONCE, at load, and deliberately not re-decided on a `change`
      event. Re-deciding meant that on a hybrid or touchscreen laptop a media
      flip could hand the native cursor back mid-session while the custom one
@@ -263,6 +263,28 @@ export function mountCursor() {
     if (document.documentElement.dataset.cursorMode === 'custom') cursor.classList.add('is-on');
   }, { passive: true });
 
+  /* A phone cannot expose or move the operating system mouse pointer.  It can,
+     however, show the site's own pointer while a two-finger gesture is in
+     progress.  The midpoint tracks the gesture without cancelling it, so the
+     browser retains its normal two-finger scroll / zoom behaviour. */
+  const moveTouchCursor = (touches) => {
+    if (touches.length < 2) return;
+    const a = touches[0], b = touches[1];
+    pos.tx = (a.clientX + b.clientX) / 2;
+    pos.ty = (a.clientY + b.clientY) / 2;
+    document.documentElement.dataset.touchCursor = 'true';
+    setCursorMode(true);
+  };
+  const stopTouchCursor = (touches) => {
+    if (touches.length >= 2) return;
+    delete document.documentElement.dataset.touchCursor;
+    if (coarse.matches) setCursorMode(false);
+  };
+  on(window, 'touchstart', (e) => moveTouchCursor(e.touches), { passive: true });
+  on(window, 'touchmove', (e) => moveTouchCursor(e.touches), { passive: true });
+  on(window, 'touchend', (e) => stopTouchCursor(e.touches), { passive: true });
+  on(window, 'touchcancel', (e) => stopTouchCursor(e.touches), { passive: true });
+
   /* Parked at the window edge with the pointer outside, the ship just sits
      there looking like a stuck cursor. Hide it instead. */
   on(document, 'pointerleave', () => cursor.classList.remove('is-on'));
@@ -425,6 +447,45 @@ export function mountCursor() {
     }
   };
   tick();
+}
+
+/* ── Mobile desktop preview ────────────────────────────────
+   The responsive page is the default.  On a phone this opt-in switch replaces
+   only the viewport declaration, letting the browser render the genuine desktop
+   layout at a fit-to-screen scale.  It is more reliable than CSS transforms:
+   fixed canvases, sticky panels and 3D stages remain in their normal coordinate
+   system, and returning to mobile restores the original declaration exactly. */
+export function mountMobileDesktopView() {
+  const button = $('#mobileDesktopToggle');
+  const viewport = document.querySelector('meta[name="viewport"]');
+  if (!button || !viewport) return;
+
+  const original = viewport.getAttribute('content') || 'width=device-width, initial-scale=1';
+  const phone = matchMedia('(max-width: 620px)');
+  const desktopWidth = 1280;
+  let active = false;
+
+  const render = () => {
+    document.documentElement.dataset.mobileDesktop = active ? 'true' : 'false';
+    button.setAttribute('aria-pressed', String(active));
+    button.textContent = active ? 'MOBILE VIEW' : 'DESKTOP VIEW';
+    if (active) {
+      /* CSS pixels, rather than hardware pixels: this remains correct on a
+         high-density phone.  Clamp avoids an unusably tiny preview. */
+      const scale = Math.max(.22, Math.min(.72, window.innerWidth / desktopWidth));
+      viewport.setAttribute('content', `width=${desktopWidth}, initial-scale=${scale.toFixed(3)}, minimum-scale=0.2, maximum-scale=3, viewport-fit=cover`);
+    } else {
+      viewport.setAttribute('content', original);
+    }
+  };
+
+  const leaveOnWideScreen = () => {
+    if (!phone.matches && active) { active = false; render(); }
+  };
+  on(button, 'click', () => { active = !active; render(); });
+  phone.addEventListener?.('change', leaveOnWideScreen);
+  on(window, 'orientationchange', () => { if (active) render(); }, { passive: true });
+  render();
 }
 
 /* ═══════════ 3. MICROGRAVITY FLOAT FIELD ═══════════

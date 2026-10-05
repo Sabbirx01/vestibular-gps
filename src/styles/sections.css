@@ -38,6 +38,7 @@
 }
 .topbar-tools { display: flex; gap: var(--sp-2); flex: 0 0 auto; align-items: center; }
 #menuToggle { display: none; }
+.mobile-desktop-toggle { display: none; }
 
 /* ── Journey rail ───────────────────────────────────────── */
 .journey {
@@ -393,7 +394,9 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
   .sec-space .stage-canvas { min-height: 400px; }
   .topbar { padding: 0 var(--sp-3); gap: var(--sp-3); }
   .brand-text small { display: none; }
-  .topbar-tools .chip-ghost:not(#menuToggle):not(#assistantToggle) { display: none; }
+  .topbar-tools .chip-ghost:not(#menuToggle):not(#assistantToggle):not(.mobile-desktop-toggle) { display: none; }
+  .mobile-desktop-toggle { display: inline-flex; color: var(--cyan); border-color: rgba(95,227,255,.4); }
+  html[data-mobile-desktop='true'] .mobile-desktop-toggle { color: var(--amber); border-color: rgba(255,181,71,.55); }
   .topbar-tools .chip { padding: 6px 10px; }
   .hero-specs { grid-template-columns: minmax(0,1fr); }
   .spec-v { font-size: 1.6rem; }
@@ -405,4 +408,5 @@ html[data-reduced-motion="true"] .float { transform: none !important; }
    cursor back while the overlay is still drawn. No cursor rules here. */
 @media (pointer: coarse) {
   .cursor { display: none !important; }
+  html[data-touch-cursor='true'] .cursor { display: block !important; }
 }
