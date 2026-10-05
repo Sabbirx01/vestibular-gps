@@ -323,11 +323,20 @@
   width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: 11px;
-  border: 1px solid rgba(95, 227, 255, 0.24);
+  border: 1px solid rgba(95, 227, 255, 0.34);
   display: block;
   background: #050b16;
-  box-shadow: inset 0 0 50px rgba(52, 161, 255, 0.06);
+  box-shadow:
+    inset 0 0 60px rgba(52, 161, 255, 0.10),
+    0 0 0 1px rgba(95, 227, 255, 0.10),
+    0 0 34px -12px rgba(95, 227, 255, 0.60);
+  animation: eye-map-breathe 2.8s ease-in-out infinite;
 }
+@keyframes eye-map-breathe {
+  0%, 100% { border-color: rgba(95, 227, 255, 0.30); box-shadow: inset 0 0 60px rgba(52,161,255,.10), 0 0 0 1px rgba(95,227,255,.10), 0 0 34px -12px rgba(95,227,255,.52); }
+  50% { border-color: rgba(139,255,210,.70); box-shadow: inset 0 0 72px rgba(52,161,255,.18), 0 0 0 1px rgba(139,255,210,.24), 0 0 48px -9px rgba(95,227,255,.82); }
+}
+@media (prefers-reduced-motion: reduce) { .cam-eye-map { animation: none; } }
 
 /* Verification readout: the verdict, then the checks it is made of. */
 .cam-verify {

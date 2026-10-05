@@ -527,25 +527,52 @@ export function mountIntegrationSection({ camera } = {}) {
 
       /* Real local landmark view — no decorative face mesh. It only appears
          after the bundled model has produced stable face/iris landmarks. The
-         sparse point field is a pixel-like analysis grid, not a fake scan. */
+         point field is the model's own landmarks, one pixel each, lit by its
+         own depth — it is a reading, not a fixed graphic. */
       const eye = state.camera?.eye;
       if (eye?.available && Array.isArray(eye.points) && eye.points.length >= 478) {
         g.save();
         g.translate(pw, 0); g.scale(-1, 1);
         const pts = eye.points;
-        g.fillStyle = 'rgba(95,227,255,0.18)';
-        for (let i = 0; i < 468; i += 3) {
+
+        /* the whole face, as a field of small pixels */
+        for (let i = 0; i < 468; i += 2) {
           const pt = pts[i];
-          g.fillRect(mapX(pt.x) - 1, mapY(pt.y) - 1, 2, 2);
+          const dep = Math.max(0, Math.min(1, (pt.z || 0) * 2.4 + 0.5));
+          g.fillStyle = `rgba(140,232,255,${0.14 + (1 - dep) * 0.26})`;
+          g.fillRect(mapX(pt.x) - 0.9, mapY(pt.y) - 0.9, 1.8, 1.8);
         }
-        const ring = (ids, colour) => {
-          g.strokeStyle = colour; g.lineWidth = 1.4; g.beginPath();
-          ids.forEach((id, n) => { const pt = pts[id]; n ? g.lineTo(mapX(pt.x), mapY(pt.y)) : g.moveTo(mapX(pt.x), mapY(pt.y)); });
+
+        /* eyelid contours, lit */
+        const ring = (ids, colour, blur, width) => {
+          g.save();
+          g.strokeStyle = colour; g.lineWidth = width;
+          g.shadowColor = colour; g.shadowBlur = blur;
+          g.beginPath();
+          ids.forEach((id, n) => {
+            const pt = pts[id];
+            n ? g.lineTo(mapX(pt.x), mapY(pt.y)) : g.moveTo(mapX(pt.x), mapY(pt.y));
+          });
           g.closePath(); g.stroke();
+          g.restore();
         };
-        ring([33, 160, 158, 133, 153, 144], 'rgba(135,255,206,0.95)');
-        ring([362, 385, 387, 263, 373, 380], 'rgba(135,255,206,0.95)');
-        [468, 473].forEach((id) => { const pt = pts[id]; g.beginPath(); g.arc(mapX(pt.x), mapY(pt.y), 4, 0, Math.PI * 2); g.strokeStyle = '#ffbd57'; g.lineWidth = 2; g.stroke(); });
+        ring([33, 160, 158, 133, 153, 144], 'rgba(135,255,206,0.98)', 9, 1.6);
+        ring([362, 385, 387, 263, 373, 380], 'rgba(135,255,206,0.98)', 9, 1.6);
+
+        /* irises: amber disc, bright rim, pupil and a specular dot */
+        [468, 473].forEach((id) => {
+          const cx = mapX(pts[id].x), cy = mapY(pts[id].y);
+          g.save();
+          g.shadowColor = 'rgba(255,190,92,0.95)'; g.shadowBlur = 12;
+          g.beginPath(); g.arc(cx, cy, 6, 0, Math.PI * 2);
+          g.fillStyle = 'rgba(255,190,92,0.22)'; g.fill();
+          g.strokeStyle = 'rgba(255,205,130,0.98)'; g.lineWidth = 1.6; g.stroke();
+          g.beginPath(); g.arc(cx, cy, 3, 0, Math.PI * 2);
+          g.strokeStyle = 'rgba(255,228,180,0.7)'; g.lineWidth = 1; g.stroke();
+          g.restore();
+          g.beginPath(); g.arc(cx, cy, 1.4, 0, Math.PI * 2);
+          g.fillStyle = 'rgba(255,247,232,0.98)'; g.fill();
+        });
         g.restore();
         g.fillStyle = 'rgba(135,255,206,0.95)';
         g.font = '600 12px ui-monospace, monospace';
@@ -559,43 +586,137 @@ export function mountIntegrationSection({ camera } = {}) {
       /* The adjacent analysis window is driven by the exact same verified
          points. It intentionally stays blank when no landmark signal exists,
          so it cannot be mistaken for an animated face substitute. */
-      eg.clearRect(0, 0, eyeMap.width, eyeMap.height);
-      eg.fillStyle = '#050b16'; eg.fillRect(0, 0, eyeMap.width, eyeMap.height);
+      const mw = eyeMap.width, mh = eyeMap.height;
+      eg.clearRect(0, 0, mw, mh);
+
+      /* deep-scope background: a radial wash, so the panel reads as a lit
+         instrument rather than a black rectangle */
+      const bg = eg.createRadialGradient(mw / 2, mh * 0.46, mh * 0.06, mw / 2, mh * 0.5, mh * 0.8);
+      bg.addColorStop(0, '#0a1c33');
+      bg.addColorStop(1, '#03070f');
+      eg.fillStyle = bg; eg.fillRect(0, 0, mw, mh);
+
+      /* Instrument-only motion: this background is deliberately independent
+         of face detection. It makes the analysis surface feel alive without
+         ever inventing a face, landmark or eye reading. The status label below
+         remains the authority for whether real landmarks exist. */
+      const scanT = performance.now() / 1000;
+      const gridStep = 32;
+      const gridOffset = (scanT * 12) % gridStep;
+      eg.save();
+      eg.strokeStyle = 'rgba(95,227,255,0.075)'; eg.lineWidth = 1;
+      for (let x = -gridStep + gridOffset; x < mw + gridStep; x += gridStep) {
+        eg.beginPath(); eg.moveTo(x, 0); eg.lineTo(x, mh); eg.stroke();
+      }
+      for (let y = -gridStep + gridOffset; y < mh + gridStep; y += gridStep) {
+        eg.beginPath(); eg.moveTo(0, y); eg.lineTo(mw, y); eg.stroke();
+      }
+      const radarX = mw * 0.5, radarY = mh * 0.52;
+      const radarR = mh * (0.22 + ((Math.sin(scanT * 2.1) + 1) * 0.04));
+      eg.strokeStyle = 'rgba(95,227,255,0.16)'; eg.lineWidth = 1;
+      eg.beginPath(); eg.arc(radarX, radarY, radarR, 0, Math.PI * 2); eg.stroke();
+      const angle = scanT * 1.7;
+      const ray = eg.createLinearGradient(radarX, radarY, radarX + Math.cos(angle) * radarR, radarY + Math.sin(angle) * radarR);
+      ray.addColorStop(0, 'rgba(95,227,255,0.34)'); ray.addColorStop(1, 'rgba(95,227,255,0)');
+      eg.strokeStyle = ray; eg.beginPath(); eg.moveTo(radarX, radarY); eg.lineTo(radarX + Math.cos(angle) * radarR, radarY + Math.sin(angle) * radarR); eg.stroke();
+      eg.restore();
+
       const mapEye = state.camera?.eye;
       if (mapEye?.available && Array.isArray(mapEye.points) && mapEye.points.length >= 478) {
         const pts = mapEye.points;
-        const px = (pt) => pt.x * eyeMap.width;
-        const py = (pt) => pt.y * eyeMap.height;
-        /* A low-opacity real point cloud gives a deep scan appearance without
-           hiding the actual eye contours. Depth changes the dot intensity. */
-        for (let i = 0; i < 468; i += 2) {
-          const pt = pts[i];
-          const alpha = Math.max(0.07, Math.min(0.23, 0.16 - (pt.z || 0) * 1.25));
-          eg.fillStyle = `rgba(89,220,255,${alpha})`;
-          eg.fillRect(px(pt) - 1.5, py(pt) - 1.5, 3, 3);
+        const px = (pt) => pt.x * mw;
+        const py = (pt) => pt.y * mh;
+
+        /* glow behind the face, centred on the real landmark centroid */
+        let fx = 0, fy = 0;
+        for (let i = 0; i < 468; i++) { fx += px(pts[i]); fy += py(pts[i]); }
+        fx /= 468; fy /= 468;
+        const halo = eg.createRadialGradient(fx, fy, mh * 0.03, fx, fy, mh * 0.62);
+        halo.addColorStop(0, 'rgba(52,161,255,0.28)');
+        halo.addColorStop(0.6, 'rgba(52,161,255,0.10)');
+        halo.addColorStop(1, 'rgba(52,161,255,0)');
+        eg.fillStyle = halo; eg.fillRect(0, 0, mw, mh);
+
+        /* the model: every landmark as a pixel, coloured and sized by its own
+           measured depth (violet far, cyan near) so the face reads as a form */
+        let z0 = Infinity, z1 = -Infinity;
+        for (let i = 0; i < 468; i++) {
+          const z = pts[i].z || 0;
+          if (z < z0) z0 = z;
+          if (z > z1) z1 = z;
         }
-        const trace = (ids, colour, width = 1.5) => {
-          eg.strokeStyle = colour; eg.lineWidth = width; eg.beginPath();
+        const zspan = Math.max(z1 - z0, 1e-6);
+        for (let i = 0; i < 468; i++) {
+          const pt = pts[i];
+          const t = ((pt.z || 0) - z0) / zspan;          // 0 far, 1 near
+          const r = 1.5 + (1 - t) * 1.6;
+          const cr = Math.round(150 - 55 * t);
+          const cg = Math.round(130 + 97 * t);
+          eg.fillStyle = `rgba(${cr},${cg},255,${0.30 + t * 0.55})`;
+          eg.fillRect(px(pt) - r / 2, py(pt) - r / 2, r, r);
+        }
+
+        /* A faint contour joins only real measured landmark positions. It
+           reads as a biometric silhouette, rather than a photograph, and is
+           never drawn in the UNAVAILABLE state. */
+        const contour = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10];
+        eg.save();
+        eg.strokeStyle = 'rgba(112,224,255,0.42)'; eg.lineWidth = 1.1;
+        eg.shadowColor = 'rgba(95,227,255,0.55)'; eg.shadowBlur = 10;
+        eg.beginPath();
+        contour.forEach((id, n) => n ? eg.lineTo(px(pts[id]), py(pts[id])) : eg.moveTo(px(pts[id]), py(pts[id])));
+        eg.stroke(); eg.restore();
+
+        const trace = (ids, colour, width, blur) => {
+          eg.save();
+          eg.strokeStyle = colour; eg.lineWidth = width;
+          eg.shadowColor = colour; eg.shadowBlur = blur;
+          eg.beginPath();
           ids.forEach((id, n) => n ? eg.lineTo(px(pts[id]), py(pts[id])) : eg.moveTo(px(pts[id]), py(pts[id])));
           eg.closePath(); eg.stroke();
+          eg.restore();
         };
-        trace([33, 160, 158, 133, 153, 144], 'rgba(139,255,210,.95)', 2);
-        trace([362, 385, 387, 263, 373, 380], 'rgba(139,255,210,.95)', 2);
-        trace([468, 469, 470, 471, 472], 'rgba(255,190,92,.98)', 2);
-        trace([473, 474, 475, 476, 477], 'rgba(255,190,92,.98)', 2);
-        const sy = (performance.now() / 9) % eyeMap.height;
-        const band = eg.createLinearGradient(0, sy - 26, 0, sy + 26);
-        band.addColorStop(0, 'rgba(95,227,255,0)'); band.addColorStop(.5, 'rgba(95,227,255,.18)'); band.addColorStop(1, 'rgba(95,227,255,0)');
-        eg.fillStyle = band; eg.fillRect(0, sy - 26, eyeMap.width, 52);
-        eg.font = '600 16px ui-monospace, monospace'; eg.fillStyle = 'rgba(139,255,210,.96)';
+        trace([33, 160, 158, 133, 153, 144], 'rgba(139,255,210,1)', 2.2, 14);
+        trace([362, 385, 387, 263, 373, 380], 'rgba(139,255,210,1)', 2.2, 14);
+        trace([468, 469, 470, 471, 472], 'rgba(255,190,92,1)', 2.2, 16);
+        trace([473, 474, 475, 476, 477], 'rgba(255,190,92,1)', 2.2, 16);
+
+        /* the sweep: a gradient tail plus a glowing core line */
+        const sy = (performance.now() / 9) % mh;
+        const band = eg.createLinearGradient(0, sy - 46, 0, sy + 46);
+        band.addColorStop(0, 'rgba(95,227,255,0)');
+        band.addColorStop(0.5, 'rgba(95,227,255,0.34)');
+        band.addColorStop(1, 'rgba(95,227,255,0)');
+        eg.fillStyle = band; eg.fillRect(0, sy - 46, mw, 92);
+        eg.save();
+        eg.shadowColor = 'rgba(170,245,255,0.95)'; eg.shadowBlur = 18;
+        eg.fillStyle = 'rgba(198,249,255,0.95)';
+        eg.fillRect(0, sy - 1, mw, 2);
+        eg.restore();
+
+        /* scope brackets */
+        const A = 22;
+        eg.strokeStyle = 'rgba(95,227,255,0.45)'; eg.lineWidth = 2;
+        eg.beginPath();
+        eg.moveTo(10, 10 + A); eg.lineTo(10, 10); eg.lineTo(10 + A, 10);
+        eg.moveTo(mw - 10 - A, 10); eg.lineTo(mw - 10, 10); eg.lineTo(mw - 10, 10 + A);
+        eg.moveTo(mw - 10, mh - 10 - A); eg.lineTo(mw - 10, mh - 10); eg.lineTo(mw - 10 - A, mh - 10);
+        eg.moveTo(10 + A, mh - 10); eg.lineTo(10, mh - 10); eg.lineTo(10, mh - 10 - A);
+        eg.stroke();
+
+        eg.font = '600 16px ui-monospace, monospace'; eg.fillStyle = 'rgba(139,255,210,.98)';
         eg.fillText('EYE SCANNING', 18, 28);
-        eg.font = '12px ui-monospace, monospace'; eg.fillStyle = 'rgba(220,245,255,.74)';
+        eg.font = '12px ui-monospace, monospace'; eg.fillStyle = 'rgba(220,245,255,.78)';
         eg.fillText(`REAL LANDMARKS · ${Math.round((mapEye.confidence || 0) * 100)}%`, 18, 48);
+        eg.fillStyle = 'rgba(95,227,255,.68)';
+        eg.fillText('LIVE BIOMETRIC OUTLINE · ON-DEVICE ONLY', 18, mh - 22);
       } else {
         eg.font = '600 16px ui-monospace, monospace'; eg.fillStyle = 'rgba(255,189,87,.9)';
         eg.fillText('EYE SCAN UNAVAILABLE', 18, 28);
         eg.font = '12px ui-monospace, monospace'; eg.fillStyle = 'rgba(220,245,255,.54)';
         eg.fillText(c?.running ? 'WAITING FOR REAL FACE / IRIS LANDMARKS' : 'CAMERA IS OFF', 18, 48);
+        eg.fillStyle = 'rgba(95,227,255,.46)';
+        eg.fillText('INSTRUMENT GRID ACTIVE · NO BIOMETRIC RESULT', 18, mh - 22);
       }
 
       /* global motion vector, unchanged from the motion estimator */
