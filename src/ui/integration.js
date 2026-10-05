@@ -667,6 +667,78 @@ export function mountIntegrationSection({ camera } = {}) {
         contour.forEach((id, n) => n ? eg.lineTo(px(pts[id]), py(pts[id])) : eg.moveTo(px(pts[id]), py(pts[id])));
         eg.stroke(); eg.restore();
 
+        /* MediaPipe measures the face, not hair or the neck. For a complete
+           mission-console silhouette we grow a clearly labelled visual
+           envelope from that measured face oval. It is a display boundary,
+           never an additional biometric reading. The facial features inside
+           remain the actual on-device points above. */
+        const faceOval = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        faceOval.forEach((id) => { minX = Math.min(minX, px(pts[id])); maxX = Math.max(maxX, px(pts[id])); minY = Math.min(minY, py(pts[id])); maxY = Math.max(maxY, py(pts[id])); });
+        const hcX = (minX + maxX) / 2;
+        const hcY = minY + (maxY - minY) * 0.46;
+        const headRX = (maxX - minX) * 0.72;
+        const headRY = (maxY - minY) * 0.83;
+        const headPoint = (theta) => ({ x: hcX + Math.cos(theta) * headRX, y: hcY + Math.sin(theta) * headRY });
+        const wire = (colour, alpha, lineWidth = 0.8) => {
+          eg.save(); eg.strokeStyle = colour; eg.globalAlpha = alpha; eg.lineWidth = lineWidth;
+          eg.shadowColor = colour; eg.shadowBlur = 7;
+          return () => eg.restore();
+        };
+        /* Full cranium boundary: top/back of head plus the measured jaw/front. */
+        let restore = wire('#74eaff', .62, 1.25);
+        eg.beginPath();
+        for (let i = 0; i <= 42; i++) {
+          const p = headPoint(Math.PI * 1.08 + (Math.PI * 1.83 * i / 42));
+          i ? eg.lineTo(p.x, p.y) : eg.moveTo(p.x, p.y);
+        }
+        eg.stroke(); restore();
+
+        /* Horizontal and vertical wireframe curves make the outline read as a
+           complete head volume, while keeping the live face landmarks clear. */
+        restore = wire('rgba(103,221,255,.75)', .42, .65);
+        [-.62, -.31, 0, .31, .62].forEach((lat) => {
+          const yy = hcY + lat * headRY;
+          const half = headRX * Math.sqrt(Math.max(0.06, 1 - lat * lat));
+          eg.beginPath();
+          for (let i = 0; i <= 22; i++) {
+            const dx = -half + (2 * half * i / 22);
+            const bow = (1 - Math.abs(dx / half)) * headRY * .065;
+            i ? eg.lineTo(hcX + dx, yy - bow) : eg.moveTo(hcX + dx, yy - bow);
+          }
+          eg.stroke();
+        });
+        [-.72, -.42, -.14, .14, .42, .72].forEach((lon) => {
+          const xx = hcX + lon * headRX;
+          const top = hcY - headRY * Math.sqrt(Math.max(0.06, 1 - lon * lon));
+          const bottom = hcY + headRY * Math.sqrt(Math.max(0.06, 1 - lon * lon));
+          eg.beginPath();
+          for (let i = 0; i <= 20; i++) {
+            const yy = top + (bottom - top) * i / 20;
+            const bow = Math.sin(i / 20 * Math.PI) * lon * headRX * .1;
+            i ? eg.lineTo(xx - bow, yy) : eg.moveTo(xx - bow, yy);
+          }
+          eg.stroke();
+        });
+        restore();
+
+        /* Estimated neck envelope visually connects the full head to the scan
+           frame. Its opacity is lower than real landmark geometry on purpose. */
+        const neckTopY = hcY + headRY * .67;
+        const neckBottomY = Math.min(mh - 34, hcY + headRY * 1.46);
+        const neckL = hcX - headRX * .42, neckR = hcX + headRX * .42;
+        restore = wire('rgba(108,220,255,.7)', .38, .9);
+        eg.beginPath();
+        eg.moveTo(neckL, neckTopY); eg.bezierCurveTo(neckL - headRX * .13, neckBottomY - 25, neckL - headRX * .08, neckBottomY, hcX - headRX * .60, neckBottomY);
+        eg.moveTo(neckR, neckTopY); eg.bezierCurveTo(neckR + headRX * .13, neckBottomY - 25, neckR + headRX * .08, neckBottomY, hcX + headRX * .60, neckBottomY);
+        eg.stroke();
+        for (let i = 0; i < 5; i++) {
+          const y = neckTopY + (neckBottomY - neckTopY) * (i / 4);
+          const spread = headRX * (.40 + .2 * (i / 4));
+          eg.beginPath(); eg.moveTo(hcX - spread, y); eg.quadraticCurveTo(hcX, y + 9, hcX + spread, y); eg.stroke();
+        }
+        restore();
+
         const trace = (ids, colour, width, blur) => {
           eg.save();
           eg.strokeStyle = colour; eg.lineWidth = width;
@@ -709,7 +781,7 @@ export function mountIntegrationSection({ camera } = {}) {
         eg.font = '12px ui-monospace, monospace'; eg.fillStyle = 'rgba(220,245,255,.78)';
         eg.fillText(`REAL LANDMARKS · ${Math.round((mapEye.confidence || 0) * 100)}%`, 18, 48);
         eg.fillStyle = 'rgba(95,227,255,.68)';
-        eg.fillText('LIVE BIOMETRIC OUTLINE · ON-DEVICE ONLY', 18, mh - 22);
+        eg.fillText('LIVE FACE LANDMARKS · FULL-HEAD VISUAL ENVELOPE', 18, mh - 22);
       } else {
         eg.font = '600 16px ui-monospace, monospace'; eg.fillStyle = 'rgba(255,189,87,.9)';
         eg.fillText('EYE SCAN UNAVAILABLE', 18, 28);
