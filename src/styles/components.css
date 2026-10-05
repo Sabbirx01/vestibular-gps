@@ -298,6 +298,60 @@
 .src-card .src-use b { color: var(--muted); }
 .src-card a.src-link { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--cyan); word-break: break-all; }
 
+/* ── Research: official NASA visual evidence carousel ──── */
+.research-evidence { margin-bottom: var(--sp-5); overflow: hidden; }
+.evidence-stage {
+  position: relative;
+  height: clamp(390px, 43vw, 510px);
+  margin-top: var(--sp-3);
+  perspective: 1300px;
+  overflow: hidden;
+  border: 1px solid rgba(95,227,255,.16);
+  border-radius: 15px;
+  background: radial-gradient(circle at 50% 18%, rgba(35,96,145,.24), rgba(3,6,15,.94) 62%);
+}
+.evidence-track { position: absolute; inset: 0; transform-style: preserve-3d; }
+.evidence-card {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0,1.15fr) minmax(270px,.85fr);
+  background: rgba(5,11,23,.96);
+  transform-origin: center;
+  transition: transform 850ms cubic-bezier(.2,.8,.2,1), opacity 650ms ease, filter 650ms ease;
+  overflow: hidden;
+}
+.evidence-card[data-position='0'] { z-index: 3; opacity: 1; transform: translateZ(0) rotateY(0); filter: none; pointer-events: auto; }
+.evidence-card[data-position='1'] { z-index: 2; opacity: .22; transform: translateX(38%) translateZ(-260px) rotateY(-29deg) scale(.85); filter: saturate(.6) brightness(.62); pointer-events: none; }
+.evidence-card[data-position='-1'] { z-index: 1; opacity: .16; transform: translateX(-38%) translateZ(-260px) rotateY(29deg) scale(.85); filter: saturate(.6) brightness(.62); pointer-events: none; }
+.evidence-image { position: relative; min-height: 0; overflow: hidden; background: linear-gradient(130deg,#061b35,#0d3e5a); }
+.evidence-image img { display:block; width:100%; height:100%; object-fit:cover; transition: transform 8s ease; }
+.evidence-card[data-position='0'] .evidence-image img { transform: scale(1.055); }
+.evidence-image::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg, transparent 42%, rgba(5,11,23,.95) 100%),linear-gradient(0deg,rgba(2,7,18,.44),transparent 44%); pointer-events:none; }
+.evidence-card.image-unavailable .evidence-image::before { content:'OFFICIAL NASA PAGE VISUAL UNAVAILABLE'; position:absolute; z-index:1; inset:0; display:grid; place-items:center; padding:30px; text-align:center; color:var(--cyan); font:700 var(--fs-xs) var(--font-mono); letter-spacing:.12em; }
+.evidence-kicker { position:absolute; z-index:2; left:16px; top:16px; padding:5px 8px; border:1px solid rgba(255,255,255,.36); border-radius:6px; color:#fff; background:rgba(3,8,17,.58); font:700 var(--fs-2xs) var(--font-mono); letter-spacing:.1em; }
+.evidence-copy { display:flex; flex-direction:column; justify-content:center; gap:12px; padding:clamp(22px,4vw,48px); background:linear-gradient(135deg,rgba(9,24,45,.98),rgba(4,8,18,.99)); }
+.evidence-copy .eyebrow { margin:0; color:var(--cyan); }
+.evidence-copy h3 { margin:0; color:var(--white); font-size:clamp(1.15rem,2vw,1.75rem); line-height:1.2; }
+.evidence-copy > p:not(.eyebrow) { margin:0; color:var(--text-2); font-size:var(--fs-sm); line-height:1.65; }
+.evidence-foot { display:flex; justify-content:space-between; gap:12px; align-items:flex-end; padding-top:14px; margin-top:4px; border-top:1px solid var(--line); }
+.evidence-foot span { color:var(--faint); font:var(--fs-2xs) var(--font-mono); letter-spacing:.05em; line-height:1.45; }
+.evidence-foot a { color:var(--cyan); white-space:nowrap; font:700 var(--fs-xs) var(--font-mono); }
+.evidence-controls { display:flex; justify-content:center; align-items:center; gap:12px; padding-top:14px; }
+.evidence-nav, .evidence-dot { border:0; cursor:pointer; }
+.evidence-nav { width:34px; height:30px; border:1px solid var(--line-strong); border-radius:7px; background:rgba(12,28,50,.7); color:var(--cyan); font-size:18px; }
+.evidence-nav:hover, .evidence-nav:focus-visible { border-color:var(--cyan); outline:0; }
+.evidence-dots { display:flex; gap:7px; }
+.evidence-dot { width:7px; height:7px; padding:0; border-radius:50%; background:var(--muted); opacity:.55; transition: transform .2s,opacity .2s,background .2s; }
+.evidence-dot.is-on { background:var(--cyan); opacity:1; transform:scale(1.45); }
+@media (max-width: 760px) {
+  .evidence-stage { height: 575px; }
+  .evidence-card { grid-template-columns:1fr; grid-template-rows: 48% 52%; }
+  .evidence-image::after { background:linear-gradient(0deg,rgba(5,11,23,.78),transparent 50%); }
+  .evidence-copy { padding:22px; }
+  .evidence-foot { align-items:flex-start; flex-direction:column; }
+}
+
 /* ── Toasts ─────────────────────────────────────────────── */
 .toasts { position: fixed; right: var(--sp-5); bottom: var(--sp-5); z-index: 400; display: grid; gap: var(--sp-2); max-width: min(360px, 86vw); }
 .toast {
