@@ -310,7 +310,12 @@
   border-radius: 15px;
   background: radial-gradient(circle at 50% 18%, rgba(35,96,145,.24), rgba(3,6,15,.94) 62%);
 }
-.evidence-track { position: absolute; inset: 0; transform-style: preserve-3d; }
+.evidence-track {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  contain: layout paint;
+}
 .evidence-card {
   position: absolute;
   inset: 0;
@@ -318,15 +323,34 @@
   grid-template-columns: minmax(0,1.15fr) minmax(270px,.85fr);
   background: rgba(5,11,23,.96);
   transform-origin: center;
-  transition: transform 850ms cubic-bezier(.2,.8,.2,1), opacity 650ms ease, filter 650ms ease;
+  transition: transform 720ms cubic-bezier(.22,.72,.22,1), opacity 520ms ease, filter 520ms ease;
   overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+  will-change: transform, opacity, filter;
 }
+.evidence-card[aria-hidden='true'] { visibility: visible; }
+.evidence-card[data-position='0'] { box-shadow: 0 18px 60px rgba(0,0,0,.24); }
+.evidence-stage.is-dragging .evidence-card { transition: none; }
 .evidence-card[data-position='0'] { z-index: 3; opacity: 1; transform: translateZ(0) rotateY(0); filter: none; pointer-events: auto; }
 .evidence-card[data-position='1'] { z-index: 2; opacity: .22; transform: translateX(38%) translateZ(-260px) rotateY(-29deg) scale(.85); filter: saturate(.6) brightness(.62); pointer-events: none; }
 .evidence-card[data-position='-1'] { z-index: 1; opacity: .16; transform: translateX(-38%) translateZ(-260px) rotateY(29deg) scale(.85); filter: saturate(.6) brightness(.62); pointer-events: none; }
-.evidence-image { position: relative; min-height: 0; overflow: hidden; background: linear-gradient(130deg,#061b35,#0d3e5a); }
-.evidence-image img { display:block; width:100%; height:100%; object-fit:cover; transition: transform 8s ease; }
-.evidence-card[data-position='0'] .evidence-image img { transform: scale(1.055); }
+.evidence-image { position: relative; min-height: 0; overflow: hidden; background: linear-gradient(130deg,#061b35,#0d3e5a); contain: paint; }
+.evidence-image img {
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  transform: scale(1.025);
+  transition: transform 720ms cubic-bezier(.22,.72,.22,1), filter 520ms ease;
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.evidence-card[data-position='0'] .evidence-image img { transform: scale(1.045); }
+.evidence-card[data-position='1'] .evidence-image img,
+.evidence-card[data-position='-1'] .evidence-image img { filter: saturate(.72) brightness(.72); }
 .evidence-image::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg, transparent 42%, rgba(5,11,23,.95) 100%),linear-gradient(0deg,rgba(2,7,18,.44),transparent 44%); pointer-events:none; }
 .evidence-card.image-unavailable .evidence-image::before { content:'OFFICIAL NASA PAGE VISUAL UNAVAILABLE'; position:absolute; z-index:1; inset:0; display:grid; place-items:center; padding:30px; text-align:center; color:var(--cyan); font:700 var(--fs-xs) var(--font-mono); letter-spacing:.12em; }
 .evidence-kicker { position:absolute; z-index:2; left:16px; top:16px; padding:5px 8px; border:1px solid rgba(255,255,255,.36); border-radius:6px; color:#fff; background:rgba(3,8,17,.58); font:700 var(--fs-2xs) var(--font-mono); letter-spacing:.1em; }

@@ -1446,7 +1446,21 @@ function mountResearchEvidence() {
 
   let current = 0;
   let timer = null;
+  let moving = false;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const panel = root.querySelector('.research-evidence');
+  const stage = root.querySelector('.evidence-stage');
+  const transitionMs = 760;
+
+  /* Warm the next two source screenshots before they are needed. This removes
+     the first-slide hitch caused by lazy decoding a large full-page capture at
+     the exact moment the card starts moving. */
+  const preload = (index) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = slides[(index + slides.length) % slides.length].image;
+  };
+
   const render = () => {
     cards.forEach((card, i) => {
       const delta = ((i - current + slides.length + 1) % slides.length) - 1;
@@ -1454,18 +1468,56 @@ function mountResearchEvidence() {
       card.setAttribute('aria-hidden', String(i !== current));
     });
     dots.forEach((dot, i) => dot.classList.toggle('is-on', i === current));
+    preload(current + 1);
+    preload(current - 1);
   };
-  const move = (dir) => { current = (current + dir + slides.length) % slides.length; render(); };
+
+  const move = (dir) => {
+    if (moving) return;
+    moving = true;
+    current = (current + dir + slides.length) % slides.length;
+    render();
+    window.setTimeout(() => { moving = false; }, reduce ? 0 : transitionMs);
+  };
   const restart = () => {
     clearInterval(timer);
-    if (!reduce) timer = setInterval(() => move(1), 6500);
+    if (!reduce) timer = setInterval(() => move(1), 6800);
   };
   prev.addEventListener('click', () => { move(-1); restart(); });
   next.addEventListener('click', () => { move(1); restart(); });
-  dots.forEach((dot, i) => dot.addEventListener('click', () => { current = i; render(); restart(); }));
-  root.querySelector('.research-evidence').addEventListener('pointerenter', () => clearInterval(timer));
-  root.querySelector('.research-evidence').addEventListener('pointerleave', restart);
-  render(); restart();
+  dots.forEach((dot, i) => dot.addEventListener('click', () => {
+    if (moving || i === current) return;
+    moving = true;
+    current = i;
+    render();
+    window.setTimeout(() => { moving = false; }, reduce ? 0 : transitionMs);
+    restart();
+  }));
+
+  /* Pointer swipe: one deliberate gesture = one slide, with no scroll-jitter
+     while the gesture is in progress. */
+  let pointerStart = null;
+  stage.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    pointerStart = event.clientX;
+    stage.classList.add('is-dragging');
+    stage.setPointerCapture?.(event.pointerId);
+  });
+  stage.addEventListener('pointerup', (event) => {
+    if (pointerStart === null) return;
+    const dx = event.clientX - pointerStart;
+    pointerStart = null;
+    stage.classList.remove('is-dragging');
+    if (Math.abs(dx) > 44) { move(dx < 0 ? 1 : -1); restart(); }
+  });
+  stage.addEventListener('pointercancel', () => {
+    pointerStart = null;
+    stage.classList.remove('is-dragging');
+  });
+  panel.addEventListener('pointerenter', () => clearInterval(timer));
+  panel.addEventListener('pointerleave', restart);
+  render();
+  restart();
 }
 
 /* ── NASA Space Apps participation links ─────────────────────
