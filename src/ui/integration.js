@@ -722,6 +722,28 @@ export function mountIntegrationSection({ camera } = {}) {
         });
         restore();
 
+        /* Ears sit beside the real face oval so the existing mask-like point
+           cloud reads as a complete head. These are a soft visual envelope
+           (the front camera does not measure ear geometry), deliberately dimmer
+           than the live eyes and face landmarks. */
+        const drawEar = (side) => {
+          const ex = hcX + side * headRX * 0.93;
+          const ey = hcY + headRY * 0.06;
+          const rx = headRX * 0.14;
+          const ry = headRY * 0.24;
+          const tilt = side * 0.10;
+          const earWire = wire('rgba(118,228,255,.78)', .46, 1);
+          eg.save(); eg.translate(ex, ey); eg.rotate(tilt);
+          eg.beginPath(); eg.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); eg.stroke();
+          eg.beginPath(); eg.ellipse(-side * rx * .12, 0, rx * .54, ry * .64, 0, Math.PI * .18, Math.PI * 1.82); eg.stroke();
+          eg.beginPath();
+          eg.moveTo(side * rx * .10, -ry * .45);
+          eg.bezierCurveTo(-side * rx * .55, -ry * .12, -side * rx * .42, ry * .34, side * rx * .08, ry * .47);
+          eg.stroke();
+          eg.restore(); earWire();
+        };
+        drawEar(-1); drawEar(1);
+
         /* Estimated neck envelope visually connects the full head to the scan
            frame. Its opacity is lower than real landmark geometry on purpose. */
         const neckTopY = hcY + headRY * .67;
