@@ -9,8 +9,7 @@ where AI was used, where it was deliberately not used, and how the AI-made parts
 are labelled on screen. Everything below is traceable to a file in this
 repository.
 
-**Status: verified against the repository on 2026-09-30. Two items are still
-open — see §5.** Do not submit this as complete until those two are filled in.
+**Status: verified against the repository and current video handoff on 2026-10-07.** The current export contains synthetic narration and a NASA/NIH source-card evidence insert; see `docs/VIDEO-RELEASE-2026-10-07.md` for the exact external asset path and timing. Keep the `DRAMATIZATION` label and the no-affiliation/no-endorsement disclaimer in the final submission.
 
 ---
 

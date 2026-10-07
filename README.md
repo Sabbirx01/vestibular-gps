@@ -6,9 +6,9 @@
 
 > **এই README-টি পরের AI/Agent-এর জন্য canonical project handoff document।** নতুন কাজ শুরু করার আগে এটি, `docs/ARCHITECTURE.md`, `docs/SENSOR_API.md`, `docs/SOURCES.md`, `docs/TESTING.md`, `docs/HRP-RISK-MAPPING.md`, এবং `reports/plans/PLAN-A-Full-Roadmap-BN.md` (= প্রজেক্ট রুটের `F:\Nasa Project\reports\plans\`, রিপোর ভিতরে নয়) পড়বে। অনুমান করে কোনো feature, sensor বা NASA claim যোগ করবে না।
 
-> **সাবমিশনের দুটো অতিরিক্ত ফাইল:** **`docs/AI_USE.md`** — প্রজেক্ট পেজের বাধ্যতামূলক "Use of AI" ফিল্ডের উত্তর (কোনটা AI দিয়ে বানানো, কোনটা নয়, কীভাবে লেবেল করা)। **`captions/`** — ইংরেজি সাবটাইটেল (`.srt` + `.vtt`), narration-এর হুবহু লেখা: ফাইনাল ফিল্ম `VESTIBULAR-GPS-3MIN-FINAL.mp4` (১৭৬s)-এর জন্য `VGPS-FILM-3MIN-EN.*`, আর ২৪০s কাটের জন্য `VGPS-PITCH-4MIN-EN.*` — দুটো আলাদা ভিডিও, গুলিয়ে ফেলবেন না।
+> **সাবমিশনের অতিরিক্ত ফাইল:** **`docs/AI_USE.md`** — প্রজেক্ট পেজের বাধ্যতামূলক "Use of AI" ফিল্ডের উত্তর (কোনটা AI দিয়ে বানানো, কোনটা নয়, কীভাবে লেবেল করা)। **`captions/`**-এর পুরোনো ১৭৬s caption track আগের edit-এর জন্য; বর্তমান master-এর জন্য নতুন timing না বানানো পর্যন্ত সেটাকে ব্যবহার করা যাবে না। বর্তমান video handoff ও verified timing `docs/VIDEO-RELEASE-2026-10-07.md`-এ।
 
-**Last verified:** 5 October 2026, Asia/Dhaka
+**Last verified:** 7 October 2026, Asia/Dhaka
 **Code baseline:** the `tests/osi.test.result.txt` in this repository is regenerated on every test run, and its timestamp is the authority on when the suite last passed. A hard-coded commit hash here went stale once and was misread as a code state, so it is not repeated.  
 **Live site:** <https://sabbirx01.github.io/vestibular-gps/>  
 **Repository:** <https://github.com/Sabbirx01/vestibular-gps>  

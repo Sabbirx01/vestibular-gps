@@ -8,8 +8,9 @@ matters right now is the first one.
 
 | File | Which video | Length | Cues |
 |---|---|---|---|
-| `VGPS-FILM-3MIN-EN.srt` / `.vtt` | **the finished film — `VESTIBULAR-GPS-3MIN-FINAL.mp4`** | 176.000 s | 30 |
-| `VGPS-PITCH-4MIN-EN.srt` / `.vtt` | the 240-second cut, **not shot yet** (Video 2) | 240 s | 39 |
+| `VGPS-FILM-3MIN-EN.srt` / `.vtt` | **legacy 176.000 s film — `VESTIBULAR-GPS-3MIN-FINAL.mp4`** | 176.000 s | 30 |
+| `VGPS-PITCH-4MIN-EN.srt` / `.vtt` | legacy 240-second cut, **not the current master** | 240 s | 39 |
+| Current master | `VESTIBULAR-GPS-FINAL-WITH-EVIDENCE.mp4` — external video workspace | 238.707 s | **captions not yet regenerated** |
 
 ## The finished film
 
