@@ -6,7 +6,7 @@
 
 > **এই README-টি পরের AI/Agent-এর জন্য canonical project handoff document।** নতুন কাজ শুরু করার আগে এটি, `docs/ARCHITECTURE.md`, `docs/SENSOR_API.md`, `docs/SOURCES.md`, `docs/TESTING.md`, `docs/HRP-RISK-MAPPING.md`, এবং `reports/plans/PLAN-A-Full-Roadmap-BN.md` (= প্রজেক্ট রুটের `F:\Nasa Project\reports\plans\`, রিপোর ভিতরে নয়) পড়বে। অনুমান করে কোনো feature, sensor বা NASA claim যোগ করবে না।
 
-> **সাবমিশনের অতিরিক্ত ফাইল:** **`docs/AI_USE.md`** — প্রজেক্ট পেজের বাধ্যতামূলক "Use of AI" ফিল্ডের উত্তর (কোনটা AI দিয়ে বানানো, কোনটা নয়, কীভাবে লেবেল করা)। **`captions/`**-এর পুরোনো ১৭৬s caption track আগের edit-এর জন্য; বর্তমান master-এর জন্য নতুন timing না বানানো পর্যন্ত সেটাকে ব্যবহার করা যাবে না। বর্তমান video handoff ও verified timing `docs/VIDEO-RELEASE-2026-10-07.md`-এ।
+> **সাবমিশনের অতিরিক্ত ফাইল:** **`docs/AI_USE.md`** — প্রজেক্ট পেজের বাধ্যতামূলক "Use of AI" ফিল্ডের উত্তর (কোনটা AI দিয়ে বানানো, কোনটা নয়, কীভাবে লেবেল করা)। **`docs/PROJECT-DESCRIPTION.md`** — প্রজেক্টের রেডি description: one-liner, short, standard (jury form), video description ও social version, সঙ্গে metadata block। **`captions/`**-এর পুরোনো ১৭৬s caption track আগের edit-এর জন্য; বর্তমান master-এর জন্য নতুন timing না বানানো পর্যন্ত সেটাকে ব্যবহার করা যাবে না। বর্তমান video handoff ও verified timing `docs/VIDEO-RELEASE-2026-10-07.md`-এ।
 
 **Last verified:** 7 October 2026, Asia/Dhaka
 **Code baseline:** the `tests/osi.test.result.txt` in this repository is regenerated on every test run, and its timestamp is the authority on when the suite last passed. A hard-coded commit hash here went stale once and was misread as a code state, so it is not repeated.  
