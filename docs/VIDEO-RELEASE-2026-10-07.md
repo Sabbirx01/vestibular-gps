@@ -1,43 +1,42 @@
 # Video release handoff — 2026-10-07
 
-## Current master
+## Current upload candidate — repair required
 
-The current working master is stored outside this Git repository, in:
+The latest requested upload candidate is stored outside this Git repository, in:
 
 ```text
-F:\Nasa Project\Video v2\New edite\New folder\VESTIBULAR-GPS-FINAL-WITH-EVIDENCE.mp4
+F:\Nasa Project\Video v2\New edite\Final Uploadable.mp4
 ```
 
-Do not add the large MP4 to this repository unless the submission workflow explicitly requires Git-hosted media. Keep the export in the video-production folder and attach it separately to the submission package.
+**Status: NOT READY TO UPLOAD.** The complete technical read is stored beside the video at [`F:\Nasa Project\Video v2\New edite\FINAL-UPLOADABLE-READ.md`](F:/Nasa%20Project/Video%20v2/New%20edite/FINAL-UPLOADABLE-READ.md). Do not add the large MP4 to this repository; keep the export in the video-production folder and attach it separately after repair.
 
 | Property | Verified value |
 |---|---:|
 | Container | MP4 |
-| Picture | 1920 × 1080, 30 fps, H.264 |
-| Audio | AAC, 44.1 kHz, stereo, 192 kbps |
-| Total duration | 238.707 s (3:58.707) |
-| "After six months" marker | 58.710 s |
-| From that marker to end | 179.997 s (3:00 target; 3 ms mux/timestamp tolerance) |
-| Evidence insert | 10.763 s, inside the last-part timeline |
-| Evidence source | `F:\Nasa Project\Video v2\Edited.mp4`, source-card Research footage, 4K source scaled to 1080p |
-| Evidence insert audio | `F:\Nasa Project\Video v2\New edite\New folder\EVIDENCE-INSERT-VO-10s76.wav` |
-| Black-frame check | No sustained black frame detected at `d=0.4`, `pix_th=0.02` |
-| Audio level | −17.80 LUFS, −1.60 dBTP |
+| Picture | 2560 × 1440, 30 fps, HEVC/H.265 |
+| Audio | AAC, 44.1 kHz, stereo, ~197 kbps |
+| Total duration | 229.274 s (3:49.274) |
+| Video duration | 229.267 s |
+| Black gap | **32.133–35.600 s (3.467 s)** |
+| Black tail | **228.400–229.233 s (0.833 s)** |
+| Input loudness | **−9.2 LUFS, +0.9 dBTP** |
+| Caption status | Old tracked captions are for a 176 s film; stale for this file |
+| Full read | `F:\Nasa Project\Video v2\New edite\FINAL-UPLOADABLE-READ.md` |
 
 ## Edit decisions
 
-- The first hook and team brief remain untouched.
-- The new insert begins at a frame-safe quiet point around `188.633 s` in the assembled film, after the existing source-verification narration.
-- The insert shows the NASA/NIH source-card Research footage from `Edited.mp4`; it is not a fabricated scientific figure.
-- The insert narration is synthetic `en-US-AriaNeural` speech. If the team replaces it with the ElevenLabs voice, preserve the slot length at **10.763 s** and recheck the final mux.
-- No silence block was appended to fill three minutes. The added slot is filled by narration and video.
+- The Mars hook and team-introduction sequence are present, but the first-minute black gap must be repaired before claiming the opening is upload-ready.
+- The film includes the Vestibular GPS site walkthrough, NASA/NIH/NCBI evidence pages, limitations, unavailable-data warnings, hardware/measurement concept footage, and the MindStaller closing card.
+- The NASA/NIH evidence visuals are screen/source material; they are not a NASA endorsement and do not turn the prototype into a clinical instrument.
+- The complete visual and audio audit, including contact-sheet observations, is in `FINAL-UPLOADABLE-READ.md` beside the export.
 - The edited film is a project presentation asset, not the application's scientific data source. Site claims remain governed by `docs/SOURCES.md`, `docs/SCIENCE.md`, `docs/HRP-RISK-MAPPING.md`, and `NOTICE`.
+- This candidate must be repaired and re-read before captions or a final-upload label are applied.
 
 ## Submission and caption warning
 
 The repository's `captions/VGPS-FILM-3MIN-EN.srt` and `.vtt` describe an older 176.000-second film. They are **stale for this 238.707-second master** and must not be submitted with it. Rebuild captions from the final audio/picture before submission; do not hand-edit the old track or rename it.
 
-The 3-minute statement applies only to the segment beginning at the spoken line **"After six months in microgravity"**, not to the full film. The full current master is just under four minutes.
+The previous 3-minute statement applied to an earlier assembled cut and must not be applied to this candidate without re-measuring. This file is 3:49.274 and its exact “After six months” segment timing is recorded in `FINAL-UPLOADABLE-READ.md` only after the repaired master is produced.
 
 ## AI/media disclosure
 
@@ -56,9 +55,11 @@ These scripts refer to local absolute paths and are not portable CI steps. Do no
 
 ## Required checks before final upload
 
-1. Verify the final export with `ffprobe`.
-2. Confirm the first minute is unchanged.
-3. Confirm the spoken marker starts at `58.710 s`.
-4. Confirm the last-part duration is 180 seconds within the mux tolerance.
-5. Rebuild captions against the exact final export.
-6. Preserve `LICENSE`, `NOTICE`, AI disclosure, and source/licence records with the submission package.
+1. Repair the 3.467s black gap at `32.133–35.600 s`.
+2. Remove or replace the 0.833s black tail at `228.400–229.233 s`.
+3. Normalize/limit audio from `−9.2 LUFS / +0.9 dBTP` to the project target without cutting final words.
+4. Verify the repaired export with `ffprobe`, `blackdetect`, and loudness measurement.
+5. Confirm the first-minute narrative and the spoken “After six months” marker after repair.
+6. Rebuild `.srt` and `.vtt` captions against the exact repaired export.
+7. Update this handoff and `FINAL-UPLOADABLE-READ.md` with the repaired file’s measured values.
+8. Preserve `LICENSE`, `NOTICE`, AI disclosure, and source/licence records with the submission package.

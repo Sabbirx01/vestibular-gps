@@ -2,7 +2,7 @@
 
 **Release review:** 2026-10-07 · **Public site:** https://sabbirx01.github.io/vestibular-gps/
 
-**Video handoff:** the current external master and its evidence-insert timing are recorded in [`VIDEO-RELEASE-2026-10-07.md`](VIDEO-RELEASE-2026-10-07.md). The full film is 3:58.707; only the segment beginning at 58.710s ("After six months in microgravity") is 3:00. The repository's older 176s captions are stale for this export and must be regenerated before submission.
+**Video handoff:** the latest external candidate is `F:\Nasa Project\Video v2\New edite\Final Uploadable.mp4`; its full read is `F:\Nasa Project\Video v2\New edite\FINAL-UPLOADABLE-READ.md`. Measured duration is 3:49.274, but the file is **not upload-ready**: it has a 3.467s black gap, a 0.833s black tail, and +0.9 dBTP audio. Repair and re-read it before submission. The repository's older 176s captions are stale for this export and must be regenerated.
 
 ## Release status
 
