@@ -28,8 +28,8 @@ or displayed anywhere on this site.
 
 Quotations from these pages appear verbatim and are attributed in place. Two
 public NASA pages describe Mars surface gravity differently — the hazards page
-says *three-eighths*, the gravity-fields page says *approximately one-third*. The
-site uses **"approximately one-third"** and performs no arithmetic on it.
+says *three-eighths*, the gravity-fields page says *approximately one-third*. They describe the same value: Mars surface gravity is 0.38 g. The site quotes **"approximately one-third"** where NASA's sentence is quoted, and uses **0.38 g** only where the value itself is needed.
 
 NASA does not endorse any non-U.S. Government entity. Nothing on this site claims
 NASA review, validation, or approval.
+
