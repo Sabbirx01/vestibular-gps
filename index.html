@@ -553,6 +553,7 @@
         <button type="button" class="btn btn-primary" id="consoleCapture">CAPTURE BASELINE SESSION</button>
         <span class="tag tag-info">SELF-REFERENCED &middot; NOT A POPULATION NORM</span>
       </div>
+      <p class="caption">No score appears until a reference exists: press CAPTURE BASELINE SESSION three times and the index reports on the third. That delay is the design, not a fault.</p>
       <div class="ctl-row">
         <label for="consoleSymptoms">MOTION SYMPTOMS (SELF-REPORT)</label>
         <input type="range" id="consoleSymptoms" min="0" max="10" step="1" value="1" />
@@ -624,17 +625,20 @@
       <div class="panel-head">
         <p class="eyebrow">NASA HRP &middot; FIVE HAZARDS OF HUMAN SPACEFLIGHT</p>
         <h3>Which hazard this instrument sits inside</h3>
-        <p>NASA's Human Research Program names five hazards of a Mars mission: space radiation, isolation and confinement, distance from Earth, gravity fields, and closed or hostile environments. This project addresses one of them and treats one more as a design constraint. The remaining three are named here so it is clear they were considered and left alone.</p>
+        <p>NASA's Human Research Program names five hazards of a Mars mission: space radiation, isolation and confinement, distance from Earth, gravity fields, and closed or hostile environments. This project addresses one of them and treats one more as a design constraint. The remaining three are named here so their status is explicit rather than implied.</p>
       </div>
       <ul class="plain">
-        <li><b>Gravity fields</b> &nbsp;<span class="tag tag-ok">MODELLED</span><br />NASA describes three gravity fields on a Mars mission &mdash; weightless transit, approximately one-third of Earth's gravity on the surface, then readaptation to Earth &mdash; and states that the transition affects spatial orientation, head-eye and hand-eye coordination, balance, and locomotion, with some crew members experiencing space motion sickness. Those are the effects the six domains instrument.</li>
+        <li><b>Gravity fields</b> &nbsp;<span class="tag tag-ok">MODELLED</span><br />NASA describes three gravity fields on a Mars mission &mdash; weightless transit, approximately one-third of Earth's gravity on the surface (0.38&nbsp;g), then readaptation to Earth &mdash; and states that the transition affects spatial orientation, head-eye and hand-eye coordination, balance, and locomotion, with some crew members experiencing space motion sickness. NASA's risk entry states the operational cost directly: ill crew members “may have trouble with mission tasks, vehicle controls, or leaving the spacecraft to perform spacewalks.” Those are the effects the six domains instrument.</li>
         <li><b>Distance from Earth</b> &nbsp;<span class="tag tag-warn">CONSTRAINT</span><br />The communication gap is treated as a design constraint, not as physiology: it sets the 0&ndash;22 minute one-way light time behind the Crew Authority Matrix and the advisory copy.</li>
         <li><b>Isolation and confinement</b> &nbsp;<span class="tag tag-simulated">REFERENCED</span><br />Behavioural responses shape the self-reported symptom domain. Nothing in that domain is a measurement we take.</li>
-        <li><b>Space radiation</b> &nbsp;<span class="tag tag-bad">NOT MODELLED</span><br />A separate hazard with a separate instrument. No dose is measured, inferred, or displayed anywhere on this site.</li>
+        <li><b>Space radiation</b> &nbsp;<span class="tag tag-bad">NOT MODELLED</span><br />A separate hazard with a separate instrument. No radiation dose is measured, inferred, or displayed anywhere on this site.</li>
         <li><b>Closed or hostile environments</b> &nbsp;<span class="tag tag-bad">NOT MODELLED</span><br />Habitat ecosystem, microbial load and immune response are outside the vestibular signal this instrument reads.</li>
       </ul>
       <p class="eyebrow">WHAT THIS DOES NOT COVER</p>
       <p class="caption">No radiation dose, no isolation or confinement score, no habitat or immune monitoring. The index covers the functional impairments NASA names for gravity transitions, and says so on every screen that shows a score.</p>
+      <p class="eyebrow">WHY IT MATTERS ON EARTH</p>
+      <p>Vestibular rehabilitation asks a patient the same question this instrument asks a crew member: is today's signal better or worse than your own reference, and did the change clear the noise floor? The Canadian Space Agency makes the link explicitly — research on astronauts “can help people suffering from balance problems, such as seniors.” The measurement does not change when the population does.</p>
+      <p class="caption">CSA, Why Do We Conduct Science Experiments in Space — asc-csa.gc.ca</p>
       <p class="eyebrow">CHALLENGE-PROVIDED RESOURCES</p>
       <p class="caption">Five Hazards of Human Spaceflight &mdash; nasa.gov/hrp/hazards &middot; Risks of Human Spaceflight &mdash; nasa.gov/hrp/risks &middot; Ongoing HRP Research in Space &mdash; nasa.gov/hrp/ongoing-hrp-research &middot; CSA, Monitoring Radiation for Astronaut Health (2026-02-26) &middot; CSA, Why Do We Conduct Science Experiments in Space &middot; Read 14 November 2026.</p>
     </div>
@@ -756,3 +760,4 @@
 </script>
 </body>
 </html>
+
